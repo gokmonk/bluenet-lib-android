@@ -1,6 +1,6 @@
 # Bluenet Android Library
 
-This android library simplifies the interaction with BLE devices running (bluenet)[https://github.com/dobots/bluenet]. For more information, have a look at the bluenet repository.
+This android library simplifies the interaction with BLE devices running [bluenet](https://github.com/dobots/bluenet). For more information, have a look at the bluenet repository.
 
 ## Copyrights
 
