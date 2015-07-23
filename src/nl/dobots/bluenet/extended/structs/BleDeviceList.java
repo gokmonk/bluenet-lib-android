@@ -51,6 +51,7 @@ public class BleDeviceList extends ArrayList<BleDevice> {
                 case descending:
                     return rhs.getRssi() - lhs.getRssi();
                 }
+                return 0;
             }
         });
     }

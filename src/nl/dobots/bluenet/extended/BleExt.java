@@ -177,7 +177,7 @@ public class BleExt {
 
             @Override
             public void onError(int error) {
-                callback.onError();
+                callback.onError(error);
             }
         });
     }
@@ -222,7 +222,7 @@ public class BleExt {
 
     public void discoverServices(IDataCallback callback) {
 
-        _bleBase.discoverServices(address, callback);
+        _bleBase.discoverServices(_targetAddress, callback);
     }
 
     public void setScanFilter(BleDeviceFilter filter) {
