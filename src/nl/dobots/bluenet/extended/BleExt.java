@@ -396,7 +396,9 @@ public class BleExt {
 		}
 	}
 
-	private CallbackRunnable _delayedDisconnect = new CallbackRunnable() {
+	private DelayedDisconnectRunnable _delayedDisconnect = null;
+
+	class DelayedDisconnectRunnable extends CallbackRunnable {
 		@Override
 		public void run() {
 			disconnectAndClose(false, new IStatusCallback() {
@@ -414,13 +416,17 @@ public class BleExt {
 					}
 				}
 			});
+			_delayedDisconnect = null;
 		}
 	};
 
 	private void delayedDisconnect(IStatusCallback callback) {
 		// todo: solve timeout issue. removing callback doesn't seem to work quite right,
 		//   the callback is still called
-		_handler.removeCallbacks(_delayedDisconnect);
+		if (_delayedDisconnect != null) {
+			_handler.removeCallbacks(_delayedDisconnect);
+		}
+		_delayedDisconnect = new DelayedDisconnectRunnable();
 		_delayedDisconnect.setCallback(callback);
 		_handler.postDelayed(_delayedDisconnect, 5000);
 	}
@@ -487,6 +493,16 @@ public class BleExt {
 		return false;
 	}
 
+	public boolean isStillConnected(IStatusCallback callback) {
+		if (isConnected(callback)) {
+			if (_delayedDisconnect != null) {
+				delayedDisconnect(callback);
+			}
+			return true;
+		}
+		return false;
+	}
+
 	///////////////////
 	// Power service //
 	///////////////////
@@ -499,7 +515,7 @@ public class BleExt {
 	}
 
 	public void readPwm(String address, final IIntegerCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			readPwm(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -538,7 +554,7 @@ public class BleExt {
 	}
 
 	public void writePwm(String address, final int value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			writePwm(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -588,7 +604,7 @@ public class BleExt {
 	}
 
 	public void togglePower(String address, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			togglePower(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -662,7 +678,7 @@ public class BleExt {
 	}
 
 	public void readCurrentConsumption(String address, final IIntegerCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			readCurrentConsumption(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -720,7 +736,7 @@ public class BleExt {
 	}
 
 	public void readCurrentCurve(String address, final IByteArrayCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			readCurrentCurve(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -759,7 +775,7 @@ public class BleExt {
 	}
 
 	public void readCurrentLimit(String address, final IIntegerCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			readCurrentLimit(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -798,7 +814,7 @@ public class BleExt {
 	}
 
 	public void writeCurrentLimit(String address, final int value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			writeCurrentLimit(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -841,7 +857,7 @@ public class BleExt {
 	}
 
 	private void writeReset(String address, final int value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			writeReset(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -896,7 +912,7 @@ public class BleExt {
 	}
 
 	public void readTemperature(String address, final IIntegerCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			readTemperature(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -935,7 +951,7 @@ public class BleExt {
 	}
 
 	public void writeMeshMessage(String address, final BleMeshMessage value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			writeMeshMessage(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -980,7 +996,7 @@ public class BleExt {
 //	}
 
 //	public void writeConfiguration(String address, final BleConfiguration value, final IStatusCallback callback) {
-//		if (isConnected(null)) {
+//		if (isStillConnected(null)) {
 //			writeConfiguration(value, callback);
 //		} else {
 //			connectAndExecute(address, new IExecuteCallback() {
@@ -1019,7 +1035,7 @@ public class BleExt {
 //	}
 
 //	public void readConfiguration(String address, final int configurationType, final IConfigurationCallback callback) {
-//		if (isConnected(null)) {
+//		if (isStillConnected(null)) {
 //			readConfiguration(configurationType, callback);
 //		} else {
 //			connectAndExecute(address, new IExecuteCallback() {
@@ -1058,7 +1074,7 @@ public class BleExt {
 	}
 
 	public void setDeviceName(String address, final String value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			setDeviceName(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1097,7 +1113,7 @@ public class BleExt {
 	}
 
 	public void getDeviceName(String address, final IStringCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			getDeviceName(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1136,7 +1152,7 @@ public class BleExt {
 	}
 
 	public void getBeaconMajor(String address, final IIntegerCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			getBeaconMajor(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1175,7 +1191,7 @@ public class BleExt {
 	}
 
 	public void setBeaconMajor(String address, final int value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			setBeaconMajor(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1214,7 +1230,7 @@ public class BleExt {
 	}
 
 	public void getBeaconMinor(String address, final IIntegerCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			getBeaconMinor(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1253,7 +1269,7 @@ public class BleExt {
 	}
 
 	public void setBeaconMinor(String address, final int value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			setBeaconMinor(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1292,7 +1308,7 @@ public class BleExt {
 	}
 
 	public void getBeaconProximityUuid(String address, final IStringCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			getBeaconProximityUuid(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1331,7 +1347,7 @@ public class BleExt {
 	}
 
 	public void setBeaconProximityUuid(String address, final String value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			setBeaconProximityUuid(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1370,7 +1386,7 @@ public class BleExt {
 	}
 
 	public void getBeaconCalibratedRssi(String address, final IIntegerCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			getBeaconCalibratedRssi(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1409,7 +1425,7 @@ public class BleExt {
 	}
 
 	public void setBeaconCalibratedRssi(String address, final int value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			setBeaconCalibratedRssi(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1448,7 +1464,7 @@ public class BleExt {
 	}
 
 	public void getDeviceType(String address, final IStringCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			getDeviceType(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1487,7 +1503,7 @@ public class BleExt {
 	}
 
 	public void setDeviceType(String address, final String value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			setDeviceType(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1526,7 +1542,7 @@ public class BleExt {
 	}
 
 	public void getFloor(String address, final IIntegerCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			getFloor(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1565,7 +1581,7 @@ public class BleExt {
 	}
 
 	public void setFloor(String address, final int value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			setFloor(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1604,7 +1620,7 @@ public class BleExt {
 	}
 
 	public void getRoom(String address, final IStringCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			getRoom(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1643,7 +1659,7 @@ public class BleExt {
 	}
 
 	public void setRoom(String address, final String value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			setRoom(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1682,7 +1698,7 @@ public class BleExt {
 	}
 
 	public void getTxPower(String address, final IIntegerCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			getTxPower(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1721,7 +1737,7 @@ public class BleExt {
 	}
 
 	public void setTxPower(String address, final int value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			setTxPower(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1760,7 +1776,7 @@ public class BleExt {
 	}
 
 	public void getAdvertisementInterval(String address, final IIntegerCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			getAdvertisementInterval(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1799,7 +1815,7 @@ public class BleExt {
 	}
 
 	public void setAdvertisementInterval(String address, final int value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			setAdvertisementInterval(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1838,7 +1854,7 @@ public class BleExt {
 	}
 
 	public void setWifi(String address, final String value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			setWifi(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1878,7 +1894,7 @@ public class BleExt {
 	}
 
 	public void getIp(String address, final IStringCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			getIp(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1921,7 +1937,7 @@ public class BleExt {
 	}
 
 	public void readTrackedDevices(String address, final IByteArrayCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			readTrackedDevices(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1960,7 +1976,7 @@ public class BleExt {
 	}
 
 	public void addTrackedDevice(String address, final BleTrackedDevice value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			addTrackedDevice(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1999,7 +2015,7 @@ public class BleExt {
 	}
 
 	public void listScannedDevices(String address, final IByteArrayCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			listScannedDevices(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2038,7 +2054,7 @@ public class BleExt {
 	}
 
 	public void writeScanDevices(String address, final boolean value, final IStatusCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			writeScanDevices(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2102,7 +2118,7 @@ public class BleExt {
 	}
 
 	public void scanForDevices(final String address, final int scanDuration, final IByteArrayCallback callback) {
-		if (isConnected(null)) {
+		if (isStillConnected(null)) {
 			scanForDevices(scanDuration, callback);
 		} else {
 			// connect and execute ...
@@ -2214,7 +2230,7 @@ public class BleExt {
 //	}
 //
 //	public void readXXX(String address, final ICallback callback) {
-//		if (isConnected(null)) {
+//		if (isStillConnected(null)) {
 //			readXXX(callback);
 //		} else {
 //			connectAndExecute(address, new IExecuteCallback() {
@@ -2253,7 +2269,7 @@ public class BleExt {
 //	}
 //
 //	public void writeXXX(String address, final zzz value, final IStatusCallback callback) {
-//		if (isConnected(null)) {
+//		if (isStillConnected(null)) {
 //			writeXXX(value, callback);
 //		} else {
 //			connectAndExecute(address, new IExecuteCallback() {

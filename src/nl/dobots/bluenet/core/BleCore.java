@@ -612,20 +612,26 @@ public class BleCore {
 		ByteBuffer bb = ByteBuffer.wrap(scanRecord);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
-		while (bb.hasRemaining()) {
-			int length = BleUtils.signedToUnsignedByte(bb.get());
-			int type = BleUtils.signedToUnsignedByte(bb.get());
-			if (type == search) {
-				byte[] result = new byte[length-1];
-				bb.get(result, 0, length-1);
-				return result;
-			} else {
-				// skip length elements
-				bb.position(bb.position() + length-1); // length also includes the type field, so only advance by length-1
+		try {
+			while (bb.hasRemaining()) {
+				int length = BleUtils.signedToUnsignedByte(bb.get());
+				int type = BleUtils.signedToUnsignedByte(bb.get());
+				if (type == search) {
+					byte[] result = new byte[length - 1];
+					bb.get(result, 0, length - 1);
+					return result;
+				} else {
+					// skip length elements
+					bb.position(bb.position() + length - 1); // length also includes the type field, so only advance by length-1
+				}
 			}
+		} catch (Exception e) {
+			LOGe("failed to parse advertisement");
+			e.printStackTrace();
 		}
 
 		return null;
+
 	}
 
 	public boolean disconnectDevice(String address, IDataCallback callback) {
