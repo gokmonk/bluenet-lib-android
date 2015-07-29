@@ -1,6 +1,7 @@
 package nl.dobots.bluenet.extended;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -52,7 +53,7 @@ public class BleExt {
 	private BleDeviceFilter _scanFilter = BleDeviceFilter.all;
 	private BleDeviceConnectionState _connectionState = BleDeviceConnectionState.uninitialized;
 
-	private Activity _context;
+	private Context _context;
 
 	private ArrayList<String> _detectedCharacteristics = new ArrayList<>();
 	private Handler _handler;
@@ -110,7 +111,7 @@ public class BleExt {
 		_bleBase.onActivityResult(requestCode, resultCode, data);
 	}
 
-	public void init(Activity context, final IStatusCallback callback) {
+	public void init(Context context, final IStatusCallback callback) {
 		_context = context;
 
 		// wrap the callback to update the connection state
