@@ -5,6 +5,6 @@ package nl.dobots.bluenet.callbacks;
  */
 public interface IStringCallback extends IBaseCallback {
 
-    void onSuccess(String value);
+	void onSuccess(String value);
 
 }

@@ -15,9 +15,9 @@ import android.util.Base64;
 import android.util.Log;
 
 public class BleUtils {
-	
+
 	private static final String TAG = BleUtils.class.getSimpleName();
-	
+
 	public static String uuidToString(UUID uuid) {
 		String uuidString = uuid.toString();
 
@@ -28,10 +28,10 @@ public class BleUtils {
 
 		return uuidString;
 	}
-	
+
 	public static UUID[] stringToUuid(String[] uuids) {
 		UUID[] result = new UUID[uuids.length];
-		
+
 		for (int i = 0; i < uuids.length; ++i) {
 			result[i] = stringToUuid(uuids[i]);
 		}
@@ -64,7 +64,7 @@ public class BleUtils {
 		UUID uuid = new UUID(msb, lsb);
 		return uuidToString(uuid);
 	}
-	
+
 	public static boolean hasCharacteristicProperty(int properties, int property) {
 		return (properties & property) == property;
 	}
@@ -86,17 +86,26 @@ public class BleUtils {
 	public static void setCharacteristic(JSONObject json, BluetoothGattCharacteristic characteristic) {
 		addProperty(json, BleCoreTypes.PROPERTY_SERVICE_UUID, BleUtils.uuidToString(characteristic.getService().getUuid()));
 		addProperty(json, BleCoreTypes.PROPERTY_CHARACTERISTIC_UUID, BleUtils.uuidToString(characteristic.getUuid()));
-    }
-    
+	}
+
 	public static void setStatus(JSONObject json, String status) {
-    	addProperty(json, BleCoreTypes.PROPERTY_STATUS, status);
-    }
-    
+		addProperty(json, BleCoreTypes.PROPERTY_STATUS, status);
+	}
+
+	public static String getStatus(JSONObject json) {
+		try {
+			return json.getString(BleCoreTypes.PROPERTY_STATUS);
+		} catch (JSONException e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+
 	public static void addBytes(JSONObject json, String field, byte[] bytes) {
 		String value = bytesToEncodedString(bytes);
 		addProperty(json, field, value);
-    }
-	
+	}
+
 	public static byte[] getBytes(JSONObject json, String field) {
 		try {
 			String value = json.getString(field);
@@ -105,14 +114,14 @@ public class BleUtils {
 			Log.e(TAG, "failed to read bytes");
 			e.printStackTrace();
 		}
-		
+
 		return null;
 	}
 
 	public static byte[] encodedStringToBytes(String encoded) {
 		return Base64.decode(encoded, Base64.NO_WRAP);
 	}
-	
+
 	public static String bytesToEncodedString(byte[] bytes) {
 		return Base64.encodeToString(bytes, Base64.NO_WRAP);
 	}
@@ -137,7 +146,7 @@ public class BleUtils {
 	public static byte[] getValue(JSONObject json) {
 		return getBytes(json, BleCoreTypes.PROPERTY_VALUE);
 	}
-	
+
 	public static void setValue(JSONObject json, byte[] value) {
 		BleUtils.addBytes(json, BleCoreTypes.PROPERTY_VALUE, value);
 	}

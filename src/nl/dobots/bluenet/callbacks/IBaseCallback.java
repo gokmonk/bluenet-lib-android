@@ -5,6 +5,6 @@ package nl.dobots.bluenet.callbacks;
  */
 public interface IBaseCallback {
 
-    void onError(int error);
+	void onError(int error);
 
 }

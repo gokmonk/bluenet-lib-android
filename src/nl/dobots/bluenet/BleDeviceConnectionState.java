@@ -5,11 +5,11 @@ package nl.dobots.bluenet;
  */
 public enum BleDeviceConnectionState {
 
-    uninitialized,
-    initialized,
-    scanning,
-    connecting,
-    connected,
-    disconnecting,
+	uninitialized,
+	initialized,
+	scanning,
+	connecting,
+	connected,
+	disconnecting,
 
 }

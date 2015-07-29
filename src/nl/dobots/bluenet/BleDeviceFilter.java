@@ -10,9 +10,9 @@ package nl.dobots.bluenet;
  */
 public enum BleDeviceFilter {
 
-    all,
-    crownstone,
-    doBeacon,
-    iBeacon
+	all,
+	crownstone,
+	doBeacon,
+	iBeacon
 
 }

@@ -10,16 +10,20 @@ import java.util.UUID;
 import nl.dobots.bluenet.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.callbacks.IConfigurationCallback;
 import nl.dobots.bluenet.callbacks.IDataCallback;
+import nl.dobots.bluenet.callbacks.IDiscoveryCallback;
 import nl.dobots.bluenet.callbacks.IIntegerCallback;
 import nl.dobots.bluenet.callbacks.IStatusCallback;
 import nl.dobots.bluenet.callbacks.IStringCallback;
-import nl.dobots.bluenet.callbacks.IWriteCallback;
+import nl.dobots.bluenet.callbacks.IStatusCallback;
 import nl.dobots.bluenet.core.BleCore;
 import nl.dobots.bluenet.core.BleCoreTypes;
+import nl.dobots.bluenet.extended.BleExtTypes;
 import nl.dobots.bluenet.structs.BleConfiguration;
 import nl.dobots.bluenet.structs.BleMeshMessage;
 import nl.dobots.bluenet.structs.BleTrackedDevice;
 
+import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 public class BleBase extends BleCore {
@@ -82,7 +86,42 @@ public class BleBase extends BleCore {
 
 	}
 
-	// Crownstone specific characteristic operations 
+	public void discoverServices(String address, final IDiscoveryCallback callback) {
+		// todo: CONTINUE here
+		super.discoverServices(address, new IDataCallback() {
+			@Override
+			public void onData(JSONObject json) {
+				try {
+					JSONArray services = json.getJSONArray(BleExtTypes.PROPERTY_SERVICES_LIST);
+					for (int i = 0; i < services.length(); i++) {
+						JSONObject service = services.getJSONObject(i);
+						String serviceUuid = service.getString(BleExtTypes.PROPERTY_SERVICE_UUID);
+						JSONArray characteristics = service.getJSONArray(BleExtTypes.PROPERTY_CHARACTERISTICS_LIST);
+						for (int j = 0; j < characteristics.length(); j++) {
+							JSONObject charac = characteristics.getJSONObject(j);
+							String characteristicUuid = charac.getString(BleExtTypes.PROPERTY_CHARACTERISTIC_UUID);
+							LOGd("found service %s with characteristic %s", serviceUuid, characteristicUuid);
+							callback.onDiscovery(serviceUuid, characteristicUuid);
+						}
+					}
+					callback.onSuccess();
+				} catch (JSONException e) {
+					LOGe("failed to parse discovery json");
+					callback.onError(BleExtTypes.ERROR_JSON_PARSING);
+					e.printStackTrace();
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
+
+
+
+	// Crownstone specific characteristic operations
 
 	public void readTemperature(String address, final IIntegerCallback callback) {
 		LOGd("read Temperature at service %s and characteristic %s", BleTypes.GENERAL_SERVICE_UUID, BleTypes.CHAR_TEMPERATURE_UUID);
@@ -103,7 +142,7 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	public void writePWM(String address, int value, final IWriteCallback callback) {
+	public void writePWM(String address, int value, final IStatusCallback callback) {
 		LOGd("write %d at service %s and characteristic %s", value, BleTypes.POWER_SERVICE_UUID, BleTypes.CHAR_PWM_UUID);
 		write(address, BleTypes.POWER_SERVICE_UUID, BleTypes.CHAR_PWM_UUID, new byte[]{(byte) value},
 				new IStatusCallback() {
@@ -120,13 +159,13 @@ public class BleBase extends BleCore {
 						callback.onError(error);
 					}
 
-//			@Override
-//			public void onData(JSONObject json) {
-//				// not interested
+//          @Override
+//          public void onData(JSONObject json) {
+//              // not interested
 //
-//				// theoretically, could check if the value that was actually written is the value we
-//				// wanted to write. but do we need to?
-//			}
+//              // theoretically, could check if the value that was actually written is the value we
+//              // wanted to write. but do we need to?
+//          }
 				});
 	}
 
@@ -143,33 +182,34 @@ public class BleBase extends BleCore {
 			@Override
 			public void onData(JSONObject json) {
 				byte[] bytes = BleUtils.getValue(json);
-				LOGd("pwm: %d", bytes[0]);
-				callback.onSuccess(bytes[0]);
+				int result = BleUtils.signedToUnsignedByte(bytes[0]);
+				LOGd("pwm: %d", result);
+				callback.onSuccess(result);
 			}
 		});
 	}
 
-	public void scanDevices(String address, boolean scan, final IWriteCallback callback) {
+	public void scanDevices(String address, boolean scan, final IStatusCallback callback) {
 		int value = scan ? 1 : 0;
-		LOGd("scanDevices: write %d at service %s and characteristic %s", value, BleTypes.INDOOR_LOCALIZATION_SERVICE_UUID, BleTypes.CHAR_DEVICE_SCAN_UUID);
+		LOGd("writeScanDevices: write %d at service %s and characteristic %s", value, BleTypes.INDOOR_LOCALIZATION_SERVICE_UUID, BleTypes.CHAR_DEVICE_SCAN_UUID);
 		write(address, BleTypes.INDOOR_LOCALIZATION_SERVICE_UUID, BleTypes.CHAR_DEVICE_SCAN_UUID, new byte[]{(byte) value},
 				new IStatusCallback() {
 
 					@Override
 					public void onSuccess() {
-						LOGd("Successfully written to scanDevices characteristic");
+						LOGd("Successfully written to writeScanDevices characteristic");
 						callback.onSuccess();
 					}
 
 					@Override
 					public void onError(int error) {
-						LOGe("Failed to write to scanDevices characteristic");
+						LOGe("Failed to write to writeScanDevices characteristic");
 						callback.onError(error);
 					}
 				});
 	}
 
-	public void listDevices(String address, final IByteArrayCallback callback) {
+	public void listScannedDevices(String address, final IByteArrayCallback callback) {
 		LOGd("read device list at service %s and characteristic %s", BleTypes.CHAR_DEVICE_LIST_UUID, BleTypes.INDOOR_LOCALIZATION_SERVICE_UUID);
 		read(address, BleTypes.CHAR_DEVICE_LIST_UUID, BleTypes.INDOOR_LOCALIZATION_SERVICE_UUID, new IDataCallback() {
 			@Override
@@ -208,7 +248,7 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	public void sampleCurrent(String address, int value, final IWriteCallback callback) {
+	public void sampleCurrent(String address, int value, final IStatusCallback callback) {
 		LOGd("sample current: write %d at service %s and characteristic %s", value, BleTypes.POWER_SERVICE_UUID, BleTypes.CHAR_SAMPLE_CURRENT_UUID);
 		write(address, BleTypes.POWER_SERVICE_UUID, BleTypes.CHAR_SAMPLE_CURRENT_UUID, new byte[]{(byte) value},
 				new IStatusCallback() {
@@ -245,7 +285,7 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	public void setFloor(String address, int value, final IWriteCallback callback) {
+	public void setFloor(String address, int value, final IStatusCallback callback) {
 		BleConfiguration configuration = new BleConfiguration(BleTypes.CONFIG_TYPE_FLOOR, 1, new byte[] {(byte)value});
 		writeConfiguration(address, configuration, callback);
 	}
@@ -256,7 +296,7 @@ public class BleBase extends BleCore {
 			public void onSuccess(BleConfiguration configuration) {
 				if (configuration.getLength() != 1) {
 					LOGe("Wrong length parameter: %s", configuration.getLength());
-					onError(BleCoreTypes.WRONG_LENGTH_PARAMETER);
+					onError(BleCoreTypes.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int floor = configuration.getPayload()[0];
 					LOGd("floor: %d", floor);
@@ -271,12 +311,33 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	public void setWifi(String address, String value, final IWriteCallback callback) {
+	public void setWifi(String address, String value, final IStatusCallback callback) {
 		BleConfiguration configuration = new BleConfiguration(BleTypes.CONFIG_TYPE_WIFI, value.length(), value.getBytes());
 		writeConfiguration(address, configuration, callback);
 	}
 
-	public void setTxPower(String address, int value, final IWriteCallback callback) {
+	public void getIp(String address, final IStringCallback callback) {
+		getConfiguration(address, BleTypes.CONFIG_TYPE_WIFI, new IConfigurationCallback() {
+			@Override
+			public void onSuccess(BleConfiguration configuration) {
+				if (configuration.getLength() == 0) {
+					LOGe("empty name received!");
+					onError(BleCoreTypes.ERROR_EMPTY_VALUE);
+				} else {
+					String deviceName = new String(configuration.getPayload());
+					LOGd("device name: %s", deviceName);
+					callback.onSuccess(deviceName);
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
+
+	public void setTxPower(String address, int value, final IStatusCallback callback) {
 		BleConfiguration configuration = new BleConfiguration(BleTypes.CONFIG_TYPE_TX_POWER, 1, new byte[]{(byte)value});
 		writeConfiguration(address, configuration, callback);
 	}
@@ -287,7 +348,7 @@ public class BleBase extends BleCore {
 			public void onSuccess(BleConfiguration configuration) {
 				if (configuration.getLength() != 1) {
 					LOGe("Wrong length parameter: %s", configuration.getLength());
-					onError(BleCoreTypes.WRONG_LENGTH_PARAMETER);
+					onError(BleCoreTypes.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int txPower = configuration.getPayload()[0];
 					LOGd("tx power: %d", txPower);
@@ -310,7 +371,7 @@ public class BleBase extends BleCore {
 	 * @param value advertisement interval (in ms)
 	 * @param callback
 	 */
-	public void setAdvertisementInterval(String address, int value, final IWriteCallback callback) {
+	public void setAdvertisementInterval(String address, int value, final IStatusCallback callback) {
 		// convert ms to value used by the crownstone (which is in increments of 0.625 ms)
 		int advertisementInterval = (int)Math.floor(value / ADVERTISEMENT_INCREMENT);
 		BleConfiguration configuration = new BleConfiguration(BleTypes.CONFIG_TYPE_ADV_INTERVAL, 2, BleUtils.shortToByteArray(advertisementInterval));
@@ -323,7 +384,7 @@ public class BleBase extends BleCore {
 			public void onSuccess(BleConfiguration configuration) {
 				if (configuration.getLength() != 2) {
 					LOGe("Wrong length parameter: %s", configuration.getLength());
-					onError(BleCoreTypes.WRONG_LENGTH_PARAMETER);
+					onError(BleCoreTypes.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int advertisementInterval = (int) (BleUtils.byteArrayToShort(configuration.getPayload()) * ADVERTISEMENT_INCREMENT);
 					LOGd("advertisement interval: %d", advertisementInterval);
@@ -338,7 +399,7 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	public void setBeaconMajor(String address, int value, final IWriteCallback callback) {
+	public void setBeaconMajor(String address, int value, final IStatusCallback callback) {
 		BleConfiguration configuration = new BleConfiguration(BleTypes.CONFIG_TYPE_IBEACON_MAJOR, 2, BleUtils.shortToByteArray(value));
 		writeConfiguration(address, configuration, callback);
 	}
@@ -349,7 +410,7 @@ public class BleBase extends BleCore {
 			public void onSuccess(BleConfiguration configuration) {
 				if (configuration.getLength() != 2) {
 					LOGe("Wrong length parameter: %s", configuration.getLength());
-					onError(BleCoreTypes.WRONG_LENGTH_PARAMETER);
+					onError(BleCoreTypes.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int major = BleUtils.byteArrayToShort(configuration.getPayload());
 					LOGd("major: %d", major);
@@ -364,7 +425,7 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	public void setBeaconMinor(String address, int value, final IWriteCallback callback) {
+	public void setBeaconMinor(String address, int value, final IStatusCallback callback) {
 		BleConfiguration configuration = new BleConfiguration(BleTypes.CONFIG_TYPE_IBEACON_MINOR, 2, BleUtils.shortToByteArray(value));
 		writeConfiguration(address, configuration, callback);
 	}
@@ -375,7 +436,7 @@ public class BleBase extends BleCore {
 			public void onSuccess(BleConfiguration configuration) {
 				if (configuration.getLength() != 2) {
 					LOGe("Wrong length parameter: %s", configuration.getLength());
-					onError(BleCoreTypes.WRONG_LENGTH_PARAMETER);
+					onError(BleCoreTypes.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int minor = BleUtils.byteArrayToShort(configuration.getPayload());
 					LOGd("major: %d", minor);
@@ -390,7 +451,7 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	public void setBeaconCalibratedRssi(String address, int value, final IWriteCallback callback) {
+	public void setBeaconCalibratedRssi(String address, int value, final IStatusCallback callback) {
 		BleConfiguration configuration = new BleConfiguration(BleTypes.CONFIG_TYPE_IBEACON_RSSI, 1, new byte[]{(byte)value});
 		writeConfiguration(address, configuration, callback);
 	}
@@ -401,7 +462,7 @@ public class BleBase extends BleCore {
 			public void onSuccess(BleConfiguration configuration) {
 				if (configuration.getLength() != 1) {
 					LOGe("Wrong length parameter: %s", configuration.getLength());
-					onError(BleCoreTypes.WRONG_LENGTH_PARAMETER);
+					onError(BleCoreTypes.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int calibratedRssi = configuration.getPayload()[0];
 					LOGd("rssi at 1 m: %d", calibratedRssi);
@@ -416,7 +477,7 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	public void setBeaconProximityUuid(String address, String value, final IWriteCallback callback) {
+	public void setBeaconProximityUuid(String address, String value, final IStatusCallback callback) {
 		byte[] bytes = BleUtils.uuidToBytes(value);
 		BleConfiguration configuration = new BleConfiguration(BleTypes.CONFIG_TYPE_IBEACON_PROXIMITY_UUID, bytes.length, bytes);
 		writeConfiguration(address, configuration, callback);
@@ -428,7 +489,7 @@ public class BleBase extends BleCore {
 			public void onSuccess(BleConfiguration configuration) {
 				if (configuration.getLength() != 16) {
 					LOGe("Wrong length parameter: %s", configuration.getLength());
-					onError(BleCoreTypes.WRONG_LENGTH_PARAMETER);
+					onError(BleCoreTypes.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					String proximityUuid = BleUtils.bytesToUuid(configuration.getPayload());
 					LOGd("proximity UUID: %s", proximityUuid);
@@ -443,7 +504,7 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	public void setDeviceName(String address, String value, final IWriteCallback callback) {
+	public void setDeviceName(String address, String value, final IStatusCallback callback) {
 		byte[] bytes = value.getBytes();
 		BleConfiguration configuration = new BleConfiguration(BleTypes.CONFIG_TYPE_NAME, bytes.length, bytes);
 		writeConfiguration(address, configuration, callback);
@@ -455,7 +516,7 @@ public class BleBase extends BleCore {
 			public void onSuccess(BleConfiguration configuration) {
 				if (configuration.getLength() == 0) {
 					LOGe("empty name received!");
-					onError(BleCoreTypes.EMPTY_VALUE);
+					onError(BleCoreTypes.ERROR_EMPTY_VALUE);
 				} else {
 					String deviceName = new String(configuration.getPayload());
 					LOGd("device name: %s", deviceName);
@@ -470,7 +531,7 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	public void setDeviceType(String address, String value, final IWriteCallback callback) {
+	public void setDeviceType(String address, String value, final IStatusCallback callback) {
 		byte[] bytes = value.getBytes();
 		BleConfiguration configuration = new BleConfiguration(BleTypes.CONFIG_TYPE_DEVICE_TYPE, bytes.length, bytes);
 		writeConfiguration(address, configuration, callback);
@@ -482,7 +543,7 @@ public class BleBase extends BleCore {
 			public void onSuccess(BleConfiguration configuration) {
 				if (configuration.getLength() == 0) {
 					LOGe("empty device type received!");
-					onError(BleCoreTypes.EMPTY_VALUE);
+					onError(BleCoreTypes.ERROR_EMPTY_VALUE);
 				} else {
 					String deviceType = new String(configuration.getPayload());
 					LOGd("device type: %s", deviceType);
@@ -497,7 +558,7 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	public void setRoom(String address, String value, final IWriteCallback callback) {
+	public void setRoom(String address, String value, final IStatusCallback callback) {
 		byte[] bytes = value.getBytes();
 		BleConfiguration configuration = new BleConfiguration(BleTypes.CONFIG_TYPE_ROOM, bytes.length, bytes);
 		writeConfiguration(address, configuration, callback);
@@ -509,7 +570,7 @@ public class BleBase extends BleCore {
 			public void onSuccess(BleConfiguration configuration) {
 				if (configuration.getLength() == 0) {
 					LOGe("empty room received!");
-					onError(BleCoreTypes.EMPTY_VALUE);
+					onError(BleCoreTypes.ERROR_EMPTY_VALUE);
 				} else {
 					String room = new String(configuration.getPayload());
 					LOGd("room: %s", room);
@@ -532,7 +593,7 @@ public class BleBase extends BleCore {
 	 * @param callback callback functions to be called on success or error
 	 */
 	public void getConfiguration(final String address, int configurationType, final IConfigurationCallback callback) {
-		selectConfiguration(address, configurationType, new IWriteCallback() {
+		selectConfiguration(address, configurationType, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
 				// todo: do we need a timeout here?
@@ -550,8 +611,8 @@ public class BleBase extends BleCore {
 			}
 		});
 	}
-	
-	public void writeConfiguration(String address, BleConfiguration configuration, final IWriteCallback callback) {
+
+	public void writeConfiguration(String address, BleConfiguration configuration, final IStatusCallback callback) {
 		byte[] bytes = configuration.toArray();
 		LOGd("configuration: write %s at service %s and characteristic %s", Arrays.toString(bytes), BleTypes.GENERAL_SERVICE_UUID, BleTypes.CHAR_SET_CONFIGURATION_UUID);
 		write(address, BleTypes.GENERAL_SERVICE_UUID, BleTypes.CHAR_SET_CONFIGURATION_UUID, bytes,
@@ -561,12 +622,12 @@ public class BleBase extends BleCore {
 					public void onSuccess() {
 						LOGd("Successfully written to configuration characteristic");
 						// todo: do we need a timeout here?
-//						_timeoutHandler.postDelayed(new Runnable() {
-//							@Override
-//							public void run() {
+//                      _timeoutHandler.postDelayed(new Runnable() {
+//                          @Override
+//                          public void run() {
 						callback.onSuccess();
-//							}
-//						}, 500);
+//                          }
+//                      }, 500);
 					}
 
 					@Override
@@ -577,7 +638,7 @@ public class BleBase extends BleCore {
 				});
 	}
 
-	public void selectConfiguration(String address, int configurationType, final IWriteCallback callback) {
+	public void selectConfiguration(String address, int configurationType, final IStatusCallback callback) {
 		LOGd("select configuration: write %d at service %s and characteristic %s", configurationType, BleTypes.GENERAL_SERVICE_UUID, BleTypes.CHAR_SELECT_CONFIGURATION_UUID);
 		write(address, BleTypes.GENERAL_SERVICE_UUID, BleTypes.CHAR_SELECT_CONFIGURATION_UUID, new byte[]{(byte) configurationType},
 				new IStatusCallback() {
@@ -615,7 +676,7 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	public void writeMeshMessage(String address, BleMeshMessage message, final IWriteCallback callback) {
+	public void writeMeshMessage(String address, BleMeshMessage message, final IStatusCallback callback) {
 		LOGd("mesh message: write %s at service %s and characteristic %s", message.toString(), BleTypes.GENERAL_SERVICE_UUID, BleTypes.CHAR_MESH_UUID);
 		write(address, BleTypes.GENERAL_SERVICE_UUID, BleTypes.CHAR_MESH_UUID, message.toArray(),
 				new IStatusCallback() {
@@ -634,7 +695,7 @@ public class BleBase extends BleCore {
 				});
 	}
 
-	public void writeCurrentLimit(String address, int value, final IWriteCallback callback) {
+	public void writeCurrentLimit(String address, int value, final IStatusCallback callback) {
 		LOGd("current limit: write %d at service %s and characteristic %s", value, BleTypes.POWER_SERVICE_UUID, BleTypes.CHAR_CURRENT_LIMIT_UUID);
 		write(address, BleTypes.POWER_SERVICE_UUID, BleTypes.CHAR_CURRENT_LIMIT_UUID, new byte[]{(byte)value},
 				new IStatusCallback() {
@@ -691,7 +752,7 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	public void addTrackedDevice(String address, BleTrackedDevice device, final IWriteCallback callback) {
+	public void addTrackedDevice(String address, BleTrackedDevice device, final IStatusCallback callback) {
 		LOGd("add tracked device: write %d at service %s and characteristic %s", device.toString(), BleTypes.INDOOR_LOCALIZATION_SERVICE_UUID, BleTypes.CHAR_ADD_TRACKED_DEVICE_UUID);
 		write(address, BleTypes.INDOOR_LOCALIZATION_SERVICE_UUID, BleTypes.CHAR_ADD_TRACKED_DEVICE_UUID, device.toArray(),
 				new IStatusCallback() {
@@ -710,12 +771,30 @@ public class BleBase extends BleCore {
 				});
 	}
 
+	public void writeReset(String address, int value, final IStatusCallback callback) {
+		LOGd("reset: write %d at service %s and characteristic %s", value, BleTypes.GENERAL_SERVICE_UUID, BleTypes.CHAR_RESET_UUID);
+		write(address, BleTypes.GENERAL_SERVICE_UUID, BleTypes.CHAR_RESET_UUID, new byte[]{(byte)value},
+				new IStatusCallback() {
+
+					@Override
+					public void onSuccess() {
+						LOGd("Successfully written to reset characteristic");
+						callback.onSuccess();
+					}
+
+					@Override
+					public void onError(int error) {
+						LOGe("Failed to write to reset characteristic");
+						callback.onError(error);
+					}
+				});
+	}
 
 
 
 
-	
-	
+
+
 
 /*
 	public void readTemplate(String address, final IIntegerCallback callback) {
@@ -737,7 +816,7 @@ public class BleBase extends BleCore {
 	}
 
 
-	public void writeTemplate(String address, int value, final IWriteCallback callback) {
+	public void writeTemplate(String address, int value, final IStatusCallback callback) {
 		LOGd("xxx: write %d at service %s and characteristic %s", uuu, BleTypes.yyy, BleTypes.zzz);
 		write(address, BleTypes.yyy, BleTypes.zzz, new byte[]{uuu},
 				new IStatusCallback() {

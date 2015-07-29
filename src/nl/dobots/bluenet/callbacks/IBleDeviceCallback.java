@@ -7,6 +7,6 @@ import nl.dobots.bluenet.extended.structs.BleDevice;
  */
 public interface IBleDeviceCallback extends IBaseCallback {
 
-    void onSuccess(BleDevice device);
+	void onSuccess(BleDevice device);
 
 }

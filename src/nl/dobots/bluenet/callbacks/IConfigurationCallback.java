@@ -7,6 +7,6 @@ import nl.dobots.bluenet.structs.BleConfiguration;
  */
 public interface IConfigurationCallback extends IBaseCallback {
 
-    void onSuccess(BleConfiguration configuration);
+	void onSuccess(BleConfiguration configuration);
 
 }

@@ -7,6 +7,9 @@ import nl.dobots.bluenet.BleBaseTypes;
  */
 public class BleExtTypes extends BleBaseTypes {
 
-    public static final int WRONG_STATE = 500;
+	private static final int BASE = 500;
+
+	public static final int ERROR_WRONG_STATE = BASE;
+	public static final int ERROR_JSON_PARSING = BASE + 1;
 
 }

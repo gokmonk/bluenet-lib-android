@@ -5,6 +5,6 @@ package nl.dobots.bluenet.callbacks;
  */
 public interface IByteArrayCallback extends IBaseCallback {
 
-    void onSuccess(byte[] result);
+	void onSuccess(byte[] result);
 
 }
