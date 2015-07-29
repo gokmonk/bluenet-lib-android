@@ -1,13 +1,15 @@
 package nl.dobots.bluenet.extended.structs;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 
 /**
  * Created by dominik on 15-7-15.
  */
-public class BleDeviceList extends ArrayList<BleDevice> {
+public class BleDeviceMap extends HashMap<String, BleDevice> {
 
 	public enum SortOrder {
 		ascending,
@@ -15,34 +17,25 @@ public class BleDeviceList extends ArrayList<BleDevice> {
 	}
 
 	public BleDevice getDevice(String address) {
-		for (BleDevice dev : this) {
-			if (dev.getAddress().matches(address)) {
-				return dev;
-			}
-		}
-		return null;
+		return get(address);
 	}
 
 	public boolean contains(BleDevice device) {
-		return getDevice(device.getAddress()) != null;
+		return containsKey(device.getAddress());
 	}
 
 	public void updateDevice(BleDevice device) {
-		BleDevice storedDevice = getDevice(device.getAddress());
-		if (storedDevice == null) {
-			add(device);
-		} else {
-			int index = indexOf(storedDevice);
-			set(index, device);
-		}
+		put(device.getAddress(), device);
 	}
 
-	public void sort() {
-		sort(SortOrder.descending);
+	public ArrayList<BleDevice> getSortedList() {
+		return getSortedList(SortOrder.descending);
 	}
 
-	public void sort(final SortOrder order) {
-		Collections.sort(this, new Comparator<BleDevice>() {
+	public ArrayList<BleDevice> getSortedList(final SortOrder order) {
+		ArrayList<BleDevice> result = new ArrayList<>();
+		result.addAll(values());
+		Collections.sort(result, new Comparator<BleDevice>() {
 			@Override
 			public int compare(BleDevice lhs, BleDevice rhs) {
 				switch (order) {
@@ -54,10 +47,7 @@ public class BleDeviceList extends ArrayList<BleDevice> {
 				return 0;
 			}
 		});
-	}
-
-	public BleDeviceList clone() {
-		return (BleDeviceList)super.clone();
+		return result;
 	}
 
 }

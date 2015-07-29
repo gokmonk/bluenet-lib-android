@@ -28,7 +28,7 @@ import nl.dobots.bluenet.callbacks.IStatusCallback;
 import nl.dobots.bluenet.callbacks.IStringCallback;
 import nl.dobots.bluenet.core.BleCoreTypes;
 import nl.dobots.bluenet.extended.structs.BleDevice;
-import nl.dobots.bluenet.extended.structs.BleDeviceList;
+import nl.dobots.bluenet.extended.structs.BleDeviceMap;
 import nl.dobots.bluenet.structs.BleMeshMessage;
 import nl.dobots.bluenet.structs.BleTrackedDevice;
 
@@ -45,7 +45,7 @@ public class BleExt {
 
 	private BleBase _bleBase;
 
-	private BleDeviceList _devices = new BleDeviceList();
+	private BleDeviceMap _devices = new BleDeviceMap();
 
 	private String _targetAddress;
 
@@ -98,7 +98,7 @@ public class BleExt {
 		return _targetAddress;
 	}
 
-	public BleDeviceList getDeviceList() {
+	public BleDeviceMap getDeviceMap() {
 		return _devices;
 	}
 
@@ -170,7 +170,6 @@ public class BleExt {
 				}
 
 				_devices.updateDevice(device);
-				_devices.sort();
 				callback.onData(json);
 			}
 
@@ -422,7 +421,7 @@ public class BleExt {
 		//   the callback is still called
 		_handler.removeCallbacks(_delayedDisconnect);
 		_delayedDisconnect.setCallback(callback);
-		_handler.postDelayed(_delayedDisconnect, 2000);
+		_handler.postDelayed(_delayedDisconnect, 5000);
 	}
 
 	public int counter = 0;
