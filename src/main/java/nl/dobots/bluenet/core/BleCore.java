@@ -151,11 +151,13 @@ public class BleCore {
 				case BluetoothAdapter.STATE_OFF:
 					_connections = new HashMap<>();
 					_scanCallback = null;
+					_initialized = false;
 
 					_initCallback.onError(BleCoreTypes.ERROR_BLUETOOTH_TURNED_OFF);
 					break;
 				case BluetoothAdapter.STATE_ON:
 
+					_initialized = true;
 					_initCallback.onSuccess();
 					break;
 				}
@@ -198,6 +200,7 @@ public class BleCore {
 			if (context instanceof Activity) {
 				((Activity)_context).startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
 			} else {
+				enableBtIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 				_context.startActivity(enableBtIntent);
 			}
 		} else {
