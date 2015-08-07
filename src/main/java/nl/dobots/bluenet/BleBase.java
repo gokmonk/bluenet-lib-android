@@ -57,6 +57,8 @@ public class BleBase extends BleCore {
 					if (companyID == BleTypes.DOBOTS_COMPANY_ID) {
 						BleUtils.addProperty(json, BleBaseTypes.PROPERTY_IS_CROWNSTONE, true);
 					}
+				} else {
+					LOGd("json: " + json.toString());
 				}
 				callback.onData(json);
 

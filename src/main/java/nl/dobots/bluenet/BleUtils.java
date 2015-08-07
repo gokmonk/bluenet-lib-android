@@ -16,7 +16,7 @@ import android.util.Log;
 
 public class BleUtils {
 
-	private static final String TAG = BleUtils.class.getSimpleName();
+	private static final String TAG = BleUtils.class.getCanonicalName();
 
 	public static String uuidToString(UUID uuid) {
 		String uuidString = uuid.toString();

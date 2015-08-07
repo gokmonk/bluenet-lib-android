@@ -38,11 +38,9 @@ import nl.dobots.bluenet.structs.BleTrackedDevice;
  */
 public class BleExt {
 
-	private static final String TAG = BleExt.class.getSimpleName();
-
+	private static final String TAG = BleExt.class.getCanonicalName();
 
 	private static final int CONNECT_TIMEOUT = 10; // 5 seconds
-
 
 	private BleBase _bleBase;
 
@@ -100,6 +98,8 @@ public class BleExt {
 	}
 
 	public BleDeviceMap getDeviceMap() {
+		// make sure it is refreshed
+		_devices.refresh();
 		return _devices;
 	}
 
@@ -130,20 +130,37 @@ public class BleExt {
 		});
 	}
 
+	public void finish() {
+		_bleBase.finish();
+	}
+
 	/**
-	 * Returns a raw json object. To get an already parsed BleDevice object, use the
-	 * overloaded function instead
+	 * Returns an object of type BleDevice which is an already parsed json object
+	 * clears the device list on start
 	 * @param callback
 	 * @return
 	 */
-	public boolean startScan(final IDataCallback callback) {
+	public boolean startScan(final IBleDeviceCallback callback) {
+		_devices.clear();
+		return startEndlessScan(callback);
+	}
+
+	/**
+	 * Starts a scan without clearing the device list
+	 * @param callback
+	 * @return
+	 */
+	public boolean startIntervalScan(final IBleDeviceCallback callback) {
+		return startEndlessScan(callback);
+	}
+
+	private boolean startEndlessScan(final IBleDeviceCallback callback) {
 		if (_connectionState != BleDeviceConnectionState.initialized) {
 			LOGe("State is not initialized: %s", _connectionState.toString());
 			callback.onError(BleExtTypes.ERROR_WRONG_STATE);
 			return false;
 		}
 
-		_devices.clear();
 		_connectionState = BleDeviceConnectionState.scanning;
 
 		return _bleBase.startEndlessScan(new IDataCallback() {
@@ -153,8 +170,9 @@ public class BleExt {
 				try {
 					device = new BleDevice(json);
 				} catch (JSONException e) {
-					LOGe("Failed to parse json into device!");
-					e.printStackTrace();
+					LOGe("Failed to parse json into device! Err: " + e.getMessage());
+					LOGd("json: " + json.toString());
+//					e.printStackTrace();
 					return;
 				}
 
@@ -170,35 +188,8 @@ public class BleExt {
 						break;
 				}
 
-				_devices.updateDevice(device);
-				callback.onData(json);
-			}
-
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
-	}
-
-	/**
-	 * Returns an object of type BleDevice which is an already parsed json object
-	 * If you want to get the raw json object, use the overloaded function instead
-	 * @param callback
-	 * @return
-	 */
-	public boolean startScan(final IBleDeviceCallback callback) {
-		return startScan(new IDataCallback() {
-			@Override
-			public void onData(JSONObject json) {
-				try {
-					BleDevice device = _devices.getDevice(json.getString(BleExtTypes.PROPERTY_ADDRESS));
-					callback.onSuccess(device);
-				} catch (JSONException e) {
-					// should not happen, otherwise it would have happened in the other
-					// startScan function already!
-					e.printStackTrace();
-				}
+				device = _devices.updateDevice(device);
+				callback.onSuccess(device);
 			}
 
 			@Override

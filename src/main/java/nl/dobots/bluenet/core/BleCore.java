@@ -40,7 +40,7 @@ import android.util.Log;
 
 public class BleCore {
 
-	private static final String TAG = BleCore.class.getSimpleName();
+	private static final String TAG = BleCore.class.getCanonicalName();
 
 	// Activity Result
 	public static final int REQUEST_ENABLE_BT = 100;
@@ -123,9 +123,9 @@ public class BleCore {
 
 
 	public BleCore() {
-		HandlerThread _timeoutThread = new HandlerThread("TimeoutHandler");
-		_timeoutThread.start();
-		_timeoutHandler = new Handler(_timeoutThread.getLooper());
+		HandlerThread timeoutThread = new HandlerThread("TimeoutHandler");
+		timeoutThread.start();
+		_timeoutHandler = new Handler(timeoutThread.getLooper());
 	}
 
 	@Override
@@ -211,6 +211,18 @@ public class BleCore {
 
 	}
 
+	/**
+	 * Reset all callbacks.
+	 */
+	public void finish() {
+		_initialized = false;
+		_connectionCallback = null;
+		_discoveryCallback = null;
+		_initCallback = null;
+		_scanCallback = null;
+		_characteristicsReadCallback = null;
+		_characteristicsWriteCallback = null;
+	}
 
 	public void onActivityResult(int requestCode, int resultCode, Intent data) {
 		switch (requestCode) {
@@ -222,7 +234,9 @@ public class BleCore {
 			// be done with simply checking if the adapter is enabled
 			if (!_bluetoothAdapter.isEnabled()) {
 				_initialized = false;
-				_initCallback.onError(BleCoreTypes.ERROR_BLUETOOTH_NOT_ENABLED);
+				if (_initCallback != null) {
+					_initCallback.onError(BleCoreTypes.ERROR_BLUETOOTH_NOT_ENABLED);
+				}
 			}
 //			if (resultCode == Activity.RESULT_OK) {
 //				if (_bluetoothAdapter.isEnabled()) {
@@ -574,10 +588,10 @@ public class BleCore {
 			return false;
 		}
 
-		if (!isScanning()) {
-			callback.onError(BleCoreTypes.ERROR_NOT_SCANNING);
-			return false;
-		}
+//		if (!isScanning()) {
+//			callback.onError(BleCoreTypes.ERROR_NOT_SCANNING);
+//			return false;
+//		}
 
 		_bluetoothAdapter.stopLeScan(scanCallback);
 		_scanCallback = null;
@@ -630,7 +644,8 @@ public class BleCore {
 			}
 		} catch (Exception e) {
 			LOGe("failed to parse advertisement");
-			e.printStackTrace();
+//			e.printStackTrace();
+			return null;
 		}
 
 		return null;
