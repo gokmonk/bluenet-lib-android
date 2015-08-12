@@ -8,7 +8,21 @@ import java.util.Iterator;
 import java.util.Map;
 
 /**
- * Created by dominik on 15-7-15.
+ * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
+ * <p/>
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 3, as
+ * published by the Free Software Foundation.
+ * <p/>
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 3 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * <p/>
+ * Created on 15-7-15
+ *
+ * @author Dominik Egger
  */
 public class BleDeviceMap extends HashMap<String, BleDevice> {
 
@@ -36,18 +50,18 @@ public class BleDeviceMap extends HashMap<String, BleDevice> {
 		}
 	}
 
-	public ArrayList<BleDevice> getList() {
-		ArrayList<BleDevice> result = new ArrayList<>();
+	public BleDeviceList getList() {
+		BleDeviceList result = new BleDeviceList();
 		result.addAll(values());
 		return result;
 	}
 
-	public ArrayList<BleDevice> getRssiSortedList() {
+	public BleDeviceList getRssiSortedList() {
 		return getRssiSortedList(SortOrder.descending);
 	}
 
-	public ArrayList<BleDevice> getRssiSortedList(final SortOrder order) {
-		ArrayList<BleDevice> result = new ArrayList<>();
+	public BleDeviceList getRssiSortedList(final SortOrder order) {
+		BleDeviceList result = new BleDeviceList();
 		result.addAll(values());
 		Collections.sort(result, new Comparator<BleDevice>() {
 			@Override
@@ -66,8 +80,8 @@ public class BleDeviceMap extends HashMap<String, BleDevice> {
 		return result;
 	}
 
-	public ArrayList<BleDevice> getDistanceSortedList() {
-		ArrayList<BleDevice> result = new ArrayList<>();
+	public BleDeviceList getDistanceSortedList() {
+		BleDeviceList result = new BleDeviceList();
 		result.addAll(values());
 		Collections.sort(result, new Comparator<BleDevice>() {
 			@Override

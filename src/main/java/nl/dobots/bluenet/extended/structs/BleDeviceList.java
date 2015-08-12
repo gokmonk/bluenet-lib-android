@@ -1,4 +1,6 @@
-package nl.dobots.bluenet;
+package nl.dobots.bluenet.extended.structs;
+
+import java.util.ArrayList;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -13,17 +15,19 @@ package nl.dobots.bluenet;
  * version 3 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  * <p/>
- * Created on 15-7-15
+ * Created on 12-8-15
  *
  * @author Dominik Egger
  */
-public enum BleDeviceConnectionState {
+public class BleDeviceList extends ArrayList<BleDevice> {
 
-	uninitialized,
-	initialized,
-	scanning,
-	connecting,
-	connected,
-	disconnecting,
+	public boolean containsDevice(String address) {
+		for (BleDevice device : this) {
+			if (device.getAddress().equals(address)) {
+				return true;
+			}
+		}
+		return false;
+	}
 
 }
