@@ -1,5 +1,7 @@
 package nl.dobots.bluenet;
 
+import android.bluetooth.le.ScanRecord;
+import android.os.Build;
 import android.os.Handler;
 
 import java.nio.ByteBuffer;
@@ -45,9 +47,12 @@ public class BleBase extends BleCore {
 
 			@Override
 			public void onData(JSONObject json) {
-				// TODO Auto-generated method stub
-
 				byte[] advertisement = BleUtils.getBytes(json, BleCoreTypes.PROPERTY_ADVERTISEMENT);
+
+//				if (Build.VERSION.SDK_INT >= 21) {
+//					ScanRecord scanRecord = ScanRecord.parseFromBytes(advertisement);
+//				}
+
 				byte[] manufacData = parseAdvertisement(advertisement, 0xFF);
 				if (manufacData != null) {
 					int companyID = BleUtils.byteArrayToShort(manufacData, 0);

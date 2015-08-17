@@ -3,7 +3,9 @@ package nl.dobots.bluenet.core;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.UUID;
 
 import nl.dobots.bluenet.BleUtils;
@@ -15,6 +17,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -26,12 +29,19 @@ import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothAdapter.LeScanCallback;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
+import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.ParcelUuid;
 import android.util.Log;
 
 /*
@@ -51,6 +61,9 @@ public class BleCore {
 
 	private boolean _initialized = false;
 	private boolean _receiverRegistered = false;
+	private BluetoothLeScanner _leScanner;
+	private ArrayList<ScanFilter> _scanFilters;
+	private ScanSettings _scanSettings;
 
 	private enum ConnectionState {
 		DISCONNECTED,
@@ -148,18 +161,26 @@ public class BleCore {
 
 			if (intent.getAction().equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
 				switch (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
-				case BluetoothAdapter.STATE_OFF:
-					_connections = new HashMap<>();
-					_scanCallback = null;
-					_initialized = false;
+					case BluetoothAdapter.STATE_OFF:
+						_connections = new HashMap<>();
+						_scanCallback = null;
+						_initialized = false;
 
-					_initCallback.onError(BleCoreTypes.ERROR_BLUETOOTH_TURNED_OFF);
-					break;
-				case BluetoothAdapter.STATE_ON:
+						_initCallback.onError(BleCoreTypes.ERROR_BLUETOOTH_TURNED_OFF);
+						break;
+					case BluetoothAdapter.STATE_ON:
 
-					_initialized = true;
-					_initCallback.onSuccess();
-					break;
+						_initialized = true;
+						if (Build.VERSION.SDK_INT >= 21) {
+							_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
+							// todo: see if we want to make the scan mode configurable
+							_scanSettings = new ScanSettings.Builder()
+									.setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+									.build();
+							_scanFilters = new ArrayList<>();
+						}
+						_initCallback.onSuccess();
+						break;
 				}
 			}
 		}
@@ -206,6 +227,13 @@ public class BleCore {
 		} else {
 			LOGd("Bluetooth successfully initialized");
 			_initialized = true;
+			if (Build.VERSION.SDK_INT >= 21) {
+				_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
+				_scanSettings = new ScanSettings.Builder()
+						.setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+						.build();
+				_scanFilters = new ArrayList<>();
+			}
 			callback.onSuccess();
 		}
 
@@ -226,18 +254,18 @@ public class BleCore {
 
 	public void onActivityResult(int requestCode, int resultCode, Intent data) {
 		switch (requestCode) {
-		case REQUEST_ENABLE_BT:
-			// don't need to do this check, because we have the broadcast receiver registered.
-			// which will trigger onSuccess if the bluetooth adapter is turned on and onError
-			// if it is turned off. However, we need to catch the case that the bluetooth adapter
-			// was never on, and the initialization failed, or the user cancelled. That can
-			// be done with simply checking if the adapter is enabled
-			if (!_bluetoothAdapter.isEnabled()) {
-				_initialized = false;
-				if (_initCallback != null) {
-					_initCallback.onError(BleCoreTypes.ERROR_BLUETOOTH_NOT_ENABLED);
+			case REQUEST_ENABLE_BT:
+				// don't need to do this check, because we have the broadcast receiver registered.
+				// which will trigger onSuccess if the bluetooth adapter is turned on and onError
+				// if it is turned off. However, we need to catch the case that the bluetooth adapter
+				// was never on, and the initialization failed, or the user cancelled. That can
+				// be done with simply checking if the adapter is enabled
+				if (!_bluetoothAdapter.isEnabled()) {
+					_initialized = false;
+					if (_initCallback != null) {
+						_initCallback.onError(BleCoreTypes.ERROR_BLUETOOTH_NOT_ENABLED);
+					}
 				}
-			}
 //			if (resultCode == Activity.RESULT_OK) {
 //				if (_bluetoothAdapter.isEnabled()) {
 //					LOGd("Bluetooth successfully initialized");
@@ -253,7 +281,7 @@ public class BleCore {
 //				_initialized = false;
 //				_initCallback.onError(BleCoreTypes.ERROR_BLUETOOTH_INITIALIZATION_CANCELLED);
 //			}
-			break;
+				break;
 		}
 	}
 
@@ -419,23 +447,23 @@ public class BleCore {
 		BluetoothGatt gatt = connection.getGatt();
 
 		switch (connection.getDiscoveryState()) {
-		case DISCOVERING:
-			LOGd(".. already running");
-			callback.onError(BleCoreTypes.ERROR_ALREADY_DISCOVERING);
-			return;
-		case DISCOVERED:
-			if (!forceDiscover) {
-				LOGd(".. already done, return existing discovery");
-				json = getDiscovery(gatt);
-				callback.onData(json);
+			case DISCOVERING:
+				LOGd(".. already running");
+				callback.onError(BleCoreTypes.ERROR_ALREADY_DISCOVERING);
 				return;
-			}
-			// else go to discovery, no break needed!
-		default:
-			LOGd(".. start discovery");
-			connection.setDiscoveryState(DiscoveryState.DISCOVERING);
-			gatt.discoverServices();
-			break;
+			case DISCOVERED:
+				if (!forceDiscover) {
+					LOGd(".. already done, return existing discovery");
+					json = getDiscovery(gatt);
+					callback.onData(json);
+					return;
+				}
+				// else go to discovery, no break needed!
+			default:
+				LOGd(".. start discovery");
+				connection.setDiscoveryState(DiscoveryState.DISCOVERING);
+				gatt.discoverServices();
+				break;
 		}
 	}
 
@@ -506,12 +534,12 @@ public class BleCore {
 	}
 
 	public void discoverCharacteristic(String address, String serviceUuid, String characteristicUuid,
-			IStatusCallback callback) {
+									   IStatusCallback callback) {
 		discoverCharacteristic(address, serviceUuid, characteristicUuid, false, callback);
 	}
 
 	public void discoverCharacteristic(String address, final String serviceUuid, final String characteristicUuid,
-			boolean forceDiscover, final IStatusCallback callback) {
+									   boolean forceDiscover, final IStatusCallback callback) {
 
 		discoverServices(address, forceDiscover, new IDataCallback() {
 
@@ -566,11 +594,31 @@ public class BleCore {
 
 		_scanCallback = callback;
 
-		if (uuids.length == 0) {
-			_scanning = _bluetoothAdapter.startLeScan(scanCallback);
+		// use new functionality if possible
+		if (Build.VERSION.SDK_INT >= 21) {
+			if (_coreScanCallback == null) {
+				createCoreScanCallback();
+			}
+
+			if (uuids.length == 0) {
+				_scanFilters.clear();
+			} else {
+				UUID[] serviceUuids = BleUtils.stringToUuid(uuids);
+				for (UUID uuid : serviceUuids) {
+					ScanFilter filter = new ScanFilter.Builder()
+							.setServiceUuid(new ParcelUuid(uuid))
+							.build();
+					_scanFilters.add(filter);
+				}
+			}
+			_leScanner.startScan(_scanFilters, _scanSettings, _coreScanCallback);
 		} else {
-			UUID[] serviceUuids = BleUtils.stringToUuid(uuids);
-			_scanning = _bluetoothAdapter.startLeScan(serviceUuids, scanCallback);
+			if (uuids.length == 0) {
+				_scanning = _bluetoothAdapter.startLeScan(_coreLeScanCallback);
+			} else {
+				UUID[] serviceUuids = BleUtils.stringToUuid(uuids);
+				_scanning = _bluetoothAdapter.startLeScan(serviceUuids, _coreLeScanCallback);
+			}
 		}
 
 		if (!_scanning) {
@@ -579,6 +627,39 @@ public class BleCore {
 		}
 
 		return true;
+	}
+
+	@TargetApi(21)
+	private void createCoreScanCallback() {
+		_coreScanCallback = new ScanCallback() {
+			@Override
+			public void onScanResult(int callbackType, ScanResult result) {
+
+				JSONObject scanResult = new JSONObject();
+				BleUtils.addDeviceInfo(scanResult, result.getDevice());
+				BleUtils.addProperty(scanResult, BleCoreTypes.PROPERTY_RSSI, result.getRssi());
+				if (result.getScanRecord() != null) {
+					BleUtils.addBytes(scanResult, BleCoreTypes.PROPERTY_ADVERTISEMENT, result.getScanRecord().getBytes());
+				}
+				BleUtils.setStatus(scanResult, BleCoreTypes.PROPERTY_SCAN_RESULT);
+
+				if (_scanCallback != null) {
+					_scanCallback.onData(scanResult);
+				}
+			}
+
+			@Override
+			public void onBatchScanResults(List<ScanResult> results) {
+				for (ScanResult result : results) {
+					onScanResult(0, result);
+				}
+			}
+
+			@Override
+			public void onScanFailed(int errorCode) {
+				_scanCallback.onError(errorCode);
+			}
+		};
 	}
 
 	public boolean stopEndlessScan(IStatusCallback callback) {
@@ -593,8 +674,13 @@ public class BleCore {
 //			return false;
 //		}
 
-		_bluetoothAdapter.stopLeScan(scanCallback);
+		if (Build.VERSION.SDK_INT >= 21) {
+			_leScanner.stopScan(_coreScanCallback);
+		} else {
+			_bluetoothAdapter.stopLeScan(_coreLeScanCallback);
+		}
 		_scanCallback = null;
+
 		_scanning = false;
 
 		callback.onSuccess();
@@ -605,24 +691,26 @@ public class BleCore {
 		return _scanning;
 	}
 
-	private LeScanCallback scanCallback = new LeScanCallback() {
+	private LeScanCallback _coreLeScanCallback = new LeScanCallback() {
 
 		@Override
 		public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
-
-			if (_scanCallback == null) {
-				return;
-			}
 
 			JSONObject scanResult = new JSONObject();
 			BleUtils.addDeviceInfo(scanResult, device);
 			BleUtils.addProperty(scanResult, BleCoreTypes.PROPERTY_RSSI, rssi);
 			BleUtils.addBytes(scanResult, BleCoreTypes.PROPERTY_ADVERTISEMENT, scanRecord);
 			BleUtils.setStatus(scanResult, BleCoreTypes.PROPERTY_SCAN_RESULT);
-			 _scanCallback.onData(scanResult);
+
+			if (_scanCallback != null) {
+				_scanCallback.onData(scanResult);
+			}
 		}
 
 	};
+
+	//	@SuppressLint("NewApi")
+	private ScanCallback _coreScanCallback;
 
 	protected byte[] parseAdvertisement(byte[] scanRecord, int search) {
 
@@ -682,13 +770,13 @@ public class BleCore {
 		BleUtils.addDeviceInfo(deviceJson, device);
 
 		switch (connection.getConnectionState()) {
-		case CONNECTING:
-			_connectionCallback = null;
-			connection.setConnectionState(ConnectionState.DISCONNECTED);
-			break;
-		default:
-			_connectionCallback = callback;
-			connection.setConnectionState(ConnectionState.DISCONNECTING);
+			case CONNECTING:
+				_connectionCallback = null;
+				connection.setConnectionState(ConnectionState.DISCONNECTED);
+				break;
+			default:
+				_connectionCallback = callback;
+				connection.setConnectionState(ConnectionState.DISCONNECTING);
 		}
 
 		gatt.disconnect();
@@ -761,20 +849,20 @@ public class BleCore {
 		 * However, due to the Android bug (still exists in Android 5.0.1), it is keeping them anyway and the only way to clear services is by using this hidden refresh method.
 		 */
 //		if (force || gatt.getDevice().getBondState() == BluetoothDevice.BOND_NONE) {
-			// Log.i(TAG, "refresh");
+		// Log.i(TAG, "refresh");
 			/*
 			 * There is a refresh() method in BluetoothGatt class but for now it's hidden. We will call it using reflections.
 			 */
-			try {
-				final Method refresh = gatt.getClass().getMethod("refresh");
-				if (refresh != null) {
-					final boolean success = (Boolean) refresh.invoke(gatt);
-					LOGd("Refreshing result: " + success);
-				}
-			} catch (Exception e) {
-				Log.e(TAG, "An exception occurred while refreshing device", e);
-				LOGe("Refreshing failed");
+		try {
+			final Method refresh = gatt.getClass().getMethod("refresh");
+			if (refresh != null) {
+				final boolean success = (Boolean) refresh.invoke(gatt);
+				LOGd("Refreshing result: " + success);
 			}
+		} catch (Exception e) {
+			Log.e(TAG, "An exception occurred while refreshing device", e);
+			LOGe("Refreshing failed");
+		}
 //		}
 	}
 
@@ -967,8 +1055,8 @@ public class BleCore {
 						_connectionCallback.onData(json);
 					}
 
-	//				intentAction = ACTION_GATT_CONNECTED;
-	//				broadcastUpdate(intentAction);
+					//				intentAction = ACTION_GATT_CONNECTED;
+					//				broadcastUpdate(intentAction);
 
 				} else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
 
@@ -982,8 +1070,8 @@ public class BleCore {
 						_connectionCallback.onData(json);
 					}
 
-	//				intentAction = ACTION_GATT_DISCONNECTED;
-	//				broadcastUpdate(intentAction);
+					//				intentAction = ACTION_GATT_DISCONNECTED;
+					//				broadcastUpdate(intentAction);
 
 				} else {
 					LOGd("..ing state: %d", status);
@@ -1000,7 +1088,7 @@ public class BleCore {
 				}
 			}
 
-			 clearConnectTimeout();
+			clearConnectTimeout();
 		}
 
 		@Override
