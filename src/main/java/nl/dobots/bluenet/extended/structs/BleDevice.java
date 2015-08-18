@@ -8,7 +8,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.UUID;
-import java.util.concurrent.Semaphore;
 
 import nl.dobots.bluenet.extended.BleExtTypes;
 
@@ -61,9 +60,6 @@ public class BleDevice {
 	private int _minor;
 	private UUID _proximityUuid;
 	private int _calibratedRssi;
-
-	private Semaphore _historySemaphore = new Semaphore(1, true);
-	private Semaphore _rssiSemaphore = new Semaphore(1, true);
 
 	public BleDevice(String address, String name, int rssi) {
 		this._address = address;
@@ -188,36 +184,16 @@ public class BleDevice {
 		_calibratedRssi = calibratedRssi;
 	}
 
-	public void updateRssiValue(long timestamp, int rssi) {
-		try {
-			_historySemaphore.acquire();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-			return;
-		}
+	public synchronized void updateRssiValue(long timestamp, int rssi) {
 		if (rssi != 127) {
 			this._rssi = rssi;
 			_rssiHistory.add(new RssiMeasurement(rssi, (new Date()).getTime()));
 		}
-		_historySemaphore.release();
 
-		try {
-			_rssiSemaphore.acquire();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-			return;
-		}
 		_averageRssi = null;
-		_rssiSemaphore.release();
 	}
 
-	private boolean refreshHistory() {
-		try {
-			_historySemaphore.acquire();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-			return false;
-		}
+	private synchronized boolean refreshHistory() {
 		Date now = new Date();
 		ArrayList<RssiMeasurement> newHistory = new ArrayList<>();
 
@@ -231,7 +207,6 @@ public class BleDevice {
 		}
 
 		this._rssiHistory = newHistory;
-		_historySemaphore.release();
 		return hasChange;
 	}
 
@@ -249,31 +224,23 @@ public class BleDevice {
 		}
 	};
 
-	private ArrayList<RssiMeasurement> getHistoryClone() {
-		try {
-			_historySemaphore.acquire();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-			return null;
-		}
+	private synchronized ArrayList<RssiMeasurement> getHistoryClone() {
 		ArrayList<RssiMeasurement> result = (ArrayList<RssiMeasurement>) _rssiHistory.clone();
-		_historySemaphore.release();
 		return result;
 	}
 
-	private ArrayList<RssiMeasurement> getTimeSortedHistory() {
+	public ArrayList<RssiMeasurement> getTimeSortedHistory() {
 		refreshHistory();
 		ArrayList<RssiMeasurement> clone = getHistoryClone();
 		Collections.sort(clone, timeSorter);
 		return clone;
 	}
 
-	private ArrayList<RssiMeasurement> getRssiSortedHistory() {
+	public ArrayList<RssiMeasurement> getRssiSortedHistory() {
 		refreshHistory();
 		ArrayList<RssiMeasurement> clone = getHistoryClone();
 		Collections.sort(clone, rssiSorter);
 		return clone;
-
 	}
 
 	/**
@@ -284,15 +251,7 @@ public class BleDevice {
 		BleDevice.expirationTime = expirationTime;
 	}
 
-	private void calculateAverageRssi() {
-//		if (!refreshHistory() && _averageRssi != null) return;
-		try {
-			_historySemaphore.acquire();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-			return;
-		}
-
+	private synchronized void calculateAverageRssi() {
 		Collections.sort(this._rssiHistory, rssiSorter);
 
 		int size = _rssiHistory.size();
@@ -308,30 +267,18 @@ public class BleDevice {
 		for (int i = startIndex; i <= endIndex; i++) {
 			sum += _rssiHistory.get(i).rssi;
 		}
-		_historySemaphore.release();
 
 		_averageRssi = (int)(sum / (endIndex - startIndex + 1));
 		_distance = null;
 	}
 
-	public int getAverageRssi() {
+	public synchronized int getAverageRssi() {
 		// avoid recalculating if no new measurement was received in between
 		// is set to null in updateRssiValue
-//		if (_averageRssi == null) {
-//			calculateAverageRssi();
-//		}
-		try {
-			_rssiSemaphore.acquire();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-			return 0;
-		}
 		if (_averageRssi == null) {
 			refresh();
 		}
-		int averageRssi = _averageRssi;
-		_rssiSemaphore.release();
-		return averageRssi;
+		return _averageRssi;
 	}
 
 	/**
@@ -371,26 +318,13 @@ public class BleDevice {
 	 * returns -1 in case of error
 	 * @return
 	 */
-	public double getDistance() {
-//		getAverageRssi();
-//		// avoid recalculating if no new measurement was received in between
-//		// is set to null in calculateAverageRssi
-//		if (_distance == null) {
-//			calculateDistance();
-//		}
-
-		try {
-			_rssiSemaphore.acquire();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-			return -1;
-		}
+	public synchronized double getDistance() {
+		// avoid recalculating if no new measurement was received in between
+		// is set to null in calculateAverageRssi
 		if (_distance == null || _averageRssi == null) {
 			refresh();
 		}
-		double distance = _distance;
-		_rssiSemaphore.release();
-		return distance;
+		return _distance;
 	}
 
 	public void refresh() {
