@@ -619,12 +619,13 @@ public class BleCore {
 				UUID[] serviceUuids = BleUtils.stringToUuid(uuids);
 				_scanning = _bluetoothAdapter.startLeScan(serviceUuids, _coreLeScanCallback);
 			}
+
+			if (!_scanning) {
+				callback.onError(BleCoreTypes.ERROR_SCAN_FAILED);
+				return false;
+			}
 		}
 
-		if (!_scanning) {
-			callback.onError(BleCoreTypes.ERROR_SCAN_FAILED);
-			return false;
-		}
 
 		return true;
 	}
@@ -634,6 +635,7 @@ public class BleCore {
 		_coreScanCallback = new ScanCallback() {
 			@Override
 			public void onScanResult(int callbackType, ScanResult result) {
+				_scanning = true;
 
 				JSONObject scanResult = new JSONObject();
 				BleUtils.addDeviceInfo(scanResult, result.getDevice());
@@ -657,6 +659,7 @@ public class BleCore {
 
 			@Override
 			public void onScanFailed(int errorCode) {
+				_scanning = false;
 				_scanCallback.onError(errorCode);
 			}
 		};
