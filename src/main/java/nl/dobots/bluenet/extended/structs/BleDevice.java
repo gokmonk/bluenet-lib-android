@@ -225,8 +225,7 @@ public class BleDevice {
 	};
 
 	private synchronized ArrayList<RssiMeasurement> getHistoryClone() {
-		ArrayList<RssiMeasurement> result = (ArrayList<RssiMeasurement>) _rssiHistory.clone();
-		return result;
+		return (ArrayList<RssiMeasurement>) _rssiHistory.clone();
 	}
 
 	public ArrayList<RssiMeasurement> getTimeSortedHistory() {

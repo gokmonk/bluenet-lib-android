@@ -31,15 +31,15 @@ public class BleDeviceMap extends HashMap<String, BleDevice> {
 		descending
 	}
 
-	public BleDevice getDevice(String address) {
+	public synchronized BleDevice getDevice(String address) {
 		return get(address);
 	}
 
-	public boolean contains(BleDevice device) {
+	public synchronized boolean contains(BleDevice device) {
 		return containsKey(device.getAddress());
 	}
 
-	public BleDevice updateDevice(BleDevice device) {
+	public synchronized BleDevice updateDevice(BleDevice device) {
 		if (contains(device)) {
 			BleDevice old = getDevice(device.getAddress());
 			old.updateRssiValue(System.currentTimeMillis(), device.getRssi());
@@ -50,37 +50,45 @@ public class BleDeviceMap extends HashMap<String, BleDevice> {
 		}
 	}
 
-	public BleDeviceList getList() {
+	public synchronized BleDeviceList getList() {
 		BleDeviceList result = new BleDeviceList();
 		result.addAll(values());
 		return result;
 	}
 
-	public BleDeviceList getRssiSortedList() {
+	public synchronized BleDeviceList getRssiSortedList() {
 		return getRssiSortedList(SortOrder.descending);
 	}
 
-	public BleDeviceList getRssiSortedList(final SortOrder order) {
+	public synchronized BleDeviceList getRssiSortedList(final SortOrder order) {
 		BleDeviceList result = new BleDeviceList();
 		result.addAll(values());
 		Collections.sort(result, new Comparator<BleDevice>() {
 			@Override
 			public int compare(BleDevice lhs, BleDevice rhs) {
-				switch (order) {
-					case ascending:
-//						return lhs.getRssi() - rhs.getRssi();
-						return lhs.getAverageRssi() - rhs.getAverageRssi();
-					case descending:
-//						return rhs.getRssi() - lhs.getRssi();
-						return rhs.getAverageRssi() - lhs.getAverageRssi();
+				int ld = lhs.getAverageRssi();
+				int rd = rhs.getAverageRssi();
+				if (ld == 0) {
+					return 1;
+				} else if (rd == 0) {
+					return -1;
+				} else {
+					switch (order) {
+						case ascending:
+//							return lhs.getRssi() - rhs.getRssi();
+							return ld - rd;
+						case descending:
+//							return rhs.getRssi() - lhs.getRssi();
+							return rd - ld;
+					}
+					return 0;
 				}
-				return 0;
 			}
 		});
 		return result;
 	}
 
-	public BleDeviceList getDistanceSortedList() {
+	public synchronized BleDeviceList getDistanceSortedList() {
 		BleDeviceList result = new BleDeviceList();
 		result.addAll(values());
 		Collections.sort(result, new Comparator<BleDevice>() {
@@ -102,7 +110,7 @@ public class BleDeviceMap extends HashMap<String, BleDevice> {
 		return result;
 	}
 
-	public void refresh() {
+	public synchronized void refresh() {
 		for (BleDevice device : values()) {
 			device.refresh();
 		}
