@@ -346,7 +346,7 @@ public class BleExt {
 		_detectedCharacteristics.add(characteristicUuid);
 	}
 
-	private boolean hasCharacteristic(String characteristicUuid, IBaseCallback callback) {
+	public boolean hasCharacteristic(String characteristicUuid, IBaseCallback callback) {
 		if (_detectedCharacteristics.indexOf(characteristicUuid) == -1) {
 			if (callback != null) {
 				callback.onError(BleExtTypes.ERROR_CHARACTERISTIC_NOT_FOUND);
