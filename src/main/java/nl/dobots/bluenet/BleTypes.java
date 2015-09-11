@@ -40,6 +40,13 @@ public class BleTypes {
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Alert Service
+	public static final String ALERT_SERVICE_UUID =                     "33690000-2a0a-11e5-b345-feff819cdc9f";
+	// Alert Service - Characteristics
+	public static final String CHAR_NEW_ALERT_UUID =                    "33690002-2a0a-11e5-b345-feff819cdc9f";
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// BleConfiguration types
 	public static final char CONFIG_TYPE_NAME =                         0x00;
 	public static final char CONFIG_TYPE_DEVICE_TYPE =                  0x01;
@@ -54,6 +61,9 @@ public class BleTypes {
 	public static final char CONFIG_TYPE_WIFI =                         0x0A;
 	public static final char CONFIG_TYPE_TX_POWER =                     0x0B;
 	public static final char CONFIG_TYPE_ADV_INTERVAL =                 0x0C;
+	public static final char CONFIG_TYPE_PASSKEY =                      0x0D;
+	public static final char CONFIG_TYPE_MIN_ENV_TEMP =                 0x0E;
+	public static final char CONFIG_TYPE_MAX_ENV_TEMP =                 0x0F;
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////

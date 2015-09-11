@@ -592,6 +592,58 @@ public class BleBase extends BleCore {
 		});
 	}
 
+	public void setMinEnvTemp(String address, int value, final IStatusCallback callback) {
+		BleConfiguration configuration = new BleConfiguration(BleTypes.CONFIG_TYPE_MIN_ENV_TEMP, 1, new byte[]{(byte)value});
+		writeConfiguration(address, configuration, callback);
+	}
+
+	public void getMinEnvTemp(String address, final IIntegerCallback callback) {
+		getConfiguration(address, BleTypes.CONFIG_TYPE_MIN_ENV_TEMP, new IConfigurationCallback() {
+			@Override
+			public void onSuccess(BleConfiguration configuration) {
+				if (configuration.getLength() != 1) {
+					LOGe("Wrong length parameter: %s", configuration.getLength());
+					onError(BleCoreTypes.ERROR_WRONG_LENGTH_PARAMETER);
+				} else {
+					int temperature = configuration.getPayload()[0];
+					LOGd("min environment temperature: %d", temperature);
+					callback.onSuccess(temperature);
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
+
+	public void setMaxEnvTemp(String address, int value, final IStatusCallback callback) {
+		BleConfiguration configuration = new BleConfiguration(BleTypes.CONFIG_TYPE_MAX_ENV_TEMP, 1, new byte[]{(byte)value});
+		writeConfiguration(address, configuration, callback);
+	}
+
+	public void getMaxEnvTemp(String address, final IIntegerCallback callback) {
+		getConfiguration(address, BleTypes.CONFIG_TYPE_MAX_ENV_TEMP, new IConfigurationCallback() {
+			@Override
+			public void onSuccess(BleConfiguration configuration) {
+				if (configuration.getLength() != 1) {
+					LOGe("Wrong length parameter: %s", configuration.getLength());
+					onError(BleCoreTypes.ERROR_WRONG_LENGTH_PARAMETER);
+				} else {
+					int temperature = configuration.getPayload()[0];
+					LOGd("max environment temperature: %d", temperature);
+					callback.onSuccess(temperature);
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
+
 	/**
 	 * Wrapper function which first calls select configuration, and on success calls the get configuration
 	 *

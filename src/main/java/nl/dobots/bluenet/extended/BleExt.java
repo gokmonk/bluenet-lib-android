@@ -1930,6 +1930,163 @@ public class BleExt {
 		}
 	}
 
+	public void getMinEnvTemp(IIntegerCallback callback) {
+		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
+			LOGd("Get minimum environment temperature...");
+			_bleBase.getMinEnvTemp(_targetAddress, callback);
+		}
+	}
+
+	public void getMinEnvTemp(String address, final IIntegerCallback callback) {
+		if (isStillConnected(null)) {
+			getMinEnvTemp(callback);
+		} else {
+			connectAndExecute(address, new IExecuteCallback() {
+				@Override
+				public void execute(final IStatusCallback execCallback) {
+					getMinEnvTemp(new IIntegerCallback() {
+						@Override
+						public void onSuccess(int result) {
+							callback.onSuccess(result);
+							execCallback.onSuccess();
+						}
+
+						@Override
+						public void onError(int error) {
+							execCallback.onSuccess();
+						}
+					});
+				}
+			}, new IStatusCallback() {
+				@Override
+				public void onSuccess() { /* don't care */ }
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			});
+		}
+	}
+
+	public void setMinEnvTemp(int value, IStatusCallback callback) {
+		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
+			LOGd("Set minimum environment temperature to %d", value);
+			_bleBase.setMinEnvTemp(_targetAddress, value, callback);
+		}
+	}
+
+	public void setMinEnvTemp(String address, final int value, final IStatusCallback callback) {
+		if (isStillConnected(null)) {
+			setMinEnvTemp(value, callback);
+		} else {
+			connectAndExecute(address, new IExecuteCallback() {
+				@Override
+				public void execute(final IStatusCallback execCallback) {
+					setMinEnvTemp(value, new IStatusCallback() {
+						@Override
+						public void onSuccess() {
+							callback.onSuccess();
+							execCallback.onSuccess();
+						}
+
+						@Override
+						public void onError(int error) {
+							execCallback.onSuccess();
+						}
+					});
+				}
+			}, new IStatusCallback() {
+				@Override
+				public void onSuccess() { /* don't care */ }
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			});
+		}
+	}
+
+	public void getMaxEnvTemp(IIntegerCallback callback) {
+		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
+			LOGd("Get maximum environment temperature...");
+			_bleBase.getMaxEnvTemp(_targetAddress, callback);
+		}
+	}
+
+	public void getMaxEnvTemp(String address, final IIntegerCallback callback) {
+		if (isStillConnected(null)) {
+			getMaxEnvTemp(callback);
+		} else {
+			connectAndExecute(address, new IExecuteCallback() {
+				@Override
+				public void execute(final IStatusCallback execCallback) {
+					getMaxEnvTemp(new IIntegerCallback() {
+						@Override
+						public void onSuccess(int result) {
+							callback.onSuccess(result);
+							execCallback.onSuccess();
+						}
+
+						@Override
+						public void onError(int error) {
+							execCallback.onSuccess();
+						}
+					});
+				}
+			}, new IStatusCallback() {
+				@Override
+				public void onSuccess() { /* don't care */ }
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			});
+		}
+	}
+
+	public void setMaxEnvTemp(int value, IStatusCallback callback) {
+		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
+			LOGd("Set maximum environment temperature to %d", value);
+			_bleBase.setMaxEnvTemp(_targetAddress, value, callback);
+		}
+	}
+
+	public void setMaxEnvTemp(String address, final int value, final IStatusCallback callback) {
+		if (isStillConnected(null)) {
+			setMaxEnvTemp(value, callback);
+		} else {
+			connectAndExecute(address, new IExecuteCallback() {
+				@Override
+				public void execute(final IStatusCallback execCallback) {
+					setMaxEnvTemp(value, new IStatusCallback() {
+						@Override
+						public void onSuccess() {
+							callback.onSuccess();
+							execCallback.onSuccess();
+						}
+
+						@Override
+						public void onError(int error) {
+							execCallback.onSuccess();
+						}
+					});
+				}
+			}, new IStatusCallback() {
+				@Override
+				public void onSuccess() { /* don't care */ }
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			});
+		}
+	}
+
+
 	//////////////////////////
 	// Localization service //
 	//////////////////////////
