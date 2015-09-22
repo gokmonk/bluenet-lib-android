@@ -17,6 +17,8 @@ import nl.dobots.bluenet.ble.base.structs.BleConfiguration;
  * <p/>
  * Created on 15-7-15
  *
+ * Returns a ble configuration message on success
+ *
  * @author Dominik Egger
  */
 public interface IConfigurationCallback extends IBaseCallback {

@@ -21,23 +21,54 @@ import nl.dobots.bluenet.utils.BleUtils;
  * <p/>
  * Created on 15-7-15
  *
+ * Class holding information about a tracked device. Used to add new tracked devices and to
+ * parse the received list of tracked devices.
+ *
+ * A tracked device has the following fields:
+ * 		* MAC address of the device
+ * 		* RSSI value, defining the trigger threshold
+ *
+ * 	And the format is:
+ * 		--------------------------------------------------
+ * 		| ADR[6] | ADR[5] | ADR[4] | ... | ADR[0] | RSSI |
+ * 		--------------------------------------------------
+ *
+ * Note: Byte Order is Little-Endian, i.e. Least Significant Bit comes first
+ *
  * @author Dominik Egger
  */
 public class BleTrackedDevice {
 
+	// the MAC address of the tracked device
 	byte[] address;
+	// the rssi value used for the trigger threshold
 	int rssi;
 
+	/**
+	 * Create a new tracked device
+	 * @param address MAC address of the tracked device (as a byte array)
+	 * @param rssi rssi value to be used as trigger threshold
+	 */
 	public BleTrackedDevice(byte[] address, int rssi) {
 		this.address = address;
 		this.rssi = rssi;
 	}
 
+	/**
+	 * Create a new tracked device
+	 * @param address MAC address of the tracked device (as a string of the format
+	 *                "00:43:A8:23:10:F0")
+	 * @param rssi rssi value to be used as trigger threshold
+	 */
 	public BleTrackedDevice(String address, int rssi) {
 		this.rssi = rssi;
 		BleUtils.addressToBytes(address);
 	}
 
+	/**
+	 * Convert the object to a byte array in order to write it to the characteristic
+	 * @return byte array representation of the object
+	 */
 	public byte[] toArray() {
 		ByteBuffer bb = ByteBuffer.allocate(7);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
@@ -48,23 +79,43 @@ public class BleTrackedDevice {
 		return bb.array();
 	}
 
+	/**
+	 * For debug purposes, create a string representation of the tracked device
+	 * @return string representation of the object
+	 */
 	@Override
 	public String toString() {
 		return String.format("{address: %s, rssi: %d}", Arrays.toString(address), rssi);
 	}
 
+	/**
+	 * Get the MAC address of the tracked device
+	 * @return MAC address
+	 */
 	public byte[] getAddress() {
 		return address;
 	}
 
+	/**
+	 * Set the MAC address of the tracked device
+	 * @param address new MAC address
+	 */
 	public void setAddress(byte[] address) {
 		this.address = address;
 	}
 
+	/**
+	 * Get the threshold rssi value
+	 * @return rssi value
+	 */
 	public int getRssi() {
 		return rssi;
 	}
 
+	/**
+	 * Set the threshold rssi value
+	 * @param rssi new rssi value
+	 */
 	public void setRssi(int rssi) {
 		this.rssi = rssi;
 	}

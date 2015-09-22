@@ -17,6 +17,8 @@ import org.json.JSONObject;
  * <p/>
  * Created on 14-7-15
  *
+ * Return data as a JSON object
+ *
  * @author Dominik Egger
  */
 public interface IDataCallback extends IBaseCallback {

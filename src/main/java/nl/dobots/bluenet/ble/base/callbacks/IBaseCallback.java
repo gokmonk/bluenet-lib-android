@@ -15,6 +15,11 @@ package nl.dobots.bluenet.ble.base.callbacks;
  * <p/>
  * Created on 15-7-15
  *
+ * Interface defining a base for every callback used by the library. I.e. every callback
+ * used by the library needs to have an onError function to report back errors
+ * success functions depend on the type of data returned and are thus part of the different
+ * derived interfaces.
+ *
  * @author Dominik Egger
  */
 public interface IBaseCallback {

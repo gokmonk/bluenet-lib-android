@@ -4,7 +4,7 @@ package nl.dobots.bluenet.ble.cfg;
  * Configuration of characteristics, uuids, configuration values, etc. used by the Bluenet code running
  * on the crownstones and doBeacons.
  *
- * Needs to be keept consistent with the values used in the bluenet code!
+ * Needs to be kept consistent with the values used in the bluenet code!
  *
  * Created on 15-7-15
  * @author Dominik Egger

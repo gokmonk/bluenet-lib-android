@@ -15,6 +15,8 @@ package nl.dobots.bluenet.ble.base.callbacks;
  * <p/>
  * Created on 14-7-15
  *
+ * Returns a byte array with the data on success
+ *
  * @author Dominik Egger
  */
 public interface IByteArrayCallback extends IBaseCallback {

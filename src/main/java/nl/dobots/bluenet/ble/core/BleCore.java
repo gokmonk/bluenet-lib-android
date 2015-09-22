@@ -1,26 +1,9 @@
 package nl.dobots.bluenet.ble.core;
 
-import java.lang.reflect.Method;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.UUID;
-
-import nl.dobots.bluenet.ble.cfg.BleErrors;
-import nl.dobots.bluenet.utils.BleUtils;
-import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
-
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
-import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothAdapter.LeScanCallback;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
@@ -29,7 +12,6 @@ import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
-import android.bluetooth.BluetoothAdapter.LeScanCallback;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
@@ -45,6 +27,23 @@ import android.os.HandlerThread;
 import android.os.ParcelUuid;
 import android.util.Log;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.lang.reflect.Method;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.UUID;
+
+import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
+import nl.dobots.bluenet.ble.cfg.BleErrors;
+import nl.dobots.bluenet.utils.BleUtils;
+
 /*
  * TODO: - implement for multiple connected devices
  */
@@ -53,18 +52,25 @@ public class BleCore {
 
 	private static final String TAG = BleCore.class.getCanonicalName();
 
+	// Timeout for a bluetooth enable request. If timeout expires, an error is created
 	private static final int BLUETOOTH_ENABLE_TIMEOUT = 15000;
 
+	// bluetooth adapter used for ble calls
 	private BluetoothAdapter _bluetoothAdapter;
 
+	// context which tries to initialize the bluetooth adapter
 	private Context _context;
 
-	private boolean _initialized = false;
-	private boolean _receiverRegistered = false;
+	// Bluetooth Scanner objects for API > 21
 	private BluetoothLeScanner _leScanner;
 	private ArrayList<ScanFilter> _scanFilters;
 	private ScanSettings _scanSettings;
 
+	// flags to keep track of state
+	private boolean _initialized = false;
+	private boolean _receiverRegistered = false;
+
+	// enum to keep track of device connection state
 	private enum ConnectionState {
 		DISCONNECTED,
 		CONNECTING,
@@ -72,6 +78,7 @@ public class BleCore {
 		DISCONNECTING
 	}
 
+	// enum to keep track of device discovery state
 	private enum DiscoveryState {
 		UNDISCOVERED,
 		DISCOVERING,
@@ -79,44 +86,76 @@ public class BleCore {
 	}
 
 	private class Connection {
+		// BluetoothGatt object, used to communicate with the BLE device
 		private BluetoothGatt _gatt;
+		// keep track of connection state
 		private ConnectionState _connectionState = ConnectionState.DISCONNECTED;
+		// keep track of discovery state
 		private DiscoveryState _discoveryState = DiscoveryState.UNDISCOVERED;
 
+		/**
+		 * Return the BluetoothGatt object used by this connection to talk to the device
+		 * @return BluetoothGatt object
+		 */
 		public BluetoothGatt getGatt() {
 			return _gatt;
 		}
 
+		/**
+		 * Assign a new BluetoothGatt object to the connection
+		 * @param gatt new BluetoothGatt object
+		 */
 		public void setGatt(BluetoothGatt gatt) {
 			_gatt = gatt;
 		}
 
+		/**
+		 * Return the current connection state
+		 * @return connection state
+		 */
 		public ConnectionState getConnectionState() {
 			return _connectionState;
 		}
 
+		/**
+		 * Set a new connection state
+		 * @param connectionState new connection state
+		 */
 		public void setConnectionState(ConnectionState connectionState) {
 			_connectionState = connectionState;
 		}
 
+		/**
+		 * Get the current discovery state
+		 * @return discovery state
+		 */
 		public DiscoveryState getDiscoveryState() {
 			return _discoveryState;
 		}
 
+		/**
+		 * Set a new discovery state
+		 * @param discoveryState new discovery state
+		 */
 		public void setDiscoveryState(DiscoveryState discoveryState) {
 			_discoveryState = discoveryState;
 		}
 	}
 
+	// a list of connections for different devices
 	private HashMap<String, Connection> _connections = new HashMap<>();
 
+	// flag to indicate if currently scanning for devices
 	private boolean _scanning;
 
+	// callbacks used to notify events
 	private IDataCallback _scanCallback;
 	private IStatusCallback _btStateCallback;
 
+	// timeout handler to check for function timeouts, e.g. bluetooth enable, connect, reconnect, etc.
 	private Handler _timeoutHandler;
 
+	// Helper functions for logging
 	protected void LOGd(String message) {
 		Log.d(TAG, message);
 	}
@@ -126,7 +165,6 @@ public class BleCore {
 	}
 
 	protected void LOGe(String message) {
-//		Toast.makeText(_context, message, Toast.LENGTH_LONG).show();
 		Log.e(TAG, message);
 	}
 
@@ -134,19 +172,29 @@ public class BleCore {
 		LOGe(String.format(fmt, args));
 	}
 
-
+	/**
+	 * Default constructor
+	 */
 	public BleCore() {
+		// create a timeout handler with it's own thread to take care of timeouts
 		HandlerThread timeoutThread = new HandlerThread("TimeoutHandler");
 		timeoutThread.start();
 		_timeoutHandler = new Handler(timeoutThread.getLooper());
 	}
 
+	/**
+	 * Make sure to close and unregister receiver if the object is not used anymore
+	 * @throws Throwable
+	 */
 	@Override
 	protected void finalize() throws Throwable {
 		super.finalize();
 		destroy();
 	}
 
+	/**
+	 * Unregister the broadcast receiver (if it is registered)
+	 */
 	public void destroy() {
 		if (_receiverRegistered) {
 			_context.unregisterReceiver(_receiver);
@@ -154,6 +202,10 @@ public class BleCore {
 		}
 	}
 
+	/**
+	 * Broadcast receiver used to handle Bluetooth Events, i.e. turning on and off of the
+	 * Bluetooth Adapter
+	 */
 	private BroadcastReceiver _receiver = new BroadcastReceiver() {
 		@Override
 		public void onReceive(Context context, Intent intent) {
@@ -166,12 +218,14 @@ public class BleCore {
 						_scanCallback = null;
 						_initialized = false;
 
+						// if bluetooth is turned off, call onError on the bt state callback
 						_btStateCallback.onError(BleErrors.ERROR_BLUETOOTH_TURNED_OFF);
 						break;
 					case BluetoothAdapter.STATE_ON:
 
 						_initialized = true;
 						if (Build.VERSION.SDK_INT >= 21) {
+							// create the ble scanner object used for API > 21
 							_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
 							// todo: see if we want to make the scan mode configurable
 							_scanSettings = new ScanSettings.Builder()
@@ -179,6 +233,7 @@ public class BleCore {
 									.build();
 							_scanFilters = new ArrayList<>();
 						}
+						// inform the callback about the enabled bluetooth
 						_btStateCallback.onSuccess();
 						// bluetooth was successfully enabled, cancel the timeout
 						_timeoutHandler.removeCallbacksAndMessages(null);

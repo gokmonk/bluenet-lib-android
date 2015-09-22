@@ -15,6 +15,8 @@ package nl.dobots.bluenet.ble.base.callbacks;
  * <p/>
  * Created on 28-7-15
  *
+ * Return discovered characteristics as tuples of service UUID and characteristic UUID
+ *
  * @author Dominik Egger
  */
 public interface IDiscoveryCallback extends IStatusCallback {
