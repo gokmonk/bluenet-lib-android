@@ -37,11 +37,13 @@ public class BleDevice {
 	private static final double coeff2 = 6.9476;
 	private static final double coeff3 = 0.54992;
 
+	// todo: should we support a device being more than one type?
 	enum DeviceType {
 		unknown,
 		crownstone,
 		dobeacon,
-		ibeacon
+		ibeacon,
+		fridge
 	}
 
 	private static long expirationTime = 5000;
@@ -110,14 +112,32 @@ public class BleDevice {
 		return _type == DeviceType.ibeacon || _type == DeviceType.dobeacon;
 	}
 
+	public boolean isDoBeacon() {
+		return _type == DeviceType.dobeacon;
+	}
+
 	public boolean isCrownstone() {
 		return _type == DeviceType.crownstone;
+	}
+
+	public boolean isFridge() {
+		return _type == DeviceType.fridge;
 	}
 
 	private DeviceType determineDeviceType(JSONObject json) throws JSONException {
 		if (json.has(BleTypes.PROPERTY_IS_CROWNSTONE)) {
 			if (json.getBoolean(BleTypes.PROPERTY_IS_CROWNSTONE)) {
 				return DeviceType.crownstone;
+			}
+		}
+		if (json.has(BleTypes.PROPERTY_IS_DOBEACON)) {
+			if (json.getBoolean(BleTypes.PROPERTY_IS_DOBEACON)) {
+				return DeviceType.dobeacon;
+			}
+		}
+		if (json.has(BleTypes.PROPERTY_IS_FRIDGE)) {
+			if (json.getBoolean(BleTypes.PROPERTY_IS_FRIDGE)) {
+				return DeviceType.fridge;
 			}
 		}
 		if (json.has(BleTypes.PROPERTY_IS_IBEACON)) {

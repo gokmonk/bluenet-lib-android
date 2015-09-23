@@ -115,4 +115,8 @@ public class BleUtils {
 		return sb.toString();
 	}
 
+	public static boolean isBitSet(int value, int bit) {
+		return (value & (1 << bit)) > 0;
+	}
+
 }

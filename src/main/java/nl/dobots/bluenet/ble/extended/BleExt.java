@@ -12,6 +12,8 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 
 import nl.dobots.bluenet.ble.base.BleBase;
+import nl.dobots.bluenet.ble.base.callbacks.IAlertCallback;
+import nl.dobots.bluenet.ble.base.structs.BleAlertState;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.core.BleCore;
@@ -135,7 +137,7 @@ public class BleExt {
 	 * is estimated
 	 * @return the list of scanned devices
 	 */
-	public BleDeviceMap getDeviceMap() {
+	public synchronized BleDeviceMap getDeviceMap() {
 		// make sure it is refreshed
 		_devices.refresh();
 		return _devices;
@@ -144,7 +146,7 @@ public class BleExt {
 	/**
 	 * Clear the list of scanned devices.
 	 */
-	public void clearDeviceMap() {
+	public synchronized void clearDeviceMap() {
 		_devices.clear();
 	}
 
@@ -257,6 +259,9 @@ public class BleExt {
 						// if filter set to beacon, but device is not a beacon, abort
 						if (!device.isIBeacon()) return;
 						break;
+					case fridge:
+						if (!device.isFridge()) return;
+						break;
 					case all:
 						// return any device that was detected
 						break;
@@ -264,7 +269,7 @@ public class BleExt {
 
 				// update the device list, this triggers recalculation of the average RSSI (and
 				// distance estimation if it is a beacon)
-				device = _devices.updateDevice(device);
+				device = updateDevice(device);
 				// report the updated device
 				callback.onDeviceScanned(device);
 			}
@@ -274,6 +279,10 @@ public class BleExt {
 				callback.onError(error);
 			}
 		});
+	}
+
+	private synchronized BleDevice updateDevice(BleDevice device) {
+		return _devices.updateDevice(device);
 	}
 
 	/**
@@ -334,8 +343,12 @@ public class BleExt {
 			} else if (_bleBase.isDisconnected(_targetAddress)) {
 				_bleBase.reconnectDevice(_targetAddress, 30, dataCallback);
 			}
-		} else if (checkConnectionState(BleDeviceConnectionState.connected, null) && _targetAddress.equals(address)) {
-			callback.onSuccess();
+		} else if (checkConnectionState(BleDeviceConnectionState.connected, null)) {
+			if (_targetAddress.equals(address)) {
+				callback.onSuccess();
+			} else {
+				callback.onError(BleErrors.ERROR_STILL_CONNECTED);
+			}
 		} else {
 			callback.onError(BleErrors.ERROR_WRONG_STATE);
 		}
@@ -390,6 +403,7 @@ public class BleExt {
 		LOGd("successfully disconnected");
 		// todo: timeout?
 		_connectionState = BleDeviceConnectionState.initialized;
+		clearDelayedDisconnect();
 //		_detectedCharacteristics.clear();
 	}
 
@@ -403,7 +417,7 @@ public class BleExt {
 	 */
 	private boolean checkConnectionState(BleDeviceConnectionState state, IBaseCallback callback) {
 		if (_connectionState != state) {
-			LOGe("wrong state: %s instead of %s", _connectionState.toString(), state.toString());
+			LOGe("wrong connection state: %s instead of %s", _connectionState.toString(), state.toString());
 			if (callback != null) {
 				callback.onError(BleErrors.ERROR_WRONG_STATE);
 			}
@@ -545,6 +559,11 @@ public class BleExt {
 
 			@Override
 			public void onError(int error) {
+				switch (error) {
+					case BleErrors.ERROR_NEVER_CONNECTED:
+						_connectionState = BleDeviceConnectionState.initialized;
+						break;
+				}
 				callback.onError(error);
 			}
 		});
@@ -604,9 +623,7 @@ public class BleExt {
 	 */
 	private void delayedDisconnect(IStatusCallback callback) {
 		// remove the previous delayed disconnect
-		if (_delayedDisconnect != null) {
-			_handler.removeCallbacks(_delayedDisconnect);
-		}
+		clearDelayedDisconnect();
 		// if a callback is provided (or no delayedDisconnect runnable available)
 		if (callback != null || _delayedDisconnect == null) {
 			// create and register a new delayed disconnect with the new callback
@@ -614,6 +631,12 @@ public class BleExt {
 			_delayedDisconnect.setCallback(callback);
 		} // otherwise post the previous runnable again with the new timeout
 		_handler.postDelayed(_delayedDisconnect, DELAYED_DISCONNECT_TIME);
+	}
+
+	private void clearDelayedDisconnect() {
+		if (_delayedDisconnect != null) {
+			_handler.removeCallbacks(_delayedDisconnect);
+		}
 	}
 
 	/**
@@ -682,7 +705,7 @@ public class BleExt {
 	 * @return true if device is connected, false otherwise
 	 */
 	public boolean isConnected(IBaseCallback callback) {
-		if (checkConnectionState(BleDeviceConnectionState.connected, callback)) {
+//		if (checkConnectionState(BleDeviceConnectionState.connected, callback)) {
 			if (_bleBase.isDeviceConnected(_targetAddress)) {
 				return true;
 			} else {
@@ -691,17 +714,18 @@ public class BleExt {
 				}
 				return false;
 			}
-		}
-		return false;
+//		}
+//		return false;
 	}
 
 	/**
 	 * Helper function to check if we are already / still connected, and if a delayed disconnect is
 	 * active, restart the delay.
 	 * @return true if we are connected, false otherwise
+	 * @param address
 	 */
-	public boolean checkConnection() {
-		if (isConnected(null)) {
+	public boolean checkConnection(String address) {
+		if (isConnected(null) && _targetAddress.equals(address)) {
 			if (_delayedDisconnect != null) {
 				delayedDisconnect(null);
 			}
@@ -736,7 +760,7 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void readPwm(String address, final IIntegerCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			readPwm(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -793,7 +817,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writePwm(String address, final int value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			writePwm(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -859,7 +883,7 @@ public class BleExt {
 	 * @param callback callback which will be informed about success or failure
 	 */
 	public void togglePower(String address, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			togglePower(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -973,7 +997,7 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void readCurrentConsumption(String address, final IIntegerCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			readCurrentConsumption(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1045,7 +1069,7 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void readCurrentCurve(String address, final IByteArrayCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			readCurrentCurve(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1098,7 +1122,7 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void readCurrentLimit(String address, final IIntegerCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			readCurrentLimit(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1153,7 +1177,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writeCurrentLimit(String address, final int value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			writeCurrentLimit(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1216,7 +1240,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	private void writeReset(String address, final int value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			writeReset(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1315,7 +1339,7 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void readTemperature(String address, final IIntegerCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			readTemperature(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1372,7 +1396,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writeMeshMessage(String address, final BleMeshMessage value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			writeMeshMessage(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1520,7 +1544,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setDeviceName(String address, final String value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			setDeviceName(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1572,7 +1596,7 @@ public class BleExt {
 	 * @param callback the callback which will get the device name on success, or an error otherwise
 	 */
 	public void getDeviceName(String address, final IStringCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			getDeviceName(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1624,7 +1648,7 @@ public class BleExt {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getBeaconMajor(String address, final IIntegerCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			getBeaconMajor(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1678,7 +1702,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setBeaconMajor(String address, final int value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			setBeaconMajor(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1730,7 +1754,7 @@ public class BleExt {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getBeaconMinor(String address, final IIntegerCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			getBeaconMinor(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1784,7 +1808,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setBeaconMinor(String address, final int value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			setBeaconMinor(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1836,7 +1860,7 @@ public class BleExt {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getBeaconProximityUuid(String address, final IStringCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			getBeaconProximityUuid(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1890,7 +1914,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setBeaconProximityUuid(String address, final String value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			setBeaconProximityUuid(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1942,7 +1966,7 @@ public class BleExt {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getBeaconCalibratedRssi(String address, final IIntegerCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			getBeaconCalibratedRssi(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -1996,7 +2020,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setBeaconCalibratedRssi(String address, final int value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			setBeaconCalibratedRssi(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2048,7 +2072,7 @@ public class BleExt {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getDeviceType(String address, final IStringCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			getDeviceType(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2102,7 +2126,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setDeviceType(String address, final String value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			setDeviceType(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2154,7 +2178,7 @@ public class BleExt {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getFloor(String address, final IIntegerCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			getFloor(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2208,7 +2232,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setFloor(String address, final int value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			setFloor(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2260,7 +2284,7 @@ public class BleExt {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getRoom(String address, final IStringCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			getRoom(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2314,7 +2338,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setRoom(String address, final String value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			setRoom(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2366,7 +2390,7 @@ public class BleExt {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getTxPower(String address, final IIntegerCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			getTxPower(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2422,7 +2446,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setTxPower(String address, final int value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			setTxPower(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2474,7 +2498,7 @@ public class BleExt {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getAdvertisementInterval(String address, final IIntegerCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			getAdvertisementInterval(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2528,7 +2552,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setAdvertisementInterval(String address, final int value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			setAdvertisementInterval(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2582,7 +2606,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setWifi(String address, final String value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			setWifi(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2635,7 +2659,7 @@ public class BleExt {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getIp(String address, final IStringCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			getIp(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2687,7 +2711,7 @@ public class BleExt {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getMinEnvTemp(String address, final IIntegerCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			getMinEnvTemp(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2741,7 +2765,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setMinEnvTemp(String address, final int value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			setMinEnvTemp(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2793,7 +2817,7 @@ public class BleExt {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getMaxEnvTemp(String address, final IIntegerCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			getMaxEnvTemp(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2847,7 +2871,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setMaxEnvTemp(String address, final int value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			setMaxEnvTemp(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2905,7 +2929,7 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void readTrackedDevices(String address, final IByteArrayCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			readTrackedDevices(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -2959,7 +2983,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void addTrackedDevice(String address, final BleTrackedDevice value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			addTrackedDevice(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -3014,7 +3038,7 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void listScannedDevices(String address, final IByteArrayCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			listScannedDevices(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -3070,7 +3094,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writeScanDevices(String address, final boolean value, final IStatusCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			writeScanDevices(value, callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
@@ -3153,7 +3177,7 @@ public class BleExt {
 	 * @param callback the callback which will return the list of scanned devices
 	 */
 	public void scanForDevices(final String address, final int scanDuration, final IByteArrayCallback callback) {
-		if (checkConnection()) {
+		if (checkConnection(address)) {
 			scanForDevices(scanDuration, callback);
 		} else {
 			// connect and execute ...
@@ -3248,8 +3272,83 @@ public class BleExt {
 		}
 	}
 
+	public void readAlert(final IAlertCallback callback) {
+		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_NEW_ALERT_UUID, callback)) {
+			LOGd("Reading Alert value ...");
+			_bleBase.readAlert(_targetAddress, callback);
+		}
+	}
 
+	public void readAlert(String address, final IAlertCallback callback) {
+		if (checkConnection(address)) {
+			readAlert(callback);
+		} else {
+			connectAndExecute(address, new IExecuteCallback() {
+				@Override
+				public void execute(final IStatusCallback execCallback) {
+					readAlert(new IAlertCallback() {
+						@Override
+						public void onSuccess(BleAlertState result) {
+							callback.onSuccess(result);
+							execCallback.onSuccess();
+						}
 
+						@Override
+						public void onError(int error) {
+							execCallback.onSuccess();
+						}
+					});
+				}
+			}, new IStatusCallback() {
+				@Override
+				public void onSuccess() { /* don't care */ }
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			});
+		}
+	}
+
+	public void resetAlert(IStatusCallback callback) {
+		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_NEW_ALERT_UUID, callback)) {
+			LOGd("Reset Alert");
+			_bleBase.writeAlert(_targetAddress, 0, callback);
+		}
+	}
+
+	public void resetAlert(String address, final IStatusCallback callback) {
+		if (checkConnection(null)) {
+			resetAlert(callback);
+		} else {
+			connectAndExecute(address, new IExecuteCallback() {
+				@Override
+				public void execute(final IStatusCallback execCallback) {
+					resetAlert(new IStatusCallback() {
+						@Override
+						public void onSuccess() {
+							callback.onSuccess();
+							execCallback.onSuccess();
+						}
+
+						@Override
+						public void onError(int error) {
+							execCallback.onSuccess();
+						}
+					});
+				}
+			}, new IStatusCallback() {
+				@Override
+				public void onSuccess() { }
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			});
+		}
+	}
 
 
 
@@ -3257,82 +3356,85 @@ public class BleExt {
 
 	/////////////////////////////////////////////////////////////////////////////////////
 
-//	public void readXXX(ICallback callback) {
-//		if (isConnected(callback) && hasCharacteristic(BluenetConfig.YYY, callback)) {
-//			LOGd("Reading XXX value ...");
-//			_bleBase.readXXX(_targetAddress, callback);
-//		}
-//	}
-//
-//	public void readXXX(String address, final ICallback callback) {
-//		if (checkConnection(null)) {
-//			readXXX(callback);
-//		} else {
-//			connectAndExecute(address, new IExecuteCallback() {
-//				@Override
-//				public void execute(final IStatusCallback execCallback) {
-//					readXXX(new ICallback() {
-//						@Override
-//						public void onDeviceScanned(zzz result) {
-//							callback.onDeviceScanned(result);
-//							execCallback.onDeviceScanned();
-//						}
-//
-//						@Override
-//						public void onError(int error) {
-//							execCallback.onDeviceScanned();
-//						}
-//					});
-//				}
-//			}, new IStatusCallback() {
-//				@Override
-//				public void onDeviceScanned() { /* don't care */ }
-//
-//				@Override
-//				public void onError(int error) {
-//					callback.onError(error);
-//				}
-//			});
-//		}
-//	}
-//
-//	public void writeXXX(zzz value, IStatusCallback callback) {
-//		if (isConnected(callback) && hasCharacteristic(BluenetConfig.YYY, callback)) {
-//			LOGd("Set XXX to %uuu", value);
-//			_bleBase.writeXXX(_targetAddress, value, callback);
-//		}
-//	}
-//
-//	public void writeXXX(String address, final zzz value, final IStatusCallback callback) {
-//		if (checkConnection(null)) {
-//			writeXXX(value, callback);
-//		} else {
-//			connectAndExecute(address, new IExecuteCallback() {
-//				@Override
-//				public void execute(final IStatusCallback execCallback) {
-//					writeXXX(value, new IStatusCallback() {
-//						@Override
-//						public void onDeviceScanned() {
-//							callback.onDeviceScanned();
-//							execCallback.onDeviceScanned();
-//						}
-//
-//						@Override
-//						public void onError(int error) {
-//							execCallback.onDeviceScanned();
-//						}
-//					});
-//				}
-//			}, new IStatusCallback() {
-//				@Override
-//				public void onDeviceScanned() { /* don't care */ }
-//
-//				@Override
-//				public void onError(int error) {
-//					callback.onError(error);
-//				}
-//			});
-//		}
-//	}
+/*
+	public void readXXX(ICallback callback) {
+		if (isConnected(callback) && hasCharacteristic(BluenetConfig.YYY, callback)) {
+			LOGd("Reading XXX value ...");
+			_bleBase.readXXX(_targetAddress, callback);
+		}
+	}
+
+	public void readXXX(String address, final ICallback callback) {
+		if (checkConnection(null)) {
+			readXXX(callback);
+		} else {
+			connectAndExecute(address, new IExecuteCallback() {
+				@Override
+				public void execute(final IStatusCallback execCallback) {
+					readXXX(new ICallback() {
+						@Override
+						public void onSuccess(zzz result) {
+							callback.onSuccess(result);
+							execCallback.onSuccess();
+						}
+
+						@Override
+						public void onError(int error) {
+							execCallback.onSuccess();
+						}
+					});
+				}
+			}, new IStatusCallback() {
+				@Override
+				public void onSuccess() { }
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			});
+		}
+	}
+
+	public void writeXXX(zzz value, IStatusCallback callback) {
+		if (isConnected(callback) && hasCharacteristic(BluenetConfig.YYY, callback)) {
+			LOGd("Set XXX to %uuu", value);
+			_bleBase.writeXXX(_targetAddress, value, callback);
+		}
+	}
+
+	public void writeXXX(String address, final zzz value, final IStatusCallback callback) {
+		if (checkConnection(null)) {
+			writeXXX(value, callback);
+		} else {
+			connectAndExecute(address, new IExecuteCallback() {
+				@Override
+				public void execute(final IStatusCallback execCallback) {
+					writeXXX(value, new IStatusCallback() {
+						@Override
+						public void onSuccess() {
+							callback.onSuccess();
+							execCallback.onSuccess();
+						}
+
+						@Override
+						public void onError(int error) {
+							execCallback.onSuccess();
+						}
+					});
+				}
+			}, new IStatusCallback() {
+				@Override
+				public void onSuccess() { }
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			});
+		}
+	}
+	
+*/
 
 }

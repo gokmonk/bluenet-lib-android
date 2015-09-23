@@ -17,4 +17,6 @@ public class BleTypes extends BleCoreTypes {
 	public static final String PROPERTY_PROXIMITY_UUID = "proximityUuid";
 	public static final String PROPERTY_IS_IBEACON = "isIBeacon";
 
+	public static final String PROPERTY_IS_DOBEACON = "isDoBeacon";
+	public static final String PROPERTY_IS_FRIDGE = "isFridge";
 }

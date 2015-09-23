@@ -11,12 +11,15 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.UUID;
 
+import nl.dobots.bluenet.ble.base.callbacks.IAlertCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IConfigurationCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDiscoveryCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IManufacDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
+import nl.dobots.bluenet.ble.base.structs.BleAlertState;
 import nl.dobots.bluenet.ble.base.structs.BleConfiguration;
 import nl.dobots.bluenet.ble.base.structs.BleMeshMessage;
 import nl.dobots.bluenet.ble.base.structs.BleTrackedDevice;
@@ -69,29 +72,68 @@ public class BleBase extends BleCore {
 			}
 
 			@Override
-			public void onData(JSONObject json) {
+			public void onData(final JSONObject json) {
 				byte[] advertisement = BleCore.getBytes(json, BleCoreTypes.PROPERTY_ADVERTISEMENT);
 
 //				if (Build.VERSION.SDK_INT >= 21) {
 //					ScanRecord scanRecord = ScanRecord.parseFromBytes(advertisement);
 //				}
 
-				byte[] manufacData = parseAdvertisement(advertisement, 0xFF);
-				if (manufacData != null) {
-					int companyID = BleUtils.byteArrayToShort(manufacData, 0);
-					if (companyID == BluenetConfig.APPLE_COMPANY_ID) {
-						parseIBeaconData(json, manufacData);
+				parseAdvertisement(advertisement, 0xFF, new IManufacDataCallback() {
+					@Override
+					public void onData(byte[] result) {
+						int companyID = BleUtils.byteArrayToShort(result, 0);
+						if (companyID == BluenetConfig.APPLE_COMPANY_ID) {
+							parseIBeaconData(json, result);
+						}
+						if (companyID == BluenetConfig.DOBOTS_COMPANY_ID) {
+							parseDoBotsData(json, result);
+						}
 					}
-					if (companyID == BluenetConfig.DOBOTS_COMPANY_ID) {
-						BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE, true);
-					}
-				} else {
-					LOGd("json: " + json.toString());
-				}
-				callback.onData(json);
 
+					@Override
+					public void onSuccess() {
+						callback.onData(json);
+					}
+
+
+					@Override
+					public void onError(int error) {
+						LOGd("json: " + json.toString());
+					}
+				});
 			}
 		});
+	}
+
+	private void parseDoBotsData(JSONObject json, byte[] manufacData) {
+		ByteBuffer bb = ByteBuffer.wrap(manufacData);
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+
+		int companyId = bb.getShort();
+
+		if (companyId == BluenetConfig.DOBOTS_COMPANY_ID) {
+			try {
+				int deviceType = bb.get();
+				switch (deviceType) {
+					case BluenetConfig.DEVICE_CROWNSTONE: {
+						BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE, true);
+						break;
+					}
+					case BluenetConfig.DEVICE_DOBEACON: {
+						BleCore.addProperty(json, BleTypes.PROPERTY_IS_DOBEACON, true);
+						break;
+					}
+					case BluenetConfig.DEVICE_FRIDGE: {
+						BleCore.addProperty(json, BleTypes.PROPERTY_IS_FRIDGE, true);
+						break;
+					}
+				}
+			} catch (Exception e) {
+				BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE, true);
+				LOGd("old advertisement package: %s", json);
+			}
+		}
 	}
 
 	/**
@@ -912,13 +954,15 @@ public class BleBase extends BleCore {
 					@Override
 					public void onSuccess() {
 						LOGd("Successfully written to configuration characteristic");
-						// todo: do we need a timeout here?
-//                      _timeoutHandler.postDelayed(new Runnable() {
-//                          @Override
-//                          public void run() {
-						callback.onSuccess();
-//                          }
-//                      }, 500);
+						// we need to give the crownstone some time to handle the config write,
+						// because it needs to access persistent memory in order to store the new
+						// config value
+						_timeoutHandler.postDelayed(new Runnable() {
+							@Override
+							public void run() {
+								callback.onSuccess();
+							}
+						}, 200);
 					}
 
 					@Override
@@ -1118,7 +1162,7 @@ public class BleBase extends BleCore {
 	 */
 	public void writeReset(String address, int value, final IStatusCallback callback) {
 		LOGd("reset: write %d at service %s and characteristic %s", value, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_RESET_UUID);
-		write(address, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_RESET_UUID, new byte[]{(byte)value},
+		write(address, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_RESET_UUID, new byte[]{(byte) value},
 				new IStatusCallback() {
 
 					@Override
@@ -1135,8 +1179,49 @@ public class BleBase extends BleCore {
 				});
 	}
 
+	public void readAlert(String address, final IAlertCallback callback) {
+		LOGd("read Alert at service %s and characteristic %s", BluenetConfig.ALERT_SERVICE_UUID, BluenetConfig.CHAR_NEW_ALERT_UUID);
+		read(address, BluenetConfig.ALERT_SERVICE_UUID, BluenetConfig.CHAR_NEW_ALERT_UUID, new IDataCallback() {
+			@Override
+			public void onError(int error) {
+				LOGe("Failed to read Alert characteristic");
+				callback.onError(error);
+			}
 
+			@Override
+			public void onData(JSONObject json) {
+				byte[] bytes = BleCore.getValue(json);
+				try {
+					int alertValue = BleUtils.signedToUnsignedByte(bytes[0]);
+					int num = BleUtils.signedToUnsignedByte(bytes[1]);
+					LOGd("Alert: %d, num: %d", alertValue, num);
+					callback.onSuccess(new BleAlertState(alertValue, num));
+				} catch (Exception e) {
+					callback.onError(BleErrors.ERROR_RETURN_VALUE_PARSING);
+				}
+			}
+		});
+	}
 
+	// only used to reset alerts (set value to 0)
+	public void writeAlert(String address, int value, final IStatusCallback callback) {
+		LOGd("Alert: write %d at service %s and characteristic %s", value, BluenetConfig.ALERT_SERVICE_UUID, BluenetConfig.CHAR_NEW_ALERT_UUID);
+		write(address, BluenetConfig.ALERT_SERVICE_UUID, BluenetConfig.CHAR_NEW_ALERT_UUID, BleUtils.shortToByteArray(value),
+				new IStatusCallback() {
+
+					@Override
+					public void onSuccess() {
+						LOGd("Successfully written to Alert characteristic");
+						callback.onSuccess();
+					}
+
+					@Override
+					public void onError(int error) {
+						LOGe("Failed to write to Alert characteristic");
+						callback.onError(error);
+					}
+				});
+	}
 
 
 
@@ -1155,7 +1240,7 @@ public class BleBase extends BleCore {
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
 				LOGd("xxx: %d", uuu);
-				callback.onDeviceScanned(uuu);
+				callback.onSuccess(uuu);
 			}
 		});
 	}
@@ -1167,9 +1252,9 @@ public class BleBase extends BleCore {
 				new IStatusCallback() {
 
 					@Override
-					public void onDeviceScanned() {
+					public void onSuccess() {
 						LOGd("Successfully written to xxx characteristic");
-						callback.onDeviceScanned();
+						callback.onSuccess();
 					}
 
 					@Override

@@ -34,9 +34,13 @@ public class BleErrors {
 	public static final int ERROR_BLUETOOTH_NOT_ENABLED = 221;
 	public static final int ERROR_DISCONNECT_FAILED = 222;
 	public static final int ERROR_NO_ADDRESS_PROVIDED = 223;
+	public static final int ERROR_STILL_CONNECTED = 224;
+	public static final int ERROR_RETURN_VALUE_PARSING = 225;
+	public static final int ERROR_ADVERTISEMENT_PARSING = 226;
 
 	// BleExt
 
 	public static final int ERROR_WRONG_STATE = 500;
 	public static final int ERROR_JSON_PARSING = 501;
+			;
 }
