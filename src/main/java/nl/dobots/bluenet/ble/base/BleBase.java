@@ -17,7 +17,6 @@ import nl.dobots.bluenet.ble.base.callbacks.IConfigurationCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDiscoveryCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IManufacDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.structs.BleAlertState;
 import nl.dobots.bluenet.ble.base.structs.BleConfiguration;
@@ -79,9 +78,9 @@ public class BleBase extends BleCore {
 //					ScanRecord scanRecord = ScanRecord.parseFromBytes(advertisement);
 //				}
 
-				parseAdvertisement(advertisement, 0xFF, new IManufacDataCallback() {
+				parseAdvertisement(advertisement, 0xFF, new IByteArrayCallback() {
 					@Override
-					public void onData(byte[] result) {
+					public void onSuccess(byte[] result) {
 						int companyID = BleUtils.byteArrayToShort(result, 0);
 						if (companyID == BluenetConfig.APPLE_COMPANY_ID) {
 							parseIBeaconData(json, result);
@@ -92,16 +91,12 @@ public class BleBase extends BleCore {
 					}
 
 					@Override
-					public void onSuccess() {
-						callback.onData(json);
-					}
-
-
-					@Override
 					public void onError(int error) {
 						LOGd("json: " + json.toString());
 					}
 				});
+
+				callback.onData(json);
 			}
 		});
 	}

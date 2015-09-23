@@ -39,8 +39,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
+import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IManufacDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.utils.BleUtils;
@@ -745,7 +745,7 @@ public class BleCore {
 	//	@SuppressLint("NewApi")
 	private ScanCallback _coreScanCallback;
 
-	protected void parseAdvertisement(byte[] scanRecord, int search, IManufacDataCallback callback) {
+	protected void parseAdvertisement(byte[] scanRecord, int search, IByteArrayCallback callback) {
 
 		ByteBuffer bb = ByteBuffer.wrap(scanRecord);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
@@ -757,9 +757,9 @@ public class BleCore {
 				if (type == search) {
 					byte[] result = new byte[length - 1];
 					bb.get(result, 0, length - 1);
-					callback.onData(result);
+					callback.onSuccess(result);
 				} else if (type == 0 && length == 0) {
-					break;
+					return;
 				} else {
 					// skip length elements
 					bb.position(bb.position() + length - 1); // length also includes the type field, so only advance by length-1
@@ -770,7 +770,6 @@ public class BleCore {
 //			e.printStackTrace();
 			callback.onError(BleErrors.ERROR_ADVERTISEMENT_PARSING);
 		}
-		callback.onSuccess();
 	}
 
 	public boolean disconnectDevice(String address, IDataCallback callback) {
