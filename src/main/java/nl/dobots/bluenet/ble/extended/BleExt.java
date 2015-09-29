@@ -303,7 +303,7 @@ public class BleExt {
 	 *                 if the device was successfully connected. onError will be called with an
 	 *                 ERROR to report failure.
 	 */
-	public void connect(String address, final IStatusCallback callback) {
+	private void connect(String address, final IStatusCallback callback) {
 
 		if (checkConnectionState(BleDeviceConnectionState.initialized, null)) {
 
@@ -469,11 +469,13 @@ public class BleExt {
 
 			@Override
 			public void onSuccess() {
+				LOGd("... discovery done");
 				callback.onSuccess();
 			}
 
 			@Override
 			public void onError(int error) {
+				LOGe("... discovery failed");
 				callback.onError(error);
 			}
 		});
@@ -551,7 +553,13 @@ public class BleExt {
 				String status = BleCore.getStatus(json);
 				if (status == "closed") {
 					onDisconnect();
-					callback.onSuccess();
+					// give the bluetooth adapter some time to settle after a close
+					_handler.postDelayed(new Runnable() {
+						@Override
+						public void run() {
+							callback.onSuccess();
+						}
+					}, 300);
 				} else if (status != "disconnected") {
 					LOGe("wrong status received: %s", status);
 				}

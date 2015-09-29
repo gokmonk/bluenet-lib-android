@@ -334,7 +334,7 @@ public class BleCore {
 				connection.setConnectionState(ConnectionState.DISCONNECTED);
 				connection.getGatt().disconnect();
 				_connectionCallback.onError(BleErrors.ERROR_RECONNECT_FAILED);
-				_connectionCallback = null;
+//				_connectionCallback = null;
 			}
 		};
 
@@ -344,6 +344,7 @@ public class BleCore {
 	private Runnable _connectTimeout;
 
 	private void setConnectTimeout(final String address, int timeout) {
+		_timeoutHandler.removeCallbacks(_connectTimeout);
 		_connectTimeout = new Runnable() {
 
 			@Override
@@ -352,10 +353,19 @@ public class BleCore {
 				Connection connection = _connections.get(address);
 				if (connection != null) {
 					connection.setConnectionState(ConnectionState.DISCONNECTED);
-					connection.getGatt().close();
+					BluetoothGatt gatt = connection.getGatt();
+					if (gatt != null) {
+						connection.getGatt().close();
+					} else {
+						LOGe("gatt == null");
+					}
 					_connections.remove(address);
-					_connectionCallback.onError(BleErrors.ERROR_CONNECT_FAILED);
-					_connectionCallback = null;
+					if (_connectionCallback != null) {
+						_connectionCallback.onError(BleErrors.ERROR_CONNECT_FAILED);
+//						_connectionCallback = null;
+					} else {
+						LOGe("_connectionCallback == null");
+					}
 				}
 			}
 		};
@@ -382,10 +392,10 @@ public class BleCore {
 		Connection connection = new Connection();
 		_connections.put(address, connection);
 
+		setConnectTimeout(address, timeout);
+
 		BluetoothGatt gatt = device.connectGatt(_context, false, new BluetoothGattCallbackExt());
 		connection.setGatt(gatt);
-
-		setConnectTimeout(address, timeout);
 
 	}
 
@@ -412,6 +422,12 @@ public class BleCore {
 			return false;
 		}
 
+		_connectionCallback = callback;
+		connection.setConnectionState(ConnectionState.CONNECTING);
+		connection.setDiscoveryState(DiscoveryState.UNDISCOVERED);
+
+		setReconnectTimeout(address, timeout);
+
 		BluetoothGatt gatt = connection.getGatt();
 		boolean result = gatt.connect();
 
@@ -421,11 +437,7 @@ public class BleCore {
 			return false;
 		}
 
-		connection.setConnectionState(ConnectionState.CONNECTING);
-		connection.setDiscoveryState(DiscoveryState.UNDISCOVERED);
-		_connectionCallback = callback;
 
-		setReconnectTimeout(address, timeout);
 
 		return true;
 	}
@@ -476,6 +488,12 @@ public class BleCore {
 		JSONObject json;
 
 		BluetoothGatt gatt = connection.getGatt();
+
+		if (gatt == null) {
+			// todo: report error?
+			LOGe("gatt == null");
+			return;
+		}
 
 		switch (connection.getDiscoveryState()) {
 			case DISCOVERING:
@@ -858,12 +876,16 @@ public class BleCore {
 
 		BluetoothGatt gatt = connection.getGatt();
 
-		if (clearCache) {
-			refreshDeviceCache(gatt);
-		}
+		if (gatt != null) {
+			if (clearCache) {
+				refreshDeviceCache(gatt);
+			}
 
-		gatt.close();
-		_connections.remove(address);
+			gatt.close();
+			_connections.remove(address);
+		} else {
+			LOGe("gatt == null");
+		}
 
 		LOGd("... done");
 
@@ -902,7 +924,9 @@ public class BleCore {
 
 		return disconnectDevice(address, new IDataCallback() {
 
-			private void close() {
+			// only report the first error, i.e. if disconnect and close fail,
+			// only report error of disconnect and skip error of close
+			private void close(final boolean reportError) {
 				closeDevice(address, clearCache, new IStatusCallback() {
 					@Override
 					public void onSuccess() {
@@ -913,7 +937,9 @@ public class BleCore {
 
 					@Override
 					public void onError(int error) {
-						callback.onError(error);
+						if (reportError) {
+							callback.onError(error);
+						}
 					}
 				});
 			}
@@ -923,7 +949,7 @@ public class BleCore {
 				String status = getStatus(json);
 				if (status == "disconnected") {
 					callback.onData(json);
-					close();
+					close(true);
 				} else {
 					LOGe("wrong status received: %s", status);
 				}
@@ -932,8 +958,9 @@ public class BleCore {
 			@Override
 			public void onError(int error) {
 				callback.onError(error);
-				// also try to close even if disconnect fails
-				close();
+				// also try to close even if disconnect fails, but don't report
+				// the error if it fails
+				close(false);
 			}
 		});
 	}
@@ -1077,7 +1104,11 @@ public class BleCore {
 
 				if (newState == BluetoothProfile.STATE_CONNECTED) {
 
-					connection.setConnectionState(ConnectionState.CONNECTED);
+					clearConnectTimeout();
+
+					if (connection != null) {
+						connection.setConnectionState(ConnectionState.CONNECTED);
+					}
 					LOGd("Connected to GATT server.");
 
 					JSONObject json = new JSONObject();
@@ -1092,7 +1123,9 @@ public class BleCore {
 
 				} else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
 
-					connection.setConnectionState(ConnectionState.DISCONNECTED);
+					if (connection != null) {
+						connection.setConnectionState(ConnectionState.DISCONNECTED);
+					}
 					LOGd("Disconnected from GATT server.");
 
 					JSONObject json = new JSONObject();
@@ -1111,6 +1144,7 @@ public class BleCore {
 				}
 			} else {
 				LOGe("BluetoothGatt Error, status: %d", status);
+				clearConnectTimeout();
 
 				gatt.close();
 				connection.setConnectionState(ConnectionState.DISCONNECTED);
@@ -1120,7 +1154,6 @@ public class BleCore {
 				}
 			}
 
-			clearConnectTimeout();
 		}
 
 		@Override
