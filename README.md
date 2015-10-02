@@ -2,6 +2,10 @@
 
 This android library simplifies the interaction with BLE devices running [bluenet](https://github.com/dobots/bluenet). For more information, have a look at the bluenet repository.
 
+# Example
+
+For a simple example of how to use the library, check out the android-bluenet-example [here](https://github.com/dobots/android-bluenet-example)
+
 ## Copyrights
 
 The copyrights (2014-2015) for the code belongs to the team of Distributed Organisms B.V. and are provided under an noncontagious open-source license:
