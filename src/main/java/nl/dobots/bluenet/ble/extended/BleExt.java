@@ -188,8 +188,8 @@ public class BleExt {
 	/**
 	 * Close the library and release all callbacks
 	 */
-	public void finish() {
-		_bleBase.finish();
+	public void destroy() {
+		_bleBase.destroy();
 	}
 
 	/**
@@ -255,6 +255,8 @@ public class BleExt {
 						if (!device.isCrownstone()) return;
 						break;
 					case doBeacon:
+						if (!device.isDoBeacon()) return;
+						break;
 					case iBeacon:
 						// if filter set to beacon, but device is not a beacon, abort
 						if (!device.isIBeacon()) return;
@@ -327,6 +329,7 @@ public class BleExt {
 						callback.onSuccess();
 					} else {
 						LOGe("wrong status received: %s", status);
+						_connectionState = BleDeviceConnectionState.initialized;
 						callback.onError(BleErrors.ERROR_CONNECT_FAILED);
 					}
 				}
@@ -783,7 +786,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -814,6 +817,10 @@ public class BleExt {
 		}
 	}
 
+	public BleBase getBleBase() {
+		return _bleBase;
+	}
+
 	/**
 	 * Function to write the given PWM value to the device. Connects to the device if not already
 	 * connected, and/or delays the disconnect if necessary.
@@ -840,7 +847,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -906,7 +913,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -1020,7 +1027,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -1092,7 +1099,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -1145,7 +1152,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -1200,7 +1207,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -1263,7 +1270,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -1362,7 +1369,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -1419,7 +1426,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -1567,7 +1574,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -1619,7 +1626,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -1671,7 +1678,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -1725,7 +1732,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -1777,7 +1784,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -1831,7 +1838,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -1883,7 +1890,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -1937,7 +1944,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -1989,7 +1996,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2043,7 +2050,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2095,7 +2102,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2149,7 +2156,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2201,7 +2208,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2255,7 +2262,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2307,7 +2314,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2361,7 +2368,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2413,7 +2420,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2469,7 +2476,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2521,7 +2528,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2575,7 +2582,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2629,7 +2636,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2682,7 +2689,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2734,7 +2741,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2788,7 +2795,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2840,7 +2847,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2894,7 +2901,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -2952,7 +2959,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -3006,7 +3013,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -3061,7 +3068,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -3117,7 +3124,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -3227,18 +3234,18 @@ public class BleExt {
 
 																@Override
 																public void onError(int error) {
-																	callback.onError(error);
+//																	callback.onError(error);
 																	// also disconnect if an error occurs
-																	stopExecCallback.onSuccess();
+																	stopExecCallback.onError(error);
 																}
 															});
 														}
 
 														@Override
 														public void onError(int error) {
-															callback.onError(error);
+//															callback.onError(error);
 															// disconnect if an error occurs
-															stopExecCallback.onSuccess();
+															stopExecCallback.onError(error);
 														}
 													});
 												}
@@ -3261,9 +3268,9 @@ public class BleExt {
 
 							@Override
 							public void onError(int error) {
-								callback.onError(error);
+//								callback.onError(error);
 								// disconnect if an error occurs
-								startExecCallback.onSuccess();
+								startExecCallback.onError(error);
 							}
 						});
 					}
@@ -3303,7 +3310,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -3342,7 +3349,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -3388,7 +3395,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}
@@ -3427,7 +3434,7 @@ public class BleExt {
 
 						@Override
 						public void onError(int error) {
-							execCallback.onSuccess();
+							execCallback.onError(error);
 						}
 					});
 				}

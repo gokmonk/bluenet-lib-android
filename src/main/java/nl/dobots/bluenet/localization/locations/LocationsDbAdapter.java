@@ -344,11 +344,13 @@ public class LocationsDbAdapter {
 		try {
 			String line = reader.readLine(); // skip first line (header information)
 			while ((line = reader.readLine()) != null) {
-				String[] data = line.split(",");
-				String locationName = data[1];
-				String deviceName = data[2];
-				String deviceAddress = data[3];
-				createEntry(locationName, deviceName, deviceAddress);
+				if (!line.equals("")) {
+					String[] data = line.split(",");
+					String locationName = data[1];
+					String deviceName = data[2];
+					String deviceAddress = data[3];
+					createEntry(locationName, deviceName, deviceAddress);
+				}
 			}
 		} catch (IOException e) {
 			e.printStackTrace();

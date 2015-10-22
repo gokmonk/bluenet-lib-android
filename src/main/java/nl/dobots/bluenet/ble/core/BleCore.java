@@ -194,16 +194,6 @@ public class BleCore {
 	}
 
 	/**
-	 * Unregister the broadcast receiver (if it is registered)
-	 */
-	public void destroy() {
-		if (_receiverRegistered) {
-			_context.unregisterReceiver(_receiver);
-			_receiverRegistered = false;
-		}
-	}
-
-	/**
 	 * Broadcast receiver used to handle Bluetooth Events, i.e. turning on and off of the
 	 * Bluetooth Adapter
 	 */
@@ -304,7 +294,12 @@ public class BleCore {
 	/**
 	 * Reset all callbacks.
 	 */
-	public void finish() {
+	public void destroy() {
+		if (_receiverRegistered) {
+			_context.unregisterReceiver(_receiver);
+			_receiverRegistered = false;
+		}
+
 		_initialized = false;
 		_connectionCallback = null;
 		_discoveryCallback = null;

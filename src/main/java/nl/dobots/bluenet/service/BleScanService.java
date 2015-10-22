@@ -233,6 +233,7 @@ public class BleScanService extends Service {
 		if (_scanning) {
 			_ble.stopScan(null); // don' t care if it worked or not, so don' t need a callback
 		}
+		_ble.destroy();
 
 		// Remove all callbacks and messages that were posted
 		_intervalScanHandler.removeCallbacksAndMessages(null);
@@ -353,7 +354,7 @@ public class BleScanService extends Service {
 		@Override
 		public void run() {
 			Log.d(TAG, "Stop endless scan");
-			_ble.stopScan(new IStatusCallback() {
+			if (_ble.stopScan(new IStatusCallback() {
 				@Override
 				public void onSuccess() {
 					onIntervalScanEnd();
@@ -364,7 +365,9 @@ public class BleScanService extends Service {
 				public void onError(int error) {
 					_intervalScanHandler.postDelayed(_startScanRunnable, _scanPause);
 				}
-			});
+			})) {
+				Log.v(TAG, "scan interval paused");
+			}
 		}
 	};
 
