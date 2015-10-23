@@ -330,6 +330,9 @@ public class BleScanService extends Service {
 				onIntervalScanStart();
 				_intervalScanHandler.postDelayed(_stopScanRunnable, _scanInterval);
 			}
+			else {
+				onEvent(EventListener.Event.BLUETOOTH_START_SCAN_ERROR);
+			}
 		}
 	};
 
@@ -369,6 +372,9 @@ public class BleScanService extends Service {
 				}
 			})) {
 				Log.v(TAG, "scan interval paused");
+			}
+			else {
+				onEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
 			}
 		}
 	};
