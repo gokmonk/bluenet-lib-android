@@ -80,6 +80,7 @@ public class BleLogger implements ScanDeviceListener, IntervalScanListener, Even
 	private HandlerThread _handlerThread;
 	private Handler _handler;
 
+	// TODO: include date in filename, so that we get a file per day
 
 	synchronized public void init(Context context, String logFileName) {
 		_context = context;
@@ -286,9 +287,8 @@ public class BleLogger implements ScanDeviceListener, IntervalScanListener, Even
 				boolean success = SensorManager.getRotationMatrix(R, I, _gravity, _geoMagnetic);
 				if (success) {
 					float orientation[] = new float[3];
-					SensorManager.getOrientation(R, orientation);
-//					float azimut = orientation[0]; // orientation contains: azimut, pitch and roll
-					Log.d(TAG, "orientation = " + orientation[0] + " " + orientation[1] + " " + orientation[2]);
+					SensorManager.getOrientation(R, orientation); // orientation contains: azimut, pitch and roll
+//					Log.d(TAG, "orientation = " + orientation[0] + " " + orientation[1] + " " + orientation[2]);
 
 					_orientationHistory.add(orientation);
 					if (_orientationHistory.size() >= COMPASS_AVERAGE_WINDOW) {
@@ -321,7 +321,7 @@ public class BleLogger implements ScanDeviceListener, IntervalScanListener, Even
 							}
 						}
 						logLine(BleLogEvent.orientation, average[0] + " " + average[1] + " " + average[2]);
-						Log.d(TAG, "orientation average = " + average[0] + " " + average[1] + " " + average[2]);
+//						Log.d(TAG, "orientation average = " + average[0] + " " + average[1] + " " + average[2]);
 						_orientationHistory.clear();
 					}
 				}
