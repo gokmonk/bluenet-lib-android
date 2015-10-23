@@ -87,6 +87,13 @@ public class BleScanService extends Service {
 	private static final int DEFAULT_SCAN_PAUSE = 500;
 
 	/**
+	 * Sometimes stopScan() didn't work properly, resulting in a failure at startScan().
+	 * We will retry to call stopScan for a couple of times with some delay
+	 */
+	private static final int STOP_SCAN_NUM_RETRIES = 5;
+	private static final int STOP_SCAN_RETRY_DELAY = 100;
+
+	/**
 	 * Set auto start to true if the service should start scanning directly on start.
 	 */
 	public static final String EXTRA_AUTO_START = "nl.dobots.bluenet.AUTO_START";
@@ -153,6 +160,8 @@ public class BleScanService extends Service {
 	private boolean _scanning = false;
 	private boolean _wasScanning = false;
 	private boolean _initialized = false;
+
+	private int _stopScanRetryNum = 0;
 
 	@Override
 	public void onCreate() {
@@ -322,11 +331,19 @@ public class BleScanService extends Service {
 					public void onError(int error) {
 						Log.e(TAG, "start scan error: " + error);
 						onEvent(EventListener.Event.BLUETOOTH_START_SCAN_ERROR);
+
+						if (error == BleErrors.ERROR_ALREADY_SCANNING) {
+							// Retry to stop scan
+							if (_stopScanRetryNum++ < STOP_SCAN_NUM_RETRIES) {
+								_intervalScanHandler.postDelayed(_stopScanRunnable, STOP_SCAN_RETRY_DELAY);
+							}
+						}
 					}
 				}))
 			{
 				Log.e(TAG, "scan started");
 				_scanning = true;
+				_stopScanRetryNum = 0;
 				onIntervalScanStart();
 				_intervalScanHandler.postDelayed(_stopScanRunnable, _scanInterval);
 			}
