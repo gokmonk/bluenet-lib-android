@@ -321,6 +321,7 @@ public class BleScanService extends Service {
 					@Override
 					public void onError(int error) {
 						Log.e(TAG, "start scan error: " + error);
+						onEvent(EventListener.Event.BLUETOOTH_START_SCAN_ERROR);
 					}
 				}))
 			{
@@ -364,6 +365,7 @@ public class BleScanService extends Service {
 				@Override
 				public void onError(int error) {
 					_intervalScanHandler.postDelayed(_startScanRunnable, _scanPause);
+					onEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
 				}
 			})) {
 				Log.v(TAG, "scan interval paused");
@@ -415,6 +417,7 @@ public class BleScanService extends Service {
 	 * This will use the scan interval and pause values set earlier, or the default values if nothing
 	 * was set previously.
 	 */
+	@Deprecated
 	public void startIntervalScan() {
 		startIntervalScan(BleDeviceFilter.doBeacon);
 	}
@@ -436,6 +439,7 @@ public class BleScanService extends Service {
 				@Override
 				public void onError(int error) {
 					Log.e(TAG, "Failed to stop interval scan: " + error);
+					onEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
 				}
 			});
 		}

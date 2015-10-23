@@ -20,8 +20,11 @@ package nl.dobots.bluenet.service.callbacks;
 public interface EventListener {
 
 	enum Event {
-		BLUETOOTH_TURNED_OFF, BLUETOOTH_NOT_ENABLED, BLUETOOTH_INITIALIZED
-
+		BLUETOOTH_TURNED_OFF,
+		BLUETOOTH_NOT_ENABLED,
+		BLUETOOTH_INITIALIZED,
+		BLUETOOTH_START_SCAN_ERROR,
+		BLUETOOTH_STOP_SCAN_ERROR,
 	}
 
 	void onEvent(Event event);
