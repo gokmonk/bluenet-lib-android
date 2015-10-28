@@ -1,6 +1,9 @@
 package nl.dobots.bluenet.utils.logger;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -40,7 +43,7 @@ import nl.dobots.bluenet.service.callbacks.ScanDeviceListener;
  *
  * @author Bart van Vliet
  */
-public class BleLogger implements ScanDeviceListener, IntervalScanListener, EventListener {
+public class BleLogger extends BroadcastReceiver implements ScanDeviceListener, IntervalScanListener, EventListener  {
 	private static final String TAG = BleLogger.class.getCanonicalName();
 	private static final int FLUSH_INTERVAL = 1000;
 	private static final int COMPASS_AVERAGE_WINDOW = 10;
@@ -71,6 +74,7 @@ public class BleLogger implements ScanDeviceListener, IntervalScanListener, Even
 		orientation,
 		bluetoothState,
 		bluetoothError,
+		phoneInteractive,
 	}
 
 	private BufferedWriter _bufferedWriter = null;
@@ -132,6 +136,7 @@ public class BleLogger implements ScanDeviceListener, IntervalScanListener, Even
 			_handler.postDelayed(_flushRunnable, FLUSH_INTERVAL);
 
 			initSensors();
+			initBroadcastReceiver();
 
 			_initialized = true;
 			logLine(BleLogEvent.start);
@@ -149,6 +154,7 @@ public class BleLogger implements ScanDeviceListener, IntervalScanListener, Even
 		if (_initialized) {
 			try {
 				deinitSensors();
+				deinitBroadcastReceiver();
 
 				logLine(BleLogEvent.stop);
 
@@ -211,6 +217,7 @@ public class BleLogger implements ScanDeviceListener, IntervalScanListener, Even
 			_handler.postDelayed(this, FLUSH_INTERVAL);
 		}
 	};
+
 
 	/////////////
 	// Sensors //
@@ -373,4 +380,32 @@ public class BleLogger implements ScanDeviceListener, IntervalScanListener, Even
 				break;
 		}
 	}
+
+
+	////////////////////////
+	// Power state events //
+	////////////////////////
+
+	void initBroadcastReceiver() {
+		IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_ON);
+		filter.addAction(Intent.ACTION_SCREEN_OFF);
+		_context.registerReceiver(this, filter);
+	}
+
+	void deinitBroadcastReceiver() {
+		_context.unregisterReceiver(this);
+	}
+
+	@Override
+	public void onReceive(Context context, Intent intent) {
+		if (intent.getAction().equals(Intent.ACTION_SCREEN_OFF)) {
+			// This broadcast is sent when the device becomes non-interactive which may have nothing to do with the screen turning off.
+			logLine(BleLogEvent.phoneInteractive, "0");
+		}
+		else if (intent.getAction().equals(Intent.ACTION_SCREEN_ON)) {
+			// This broadcast is sent when the device becomes interactive which may have nothing to do with the screen turning on.
+			logLine(BleLogEvent.phoneInteractive, "1");
+		}
+	}
+
 }
