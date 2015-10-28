@@ -9,10 +9,13 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.hardware.display.DisplayManager;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.SystemClock;
 import android.util.Log;
+import android.view.Display;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -197,12 +200,16 @@ public class BleLogger extends BroadcastReceiver implements ScanDeviceListener, 
 		logLine(event, "");
 	}
 
-	synchronized public void logLine(BleLogEvent event, String text) {
+	public void logLine(BleLogEvent event, String text) {
+		logLine(System.currentTimeMillis(), event, text);
+	}
+
+	synchronized public void logLine(long timeStampMs, BleLogEvent event, String text) {
 		if (!_initialized) {
 			return;
 		}
 		try {
-			_bufferedWriter.append(System.currentTimeMillis() + " " + event.toString() + " " + text);
+			_bufferedWriter.append(timeStampMs + " " + event.toString() + " " + text);
 			_bufferedWriter.append('\n');
 		} catch (IOException e) {
 			// TODO: handle exception
@@ -280,10 +287,13 @@ public class BleLogger extends BroadcastReceiver implements ScanDeviceListener, 
 				_geoMagnetic = event.values;
 			}
 			else if (event.sensor.getType() == Sensor.TYPE_STEP_DETECTOR) {
-				logLine(BleLogEvent.stepDetected);
+				// Event timestamp is recorded in us accuracy, compare with: SystemClock.elapsedRealtimeNanos()
+				long timeStampMs = System.currentTimeMillis() - ((SystemClock.elapsedRealtimeNanos() - event.timestamp) / 1000000L);
+				logLine(timeStampMs, BleLogEvent.stepDetected, "");
 			}
 			else if (event.sensor.getType() == Sensor.TYPE_STEP_COUNTER) {
-				logLine(BleLogEvent.stepCount, "" + event.values[0]);
+				long timeStampMs = System.currentTimeMillis() - ((SystemClock.elapsedRealtimeNanos() - event.timestamp) / 1000000L);
+				logLine(timeStampMs, BleLogEvent.stepCount, "" + event.values[0]);
 			}
 			else {
 				return;
@@ -386,7 +396,12 @@ public class BleLogger extends BroadcastReceiver implements ScanDeviceListener, 
 	// Power state events //
 	////////////////////////
 
+	DisplayManager _displayManager;
+	Display _display;
+
 	void initBroadcastReceiver() {
+		_displayManager = (DisplayManager) _context.getSystemService(Context.DISPLAY_SERVICE);
+		_display = _displayManager.getDisplay(Display.DEFAULT_DISPLAY);
 		IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_ON);
 		filter.addAction(Intent.ACTION_SCREEN_OFF);
 		_context.registerReceiver(this, filter);
@@ -400,6 +415,26 @@ public class BleLogger extends BroadcastReceiver implements ScanDeviceListener, 
 	public void onReceive(Context context, Intent intent) {
 		if (intent.getAction().equals(Intent.ACTION_SCREEN_OFF)) {
 			// This broadcast is sent when the device becomes non-interactive which may have nothing to do with the screen turning off.
+
+/* TODO: this uses API level 20, but would be nice to have, check https://developer.android.com/about/dashboards/index.html
+			String displayState;
+			switch (_display.getState()) {
+				case Display.STATE_OFF:
+					displayState = "OFF";
+					break;
+				case Display.STATE_ON:
+					displayState = "ON";
+					break;
+				case Display.STATE_DOZE_SUSPEND:
+					displayState = "DOZE_SUSPEND";
+					break;
+				case Display.STATE_UNKNOWN:
+				default:
+					displayState = "UNKNOWN";
+					break;
+			}
+			logLine(BleLogEvent.phoneInteractive, "0 " + displayState);
+*/
 			logLine(BleLogEvent.phoneInteractive, "0");
 		}
 		else if (intent.getAction().equals(Intent.ACTION_SCREEN_ON)) {
