@@ -4,7 +4,6 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
-import android.util.Log;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -30,6 +29,7 @@ import nl.dobots.bluenet.ble.extended.structs.BleDevice;
 import nl.dobots.bluenet.ble.extended.structs.BleDeviceMap;
 import nl.dobots.bluenet.ble.base.structs.BleMeshMessage;
 import nl.dobots.bluenet.ble.base.structs.BleTrackedDevice;
+import nl.dobots.bluenet.utils.BleLog;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -86,23 +86,6 @@ public class BleExt {
 		HandlerThread handlerThread = new HandlerThread("BleExtHandler");
 		handlerThread.start();
 		_handler = new Handler(handlerThread.getLooper());
-	}
-
-	/* Helper functions for logging, avoid typing tag and provide printf */
-	protected void LOGd(String message) {
-		Log.d(TAG, message);
-	}
-
-	protected void LOGd(String fmt, Object ... args) {
-		LOGd(String.format(fmt, args));
-	}
-
-	protected void LOGe(String message) {
-		Log.e(TAG, message);
-	}
-
-	protected void LOGe(String fmt, Object ... args) {
-		LOGe(String.format(fmt, args));
 	}
 
 	/**
@@ -230,7 +213,7 @@ public class BleExt {
 	private boolean startEndlessScan(final IBleDeviceCallback callback) {
 		checkConnectionState(BleDeviceConnectionState.initialized, null);
 //		if (_connectionState != BleDeviceConnectionState.initialized) {
-//			LOGe("State is not initialized: %s", _connectionState.toString());
+//			BleCore.LOGe(TAG, "State is not initialized: %s", _connectionState.toString());
 //			callback.onError(BleCoreTypes.ERROR_WRONG_STATE);
 //			return false;
 //		}
@@ -244,8 +227,8 @@ public class BleExt {
 				try {
 					device = new BleDevice(json);
 				} catch (JSONException e) {
-					LOGe("Failed to parse json into device! Err: " + e.getMessage());
-					LOGd("json: " + json.toString());
+					BleLog.LOGe(TAG, "Failed to parse json into device! Err: " + e.getMessage());
+					BleLog.LOGd(TAG, "json: " + json.toString());
 					return;
 				}
 
@@ -328,7 +311,7 @@ public class BleExt {
 						onConnect();
 						callback.onSuccess();
 					} else {
-						LOGe("wrong status received: %s", status);
+						BleLog.LOGe(TAG, "wrong status received: %s", status);
 						_connectionState = BleDeviceConnectionState.initialized;
 						callback.onError(BleErrors.ERROR_CONNECT_FAILED);
 					}
@@ -362,7 +345,7 @@ public class BleExt {
 	 * Helper function to handle connect events. E.g. update the connection state
 	 */
 	private void onConnect() {
-		LOGd("successfully connected");
+		BleLog.LOGd(TAG, "successfully connected");
 		// todo: timeout?
 		_connectionState = BleDeviceConnectionState.connected;
 	}
@@ -387,7 +370,7 @@ public class BleExt {
 					onDisconnect();
 					callback.onSuccess();
 				} else {
-					LOGe("wrong status received: %s", status);
+					BleLog.LOGe(TAG, "wrong status received: %s", status);
 					callback.onError(BleErrors.ERROR_DISCONNECT_FAILED);
 				}
 			}
@@ -403,7 +386,7 @@ public class BleExt {
 	 * Helper function to handle disconnect events, e.g. update the connection state
 	 */
 	private void onDisconnect() {
-		LOGd("successfully disconnected");
+		BleLog.LOGd(TAG, "successfully disconnected");
 		// todo: timeout?
 		_connectionState = BleDeviceConnectionState.initialized;
 		clearDelayedDisconnect();
@@ -420,7 +403,7 @@ public class BleExt {
 	 */
 	private boolean checkConnectionState(BleDeviceConnectionState state, IBaseCallback callback) {
 		if (_connectionState != state) {
-			LOGe("wrong connection state: %s instead of %s", _connectionState.toString(), state.toString());
+			BleLog.LOGe(TAG, "wrong connection state: %s instead of %s", _connectionState.toString(), state.toString());
 			if (callback != null) {
 				callback.onError(BleErrors.ERROR_WRONG_STATE);
 			}
@@ -445,7 +428,7 @@ public class BleExt {
 	 * @param callback the callback used to report success or failure
 	 */
 	public void close(boolean clearCache, IStatusCallback callback) {
-		LOGd("closing device ...");
+		BleLog.LOGd(TAG, "closing device ...");
 		_bleBase.closeDevice(_targetAddress, clearCache, callback);
 	}
 
@@ -461,7 +444,7 @@ public class BleExt {
 	 * @param callback the callback used to report discovered services and characteristics
 	 */
 	public void discoverServices(final IDiscoveryCallback callback) {
-		LOGd("discovering services ...");
+		BleLog.LOGd(TAG, "discovering services ...");
 		_detectedCharacteristics.clear();
 		_bleBase.discoverServices(_targetAddress, new IDiscoveryCallback() {
 			@Override
@@ -472,13 +455,13 @@ public class BleExt {
 
 			@Override
 			public void onSuccess() {
-				LOGd("... discovery done");
+				BleLog.LOGd(TAG, "... discovery done");
 				callback.onSuccess();
 			}
 
 			@Override
 			public void onError(int error) {
-				LOGe("... discovery failed");
+				BleLog.LOGe(TAG, "... discovery failed");
 				callback.onError(error);
 			}
 		});
@@ -492,7 +475,7 @@ public class BleExt {
 	 * @param characteristicUuid the UUID of the characteristic
 	 */
 	private void onCharacteristicDiscovered(String serviceUuid, String characteristicUuid) {
-		LOGd("discovered characteristic: %s", characteristicUuid);
+		BleLog.LOGd(TAG, "discovered characteristic: %s", characteristicUuid);
 		// todo: might have to store both service and characteristic uuid, because the characteristic
 		//       UUID is not unique!
 		_detectedCharacteristics.add(characteristicUuid);
@@ -564,7 +547,7 @@ public class BleExt {
 						}
 					}, 300);
 				} else if (status != "disconnected") {
-					LOGe("wrong status received: %s", status);
+					BleLog.LOGe(TAG, "wrong status received: %s", status);
 				}
 			}
 
@@ -758,7 +741,7 @@ public class BleExt {
 	 */
 	public void readPwm(IIntegerCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_PWM_UUID, callback)) {
-			LOGd("Reading current PWM value ...");
+			BleLog.LOGd(TAG, "Reading current PWM value ...");
 			_bleBase.readPWM(_targetAddress, callback);
 		}
 	}
@@ -812,11 +795,17 @@ public class BleExt {
 	 */
 	public void writePwm(int value, IStatusCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_PWM_UUID, callback)) {
-			LOGd("Set PWM to %d", value);
+			BleLog.LOGd(TAG, "Set PWM to %d", value);
 			_bleBase.writePWM(_targetAddress, value, callback);
 		}
 	}
 
+	/**
+	 * Get access to the base bluenet object. Only use it if you need to change some low level
+	 * settings. Usually this is Not necessary.
+	 * @return BleBase object used by this exented object to interact with the Android Bluetooth
+	 * functions
+	 */
 	public BleBase getBleBase() {
 		return _bleBase;
 	}
@@ -982,7 +971,7 @@ public class BleExt {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_SAMPLE_CURRENT_UUID, callback) &&
 				hasCharacteristic(BluenetConfig.CHAR_CURRENT_CONSUMPTION_UUID, callback)) {
 			// Sample current
-			LOGd("Sampling Current ...");
+			BleLog.LOGd(TAG, "Sampling Current ...");
 			_bleBase.sampleCurrent(_targetAddress, BluenetConfig.SAMPLE_CURRENT_CONSUMPTION, new IStatusCallback() {
 				@Override
 				public void onSuccess() {
@@ -990,7 +979,7 @@ public class BleExt {
 					_handler.postDelayed(new Runnable() {
 						@Override
 						public void run() {
-							LOGd("Reading CurrentConsumption value ...");
+							BleLog.LOGd(TAG, "Reading CurrentConsumption value ...");
 							_bleBase.readCurrentConsumption(_targetAddress, callback);
 						}
 					}, 100);
@@ -1054,7 +1043,7 @@ public class BleExt {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_SAMPLE_CURRENT_UUID, callback) &&
 				hasCharacteristic(BluenetConfig.CHAR_CURRENT_CURVE_UUID, callback)) {
 			// Sample current
-			LOGd("Sampling Current ...");
+			BleLog.LOGd(TAG, "Sampling Current ...");
 			_bleBase.sampleCurrent(_targetAddress, BluenetConfig.SAMPLE_CURRENT_CURVE, new IStatusCallback() {
 				@Override
 				public void onSuccess() {
@@ -1062,7 +1051,7 @@ public class BleExt {
 					_handler.postDelayed(new Runnable() {
 						@Override
 						public void run() {
-							LOGd("Reading CurrentCurve value ...");
+							BleLog.LOGd(TAG, "Reading CurrentCurve value ...");
 							_bleBase.readCurrentCurve(_targetAddress, callback);
 						}
 					}, 100);
@@ -1124,7 +1113,7 @@ public class BleExt {
 	 */
 	public void readCurrentLimit(IIntegerCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_CURRENT_LIMIT_UUID, callback)) {
-			LOGd("Reading CurrentLimit value ...");
+			BleLog.LOGd(TAG, "Reading CurrentLimit value ...");
 			_bleBase.readCurrentLimit(_targetAddress, callback);
 		}
 	}
@@ -1178,7 +1167,7 @@ public class BleExt {
 	 */
 	public void writeCurrentLimit(int value, IStatusCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_CURRENT_LIMIT_UUID, callback)) {
-			LOGd("Set CurrentLimit to %d", value);
+			BleLog.LOGd(TAG, "Set CurrentLimit to %d", value);
 			_bleBase.writeCurrentLimit(_targetAddress, value, callback);
 		}
 	}
@@ -1239,7 +1228,7 @@ public class BleExt {
 	 */
 	private void writeReset(int value, IStatusCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_RESET_UUID, callback)) {
-			LOGd("Set Reset to %d", value);
+			BleLog.LOGd(TAG, "Set Reset to %d", value);
 			_bleBase.writeReset(_targetAddress, value, callback);
 		}
 	}
@@ -1341,7 +1330,7 @@ public class BleExt {
 	 */
 	public void readTemperature(IIntegerCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_TEMPERATURE_UUID, callback)) {
-			LOGd("Reading Temperature value ...");
+			BleLog.LOGd(TAG, "Reading Temperature value ...");
 			_bleBase.readTemperature(_targetAddress, callback);
 		}
 	}
@@ -1396,7 +1385,7 @@ public class BleExt {
 	 */
 	public void writeMeshMessage(BleMeshMessage value, IStatusCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_MESH_UUID, callback)) {
-			LOGd("Set MeshMessage to %s", value.toString());
+			BleLog.LOGd(TAG, "Set MeshMessage to %s", value.toString());
 			_bleBase.writeMeshMessage(_targetAddress, value, callback);
 		}
 	}
@@ -1460,7 +1449,7 @@ public class BleExt {
 
 //	public void writeConfiguration(BleConfiguration value, IStatusCallback callback) {
 //		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-//			LOGd("Set Configuration to %s", value.toString());
+//			BleCore.LOGd(TAG, "Set Configuration to %s", value.toString());
 //			_bleBase.writeConfiguration(_targetAddress, value, callback);
 //		}
 //	}
@@ -1499,7 +1488,7 @@ public class BleExt {
 
 //	public void readConfiguration(int configurationType, IConfigurationCallback callback) {
 //		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-//			LOGd("Reading Configuration value ...");
+//			BleCore.LOGd(TAG, "Reading Configuration value ...");
 //			_bleBase.getConfiguration(_targetAddress, configurationType, callback);
 //		}
 //	}
@@ -1546,7 +1535,7 @@ public class BleExt {
 	 */
 	public void setDeviceName(String value, IStatusCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Set DeviceName to %s", value);
+			BleLog.LOGd(TAG, "Set DeviceName to %s", value);
 			_bleBase.setDeviceName(_targetAddress, value, callback);
 		}
 	}
@@ -1599,7 +1588,7 @@ public class BleExt {
 	 */
 	public void getDeviceName(IStringCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Get DeviceName ...");
+			BleLog.LOGd(TAG, "Get DeviceName ...");
 			_bleBase.getDeviceName(_targetAddress, callback);
 		}
 	}
@@ -1651,7 +1640,7 @@ public class BleExt {
 	 */
 	public void getBeaconMajor(IIntegerCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Reading BeaconMajor value ...");
+			BleLog.LOGd(TAG, "Reading BeaconMajor value ...");
 			_bleBase.getBeaconMajor(_targetAddress, callback);
 		}
 	}
@@ -1704,7 +1693,7 @@ public class BleExt {
 	 */
 	public void setBeaconMajor(int value, IStatusCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Set BeaconMajor to %d", value);
+			BleLog.LOGd(TAG, "Set BeaconMajor to %d", value);
 			_bleBase.setBeaconMajor(_targetAddress, value, callback);
 		}
 	}
@@ -1757,7 +1746,7 @@ public class BleExt {
 	 */
 	public void getBeaconMinor(IIntegerCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Get BeaconMinor ...");
+			BleLog.LOGd(TAG, "Get BeaconMinor ...");
 			_bleBase.getBeaconMinor(_targetAddress, callback);
 		}
 	}
@@ -1810,7 +1799,7 @@ public class BleExt {
 	 */
 	public void setBeaconMinor(int value, IStatusCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Set BeaconMinor to %d", value);
+			BleLog.LOGd(TAG, "Set BeaconMinor to %d", value);
 			_bleBase.setBeaconMinor(_targetAddress, value, callback);
 		}
 	}
@@ -1863,7 +1852,7 @@ public class BleExt {
 	 */
 	public void getBeaconProximityUuid(IStringCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Get BeaconProximityUuid ...");
+			BleLog.LOGd(TAG, "Get BeaconProximityUuid ...");
 			_bleBase.getBeaconProximityUuid(_targetAddress, callback);
 		}
 	}
@@ -1916,7 +1905,7 @@ public class BleExt {
 	 */
 	public void setBeaconProximityUuid(String value, IStatusCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Set BeaconProximityUuid to %s", value);
+			BleLog.LOGd(TAG, "Set BeaconProximityUuid to %s", value);
 			_bleBase.setBeaconProximityUuid(_targetAddress, value, callback);
 		}
 	}
@@ -1969,7 +1958,7 @@ public class BleExt {
 	 */
 	public void getBeaconCalibratedRssi(IIntegerCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Get BeaconCalibratedRssi ...");
+			BleLog.LOGd(TAG, "Get BeaconCalibratedRssi ...");
 			_bleBase.getBeaconCalibratedRssi(_targetAddress, callback);
 		}
 	}
@@ -2022,7 +2011,7 @@ public class BleExt {
 	 */
 	public void setBeaconCalibratedRssi(int value, IStatusCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Set BeaconCalibratedRssi to %d", value);
+			BleLog.LOGd(TAG, "Set BeaconCalibratedRssi to %d", value);
 			_bleBase.setBeaconCalibratedRssi(_targetAddress, value, callback);
 		}
 	}
@@ -2075,7 +2064,7 @@ public class BleExt {
 	 */
 	public void getDeviceType(IStringCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Get DeviceType ...");
+			BleLog.LOGd(TAG, "Get DeviceType ...");
 			_bleBase.getDeviceType(_targetAddress, callback);
 		}
 	}
@@ -2128,7 +2117,7 @@ public class BleExt {
 	 */
 	public void setDeviceType(String value, IStatusCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Set DeviceType to %s", value);
+			BleLog.LOGd(TAG, "Set DeviceType to %s", value);
 			_bleBase.setDeviceType(_targetAddress, value, callback);
 		}
 	}
@@ -2181,7 +2170,7 @@ public class BleExt {
 	 */
 	public void getFloor(IIntegerCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Get Floor ...");
+			BleLog.LOGd(TAG, "Get Floor ...");
 			_bleBase.getFloor(_targetAddress, callback);
 		}
 	}
@@ -2234,7 +2223,7 @@ public class BleExt {
 	 */
 	public void setFloor(int value, IStatusCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Set Floor to %s", value);
+			BleLog.LOGd(TAG, "Set Floor to %s", value);
 			_bleBase.setFloor(_targetAddress, value, callback);
 		}
 	}
@@ -2287,7 +2276,7 @@ public class BleExt {
 	 */
 	public void getRoom(IStringCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Get Room ...");
+			BleLog.LOGd(TAG, "Get Room ...");
 			_bleBase.getRoom(_targetAddress, callback);
 		}
 	}
@@ -2340,7 +2329,7 @@ public class BleExt {
 	 */
 	public void setRoom(String value, IStatusCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Set Room to %s", value);
+			BleLog.LOGd(TAG, "Set Room to %s", value);
 			_bleBase.setRoom(_targetAddress, value, callback);
 		}
 	}
@@ -2393,7 +2382,7 @@ public class BleExt {
 	 */
 	public void getTxPower(IIntegerCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Get TxPower ...");
+			BleLog.LOGd(TAG, "Get TxPower ...");
 			_bleBase.getTxPower(_targetAddress, callback);
 		}
 	}
@@ -2447,7 +2436,7 @@ public class BleExt {
 	 */
 	public void setTxPower(int value, IStatusCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Set TxPower to %d", value);
+			BleLog.LOGd(TAG, "Set TxPower to %d", value);
 			_bleBase.setTxPower(_targetAddress, value, callback);
 		}
 	}
@@ -2501,7 +2490,7 @@ public class BleExt {
 	 */
 	public void getAdvertisementInterval(IIntegerCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Get AdvertisementInterval ...");
+			BleLog.LOGd(TAG, "Get AdvertisementInterval ...");
 			_bleBase.getAdvertisementInterval(_targetAddress, callback);
 		}
 	}
@@ -2554,7 +2543,7 @@ public class BleExt {
 	 */
 	public void setAdvertisementInterval(int value, IStatusCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Set AdvertisementInterval to %d", value);
+			BleLog.LOGd(TAG, "Set AdvertisementInterval to %d", value);
 			_bleBase.setAdvertisementInterval(_targetAddress, value, callback);
 		}
 	}
@@ -2608,7 +2597,7 @@ public class BleExt {
 	 */
 	public void setWifi(String value, IStatusCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Set Wifi to %s", value);
+			BleLog.LOGd(TAG, "Set Wifi to %s", value);
 			_bleBase.setWifi(_targetAddress, value, callback);
 		}
 	}
@@ -2661,7 +2650,7 @@ public class BleExt {
 	 */
 	public void getIp(IStringCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Get Ip ...");
+			BleLog.LOGd(TAG, "Get Ip ...");
 			// todo: continue here
 			_bleBase.getIp(_targetAddress, callback);
 		}
@@ -2714,7 +2703,7 @@ public class BleExt {
 	 */
 	public void getMinEnvTemp(IIntegerCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Get minimum environment temperature...");
+			BleLog.LOGd(TAG, "Get minimum environment temperature...");
 			_bleBase.getMinEnvTemp(_targetAddress, callback);
 		}
 	}
@@ -2767,7 +2756,7 @@ public class BleExt {
 	 */
 	public void setMinEnvTemp(int value, IStatusCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Set minimum environment temperature to %d", value);
+			BleLog.LOGd(TAG, "Set minimum environment temperature to %d", value);
 			_bleBase.setMinEnvTemp(_targetAddress, value, callback);
 		}
 	}
@@ -2820,7 +2809,7 @@ public class BleExt {
 	 */
 	public void getMaxEnvTemp(IIntegerCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Get maximum environment temperature...");
+			BleLog.LOGd(TAG, "Get maximum environment temperature...");
 			_bleBase.getMaxEnvTemp(_targetAddress, callback);
 		}
 	}
@@ -2873,7 +2862,7 @@ public class BleExt {
 	 */
 	public void setMaxEnvTemp(int value, IStatusCallback callback) {
 		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
-			LOGd("Set maximum environment temperature to %d", value);
+			BleLog.LOGd(TAG, "Set maximum environment temperature to %d", value);
 			_bleBase.setMaxEnvTemp(_targetAddress, value, callback);
 		}
 	}
@@ -2931,7 +2920,7 @@ public class BleExt {
 	 */
 	public void readTrackedDevices(IByteArrayCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_LIST_TRACKED_DEVICES_UUID, callback)) {
-			LOGd("Reading TrackedDevices value ...");
+			BleLog.LOGd(TAG, "Reading TrackedDevices value ...");
 			_bleBase.readTrackedDevices(_targetAddress, callback);
 		}
 	}
@@ -2985,7 +2974,7 @@ public class BleExt {
 	 */
 	public void addTrackedDevice(BleTrackedDevice value, IStatusCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_ADD_TRACKED_DEVICE_UUID, callback)) {
-			LOGd("Set TrackedDevice to %s", value.toString());
+			BleLog.LOGd(TAG, "Set TrackedDevice to %s", value.toString());
 			_bleBase.addTrackedDevice(_targetAddress, value, callback);
 		}
 	}
@@ -3039,7 +3028,7 @@ public class BleExt {
 	 */
 	public void listScannedDevices(IByteArrayCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_DEVICE_LIST_UUID, callback)) {
-			LOGd("List scanned devices ...");
+			BleLog.LOGd(TAG, "List scanned devices ...");
 			_bleBase.listScannedDevices(_targetAddress, callback);
 		}
 	}
@@ -3095,7 +3084,7 @@ public class BleExt {
 	 */
 	public void writeScanDevices(boolean value, IStatusCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_DEVICE_SCAN_UUID, callback)) {
-			LOGd("Scan Devices: %b", value);
+			BleLog.LOGd(TAG, "Scan Devices: %b", value);
 			_bleBase.scanDevices(_targetAddress, value, callback);
 		}
 	}
@@ -3289,7 +3278,7 @@ public class BleExt {
 
 	public void readAlert(final IAlertCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_NEW_ALERT_UUID, callback)) {
-			LOGd("Reading Alert value ...");
+			BleLog.LOGd(TAG, "Reading Alert value ...");
 			_bleBase.readAlert(_targetAddress, callback);
 		}
 	}
@@ -3328,7 +3317,7 @@ public class BleExt {
 
 	public void resetAlert(IStatusCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_NEW_ALERT_UUID, callback)) {
-			LOGd("Reset Alert");
+			BleLog.LOGd(TAG, "Reset Alert");
 			_bleBase.writeAlert(_targetAddress, 0, callback);
 		}
 	}
@@ -3374,7 +3363,7 @@ public class BleExt {
 /*
 	public void readXXX(ICallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.YYY, callback)) {
-			LOGd("Reading XXX value ...");
+			BleCore.LOGd(TAG, "Reading XXX value ...");
 			_bleBase.readXXX(_targetAddress, callback);
 		}
 	}
@@ -3413,7 +3402,7 @@ public class BleExt {
 
 	public void writeXXX(zzz value, IStatusCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.YYY, callback)) {
-			LOGd("Set XXX to %uuu", value);
+			BleCore.LOGd(TAG, "Set XXX to %uuu", value);
 			_bleBase.writeXXX(_targetAddress, value, callback);
 		}
 	}
