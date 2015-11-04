@@ -22,6 +22,7 @@ import nl.dobots.bluenet.ble.extended.structs.BleDeviceMap;
 import nl.dobots.bluenet.service.callbacks.EventListener;
 import nl.dobots.bluenet.service.callbacks.IntervalScanListener;
 import nl.dobots.bluenet.service.callbacks.ScanDeviceListener;
+import nl.dobots.bluenet.utils.BleLog;
 
 /**
  * Defines a Ble Scan Service which provides the functionality to do interval scanning. This means
@@ -204,6 +205,14 @@ public class BleScanService extends Service {
 	}
 
 	/**
+	 * Return the Ble Extended object used by this service to access lower level functions
+	 * @return the bluenet extended object used by this service
+	 */
+	public BleExt getBleExt() {
+		return _ble;
+	}
+
+	/**
 	 * Extras can be provided with the intent to customize the service on start. See
 	 * EXTRA_SCAN_INTERVAL, EXTRA_SCAN_PAUSE, EXTRA_AUTO_START, EXTRA_SCAN_FILTER for
 	 * details
@@ -238,7 +247,7 @@ public class BleScanService extends Service {
 	@Override
 	public void onDestroy() {
 		super.onDestroy();
-		Log.d(TAG, "onDestroy");
+		BleLog.LOGd(TAG, "onDestroy");
 		if (_scanning) {
 			_ble.stopScan(null); // don' t care if it worked or not, so don' t need a callback
 		}
@@ -260,7 +269,7 @@ public class BleScanService extends Service {
 		public void onSuccess() {
 			// will be called whenever bluetooth is enabled
 
-			Log.d(TAG, "successfully initialized BLE");
+			BleLog.LOGd(TAG, "successfully initialized BLE");
 			_initialized = true;
 
 			// if scanning enabled, resume scanning
@@ -319,7 +328,7 @@ public class BleScanService extends Service {
 	private Runnable _startScanRunnable = new Runnable() {
 		@Override
 		public void run() {
-			Log.d(TAG, "Start endless scan");
+			BleLog.LOGd(TAG, "starting scan interval ...");
 			if (_ble.startIntervalScan(new IBleDeviceCallback() {
 
 					@Override
@@ -329,7 +338,7 @@ public class BleScanService extends Service {
 
 					@Override
 					public void onError(int error) {
-						Log.e(TAG, "start scan error: " + error);
+						Log.e(TAG, "... scan interval error: " + error);
 						onEvent(EventListener.Event.BLUETOOTH_START_SCAN_ERROR);
 
 						if (error == BleErrors.ERROR_ALREADY_SCANNING) {
@@ -341,7 +350,7 @@ public class BleScanService extends Service {
 					}
 				}))
 			{
-				Log.e(TAG, "scan started");
+				Log.d(TAG, "... scan interval started");
 				_scanning = true;
 				_stopScanRetryNum = 0;
 				onIntervalScanStart();
@@ -358,7 +367,7 @@ public class BleScanService extends Service {
 	 * @param device the scanned device
 	 */
 	private void notifyDeviceScanned(BleDevice device) {
-		Log.d(TAG, "scanned device: " + device.getName() + " " + device.getRssi());
+		BleLog.LOGd(TAG, "scanned device: " + device.getName() + " " + device.getRssi());
 
 		for (ScanDeviceListener listener : _scanDeviceListeners) {
 			listener.onDeviceScanned(device);
@@ -374,7 +383,7 @@ public class BleScanService extends Service {
 	private Runnable _stopScanRunnable = new Runnable() {
 		@Override
 		public void run() {
-			Log.d(TAG, "Stop endless scan");
+			BleLog.LOGd(TAG, "pausing scan interval ...");
 			if (_ble.stopScan(new IStatusCallback() {
 				@Override
 				public void onSuccess() {
@@ -388,7 +397,7 @@ public class BleScanService extends Service {
 					onEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
 				}
 			})) {
-				Log.v(TAG, "scan interval paused");
+				Log.d(TAG, "... scan interval paused");
 			}
 			else {
 				onEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
@@ -424,13 +433,13 @@ public class BleScanService extends Service {
 		setScanningState(true);
 
 		if (!_initialized) {
-			Log.i(TAG, "Starting interval scan");
+			Log.i(TAG, "Start scan");
 			// set wasScanning flag to true so that once bluetooth is enabled, and we receive
 			// the event, the service will automatically start scanning
 			_wasScanning = true;
 			_ble.init(this, _btStateCallback);
 		} else if (!_scanning) {
-			Log.i(TAG, "Starting interval scan");
+			Log.i(TAG, "Start scan");
 			_intervalScanHandler.post(_startScanRunnable);
 		}
 	}
@@ -450,18 +459,19 @@ public class BleScanService extends Service {
 	 */
 	public void stopIntervalScan() {
 		if (_scanning) {
+			Log.i(TAG, "Stop scan");
 			_intervalScanHandler.removeCallbacksAndMessages(null);
 			_scanning = false;
 			setScanningState(false);
 			_ble.stopScan(new IStatusCallback() {
 				@Override
 				public void onSuccess() {
-					Log.i(TAG, "Stopped interval scan");
+					Log.i(TAG, "scan stopped");
 				}
 
 				@Override
 				public void onError(int error) {
-					Log.e(TAG, "Failed to stop interval scan: " + error);
+					Log.e(TAG, "Failed to stop scan: " + error);
 					onEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
 				}
 			});

@@ -25,7 +25,6 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.ParcelUuid;
-import android.util.Log;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -43,6 +42,7 @@ import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
+import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
 /*
@@ -66,6 +66,8 @@ public class BleCore {
 	private BluetoothLeScanner _leScanner;
 	private ArrayList<ScanFilter> _scanFilters;
 	private ScanSettings _scanSettings;
+	// default scan mode is low latency
+	private int _scanMode = ScanSettings.SCAN_MODE_LOW_LATENCY;
 
 	// flags to keep track of state
 	private boolean _initialized = false;
@@ -156,23 +158,6 @@ public class BleCore {
 	// timeout handler to check for function timeouts, e.g. bluetooth enable, connect, reconnect, etc.
 	private Handler _timeoutHandler;
 
-	// Helper functions for logging
-	protected void LOGd(String message) {
-		Log.d(TAG, message);
-	}
-
-	protected void LOGd(String fmt, Object ... args) {
-		LOGd(String.format(fmt, args));
-	}
-
-	protected void LOGe(String message) {
-		Log.e(TAG, message);
-	}
-
-	protected void LOGe(String fmt, Object ... args) {
-		LOGe(String.format(fmt, args));
-	}
-
 	/**
 	 * Default constructor
 	 */
@@ -218,9 +203,8 @@ public class BleCore {
 						if (Build.VERSION.SDK_INT >= 21) {
 							// create the ble scanner object used for API > 21
 							_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
-							// todo: see if we want to make the scan mode configurable
 							_scanSettings = new ScanSettings.Builder()
-									.setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+									.setScanMode(_scanMode)
 									.build();
 							_scanFilters = new ArrayList<>();
 						}
@@ -233,6 +217,23 @@ public class BleCore {
 			}
 		}
 	};
+
+	/**
+	 * Change the scan mode used to scan for devices. See ScanSettings for an choice and
+	 * explanation of the different scan modes.
+	 * You need to stop and start scanning again for this to take effect.
+	 * Note: Only used for api 21 and newer
+	 * @param mode
+	 */
+	@SuppressLint("NewApi")
+	public void setScanMode(int mode) {
+		if (Build.VERSION.SDK_INT >= 21) {
+			_scanSettings = new ScanSettings.Builder()
+					.setScanMode(mode)
+					.build();
+			_scanMode = mode;
+		}
+	}
 
 	/**
 	 * Initializes the BLE Modules and tries to enable the Bluetooth adapter. Note, the callback
@@ -249,7 +250,7 @@ public class BleCore {
 		_context = context;
 		_btStateCallback = callback;
 
-		LOGd("Initialize BLE hardware");
+		BleLog.LOGd(TAG, "Initialize BLE hardware");
 		BluetoothManager bluetoothManager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
 		_bluetoothAdapter = bluetoothManager.getAdapter();
 
@@ -277,18 +278,17 @@ public class BleCore {
 				}
 			}, BLUETOOTH_ENABLE_TIMEOUT);
 		} else {
-			LOGd("Bluetooth successfully initialized");
+			BleLog.LOGd(TAG, "Bluetooth successfully initialized");
 			_initialized = true;
 			if (Build.VERSION.SDK_INT >= 21) {
 				_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
 				_scanSettings = new ScanSettings.Builder()
-						.setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+						.setScanMode(_scanMode)
 						.build();
 				_scanFilters = new ArrayList<>();
 			}
 			callback.onSuccess();
 		}
-
 	}
 
 	/**
@@ -324,7 +324,7 @@ public class BleCore {
 
 			@Override
 			public void run() {
-				LOGe("timeout reconnecting to %s, ABORT!", address);
+				BleLog.LOGe(TAG, "timeout reconnecting to %s, ABORT!", address);
 				Connection connection = _connections.get(address);
 				connection.setConnectionState(ConnectionState.DISCONNECTED);
 				connection.getGatt().disconnect();
@@ -344,7 +344,7 @@ public class BleCore {
 
 			@Override
 			public void run() {
-				LOGe("timeout connecting to %s, ABORT!", address);
+				BleLog.LOGe(TAG, "timeout connecting to %s, ABORT!", address);
 				Connection connection = _connections.get(address);
 				if (connection != null) {
 					connection.setConnectionState(ConnectionState.DISCONNECTED);
@@ -352,14 +352,14 @@ public class BleCore {
 					if (gatt != null) {
 						connection.getGatt().close();
 					} else {
-						LOGe("gatt == null");
+						BleLog.LOGe(TAG, "gatt == null");
 					}
 					_connections.remove(address);
 					if (_connectionCallback != null) {
 						_connectionCallback.onError(BleErrors.ERROR_CONNECT_FAILED);
 //						_connectionCallback = null;
 					} else {
-						LOGe("_connectionCallback == null");
+						BleLog.LOGe(TAG, "_connectionCallback == null");
 					}
 				}
 			}
@@ -369,12 +369,12 @@ public class BleCore {
 	}
 
 	private void clearConnectTimeout() {
-		LOGd("clear connect timeout");
+		BleLog.LOGd(TAG, "clear connect timeout");
 		_timeoutHandler.removeCallbacks(_connectTimeout);
 	}
 
 	public void connectDevice(String address, int timeout, IDataCallback callback) {
-		LOGd("Connecting to %s with %d second timeout ...", address, timeout);
+		BleLog.LOGd(TAG, "Connecting to %s with %d second timeout ...", address, timeout);
 		_connectionCallback = callback;
 
 		if (!isInitialized()) {
@@ -396,23 +396,23 @@ public class BleCore {
 
 	public boolean reconnectDevice(String address, int timeout, IDataCallback callback) {
 
-		LOGd("reconnecting device ...");
+		BleLog.LOGd(TAG, "reconnecting device ...");
 
 		if (!isInitialized()) {
-			LOGe(".. not initialized");
+			BleLog.LOGe(TAG, ".. not initialized");
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return false;
 		}
 
 		Connection connection = _connections.get(address);
 		if (connection == null) {
-			LOGe(".. never connected");
+			BleLog.LOGe(TAG, ".. never connected");
 			callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
 			return false;
 		}
 
 		if (connection.getConnectionState() != ConnectionState.DISCONNECTED) {
-			LOGe(".. not disconnected");
+			BleLog.LOGe(TAG, ".. not disconnected");
 			callback.onError(BleErrors.ERROR_NOT_CONNECTED);
 			return false;
 		}
@@ -427,7 +427,7 @@ public class BleCore {
 		boolean result = gatt.connect();
 
 		if (!result) {
-			LOGe(".. reconnect failed");
+			BleLog.LOGe(TAG, ".. reconnect failed");
 			callback.onError(BleErrors.ERROR_RECONNECT_FAILED);
 			return false;
 		}
@@ -458,24 +458,24 @@ public class BleCore {
 	 * @param callback
 	 */
 	public void discoverServices(String address, boolean forceDiscover, IDataCallback callback) {
-		LOGd("Discovering services ...");
+		BleLog.LOGd(TAG, "Discovering services ...");
 		_discoveryCallback = callback;
 
 		if (!isInitialized()) {
-			LOGe(".. not initialized");
+			BleLog.LOGe(TAG, ".. not initialized");
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return;
 		}
 
 		Connection connection = _connections.get(address);
 		if (connection == null) {
-			LOGe(".. never connected");
+			BleLog.LOGe(TAG, ".. never connected");
 			callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
 			return;
 		}
 
 		if (connection.getConnectionState() != ConnectionState.CONNECTED) {
-			LOGe(".. not connected");
+			BleLog.LOGe(TAG, ".. not connected");
 			callback.onError(BleErrors.ERROR_NOT_CONNECTED);
 			return;
 		}
@@ -486,25 +486,25 @@ public class BleCore {
 
 		if (gatt == null) {
 			// todo: report error?
-			LOGe("gatt == null");
+			BleLog.LOGe(TAG, "gatt == null");
 			return;
 		}
 
 		switch (connection.getDiscoveryState()) {
 			case DISCOVERING:
-				LOGd(".. already running");
+				BleLog.LOGd(TAG, ".. already running");
 				callback.onError(BleErrors.ERROR_ALREADY_DISCOVERING);
 				return;
 			case DISCOVERED:
 				if (!forceDiscover) {
-					LOGd(".. already done, return existing discovery");
+					BleLog.LOGd(TAG, ".. already done, return existing discovery");
 					json = getDiscovery(gatt);
 					callback.onData(json);
 					return;
 				}
 				// else go to discovery, no break needed!
 			default:
-				LOGd(".. start discovery");
+				BleLog.LOGd(TAG, ".. start discovery");
 				connection.setDiscoveryState(DiscoveryState.DISCOVERING);
 				gatt.discoverServices();
 				break;
@@ -613,7 +613,7 @@ public class BleCore {
 						}
 					}
 				} catch (JSONException e) {
-					LOGe("failed to decode discovered data");
+					BleLog.LOGe(TAG, "failed to decode discovered data");
 					callback.onError(BleErrors.ERROR_DISCOVERY_FAILED);
 				}
 			}
@@ -678,17 +678,20 @@ public class BleCore {
 		_coreScanCallback = new ScanCallback() {
 			@Override
 			public void onScanResult(int callbackType, ScanResult result) {
-				_scanning = true;
 
-				JSONObject scanResult = new JSONObject();
-				addDeviceInfo(scanResult, result.getDevice());
-				addProperty(scanResult, BleCoreTypes.PROPERTY_RSSI, result.getRssi());
-				if (result.getScanRecord() != null) {
-					addBytes(scanResult, BleCoreTypes.PROPERTY_ADVERTISEMENT, result.getScanRecord().getBytes());
-				}
-				setStatus(scanResult, BleCoreTypes.PROPERTY_SCAN_RESULT);
-
+				// [3.11.15] moved code into if statement, so that if scan is stopped but a scan
+				// result is still received, _scanning is not set to true again
 				if (_scanCallback != null) {
+					_scanning = true;
+
+					JSONObject scanResult = new JSONObject();
+					addDeviceInfo(scanResult, result.getDevice());
+					addProperty(scanResult, BleCoreTypes.PROPERTY_RSSI, result.getRssi());
+					if (result.getScanRecord() != null) {
+						addBytes(scanResult, BleCoreTypes.PROPERTY_ADVERTISEMENT, result.getScanRecord().getBytes());
+					}
+					setStatus(scanResult, BleCoreTypes.PROPERTY_SCAN_RESULT);
+
 					_scanCallback.onData(scanResult);
 				}
 			}
@@ -726,7 +729,6 @@ public class BleCore {
 			_bluetoothAdapter.stopLeScan(_coreLeScanCallback);
 		}
 		_scanCallback = null;
-
 		_scanning = false;
 
 		if (callback != null) callback.onSuccess();
@@ -779,7 +781,7 @@ public class BleCore {
 				}
 			}
 		} catch (Exception e) {
-			LOGe("failed to parse advertisement");
+			BleLog.LOGe(TAG, "failed to parse advertisement");
 //			e.printStackTrace();
 			callback.onError(BleErrors.ERROR_ADVERTISEMENT_PARSING);
 		}
@@ -787,23 +789,23 @@ public class BleCore {
 
 	public boolean disconnectDevice(String address, IDataCallback callback) {
 
-		LOGd("disconnecting device ...");
+		BleLog.LOGd(TAG, "disconnecting device ...");
 
 		if (!isInitialized()) {
-			LOGe(".. not initialized");
+			BleLog.LOGe(TAG, ".. not initialized");
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return false;
 		}
 
 		Connection connection = _connections.get(address);
 		if (connection == null) {
-			LOGe(".. never connected");
+			BleLog.LOGe(TAG, ".. never connected");
 			callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
 			return false;
 		}
 
 		if (connection.getConnectionState() != ConnectionState.CONNECTED) {
-			LOGe(".. not connected");
+			BleLog.LOGe(TAG, ".. not connected");
 			callback.onError(BleErrors.ERROR_NOT_CONNECTED);
 			return false;
 		}
@@ -826,7 +828,7 @@ public class BleCore {
 
 		gatt.disconnect();
 
-		LOGd("... done");
+		BleLog.LOGd(TAG, "... done");
 
 		return true;
 
@@ -848,23 +850,23 @@ public class BleCore {
 
 	public boolean closeDevice(String address, boolean clearCache, IStatusCallback callback) {
 
-		LOGd("closing device ...");
+		BleLog.LOGd(TAG, "closing device ...");
 
 		if (!isInitialized()) {
-			LOGe(".. not initialized");
+			BleLog.LOGe(TAG, ".. not initialized");
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return false;
 		}
 
 		Connection connection = _connections.get(address);
 		if (connection == null) {
-			LOGe(".. never connected");
+			BleLog.LOGe(TAG, ".. never connected");
 			callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
 			return false;
 		}
 
 		if (connection.getConnectionState() != ConnectionState.DISCONNECTED) {
-			LOGe(".. still connected?");
+			BleLog.LOGe(TAG, ".. still connected?");
 			callback.onError(BleErrors.ERROR_NOT_CONNECTED);
 			return false;
 		}
@@ -879,10 +881,10 @@ public class BleCore {
 			gatt.close();
 			_connections.remove(address);
 		} else {
-			LOGe("gatt == null");
+			BleLog.LOGe(TAG, "gatt == null");
 		}
 
-		LOGd("... done");
+		BleLog.LOGd(TAG, "... done");
 
 		callback.onSuccess();
 		return true;
@@ -890,7 +892,7 @@ public class BleCore {
 	}
 
 	private void refreshDeviceCache(final BluetoothGatt gatt) {
-		LOGd("refreshDeviceCache");
+		BleLog.LOGd(TAG, "refreshDeviceCache");
 		/*
 		 * If the device is bonded this is up to the Service Changed characteristic to notify Android that the services has changed.
 		 * There is no need for this trick in that case.
@@ -906,11 +908,11 @@ public class BleCore {
 			final Method refresh = gatt.getClass().getMethod("refresh");
 			if (refresh != null) {
 				final boolean success = (Boolean) refresh.invoke(gatt);
-				LOGd("Refreshing result: " + success);
+				BleLog.LOGd(TAG, "Refreshing result: " + success);
 			}
 		} catch (Exception e) {
-			Log.e(TAG, "An exception occurred while refreshing device", e);
-			LOGe("Refreshing failed");
+			BleLog.LOGe(TAG, "An exception occurred while refreshing device", e);
+			BleLog.LOGe(TAG, "Refreshing failed");
 		}
 //		}
 	}
@@ -946,7 +948,7 @@ public class BleCore {
 					callback.onData(json);
 					close(true);
 				} else {
-					LOGe("wrong status received: %s", status);
+					BleLog.LOGe(TAG, "wrong status received: %s", status);
 				}
 			}
 
@@ -963,20 +965,20 @@ public class BleCore {
 	public boolean read(String address, String serviceUuid, String characteristicUuid, IDataCallback callback) {
 
 		if (!isInitialized()) {
-			LOGe(".. not initialized");
+			BleLog.LOGe(TAG, ".. not initialized");
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return false;
 		}
 
 		Connection connection = _connections.get(address);
 		if (connection == null) {
-			LOGe(".. never connected");
+			BleLog.LOGe(TAG, ".. never connected");
 			callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
 			return false;
 		}
 
 		if (connection.getConnectionState() != ConnectionState.CONNECTED) {
-			LOGe(".. not connected");
+			BleLog.LOGe(TAG, ".. not connected");
 			callback.onError(BleErrors.ERROR_NOT_CONNECTED);
 			return false;
 		}
@@ -985,7 +987,7 @@ public class BleCore {
 		BluetoothGattService service = gatt.getService(BleUtils.stringToUuid(serviceUuid));
 
 		if (service == null) {
-			LOGe(".. service not found!");
+			BleLog.LOGe(TAG, ".. service not found!");
 			callback.onError(BleErrors.ERROR_SERVICE_NOT_FOUND);
 			return false;
 		}
@@ -994,7 +996,7 @@ public class BleCore {
 		BluetoothGattCharacteristic characteristic = service.getCharacteristic(uuid);
 
 		if (characteristic == null) {
-			LOGe(".. characteristic not found!");
+			BleLog.LOGe(TAG, ".. characteristic not found!");
 			callback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
 			return false;
 		}
@@ -1004,7 +1006,7 @@ public class BleCore {
 
 		boolean result = gatt.readCharacteristic(characteristic);
 		if (!result) {
-			LOGe(".. failed to read from characteristic!");
+			BleLog.LOGe(TAG, ".. failed to read from characteristic!");
 			callback.onError(BleErrors.ERROR_CHARACTERISTIC_READ_FAILED);
 			return false;
 		}
@@ -1023,20 +1025,20 @@ public class BleCore {
 	private boolean write(String address, String serviceUuid, String characteristicUuid, byte[] value, IStatusCallback callback, int writeType) {
 
 		if (!isInitialized()) {
-			LOGe(".. not initialized");
+			BleLog.LOGe(TAG, ".. not initialized");
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return false;
 		}
 
 		Connection connection = _connections.get(address);
 		if (connection == null) {
-			LOGe(".. never connected");
+			BleLog.LOGe(TAG, ".. never connected");
 			callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
 			return false;
 		}
 
 		if (connection.getConnectionState() != ConnectionState.CONNECTED) {
-			LOGe(".. not connected");
+			BleLog.LOGe(TAG, ".. not connected");
 			callback.onError(BleErrors.ERROR_NOT_CONNECTED);
 			return false;
 		}
@@ -1045,7 +1047,7 @@ public class BleCore {
 		BluetoothGattService service = gatt.getService(BleUtils.stringToUuid(serviceUuid));
 
 		if (service == null) {
-			LOGe(".. service not found!");
+			BleLog.LOGe(TAG, ".. service not found!");
 			callback.onError(BleErrors.ERROR_SERVICE_NOT_FOUND);
 			return false;
 		}
@@ -1054,7 +1056,7 @@ public class BleCore {
 		BluetoothGattCharacteristic characteristic = service.getCharacteristic(uuid);
 
 		if (characteristic == null) {
-			LOGe(".. characteristic not found!");
+			BleLog.LOGe(TAG, ".. characteristic not found!");
 			callback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
 			return false;
 		}
@@ -1063,7 +1065,7 @@ public class BleCore {
 
 		boolean result = characteristic.setValue(value);
 		if (!result) {
-			LOGe(".. failed to set value!");
+			BleLog.LOGe(TAG, ".. failed to set value!");
 			callback.onError(BleErrors.ERROR_WRITE_VALUE_NOT_SET);
 			return false;
 		}
@@ -1072,7 +1074,7 @@ public class BleCore {
 
 		result = gatt.writeCharacteristic(characteristic);
 		if (!result) {
-			LOGe(".. failed to write characteristic!");
+			BleLog.LOGe(TAG, ".. failed to write characteristic!");
 			callback.onError(BleErrors.ERROR_WRITE_FAILED);
 			return false;
 		}
@@ -1104,7 +1106,7 @@ public class BleCore {
 					if (connection != null) {
 						connection.setConnectionState(ConnectionState.CONNECTED);
 					}
-					LOGd("Connected to GATT server.");
+					BleLog.LOGd(TAG, "Connected to GATT server.");
 
 					JSONObject json = new JSONObject();
 					setStatus(json, "connected");
@@ -1121,7 +1123,7 @@ public class BleCore {
 					if (connection != null) {
 						connection.setConnectionState(ConnectionState.DISCONNECTED);
 					}
-					LOGd("Disconnected from GATT server.");
+					BleLog.LOGd(TAG, "Disconnected from GATT server.");
 
 					JSONObject json = new JSONObject();
 					setStatus(json, "disconnected");
@@ -1134,11 +1136,11 @@ public class BleCore {
 					//				broadcastUpdate(intentAction);
 
 				} else {
-					LOGd("..ing state: %d", status);
+					BleLog.LOGd(TAG, "..ing state: %d", status);
 					return;
 				}
 			} else {
-				LOGe("BluetoothGatt Error, status: %d", status);
+				BleLog.LOGe(TAG, "BluetoothGatt Error, status: %d", status);
 				clearConnectTimeout();
 
 				gatt.close();
@@ -1172,7 +1174,7 @@ public class BleCore {
 			} else {
 				connection.setDiscoveryState(DiscoveryState.UNDISCOVERED);
 
-				LOGe("Discovery failed, status: %d", status);
+				BleLog.LOGe(TAG, "Discovery failed, status: %d", status);
 
 				if (_discoveryCallback != null) {
 					_discoveryCallback.onError(BleErrors.ERROR_DISCOVERY_FAILED);
@@ -1199,7 +1201,7 @@ public class BleCore {
 //				broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
 
 			} else {
-				LOGe("Characteristic read failed, status: %d", status);
+				BleLog.LOGe(TAG, "Characteristic read failed, status: %d", status);
 
 				if (_characteristicsReadCallback != null) {
 					_characteristicsReadCallback.onError(BleErrors.ERROR_CHARACTERISTIC_READ_FAILED);
@@ -1239,7 +1241,7 @@ public class BleCore {
 				}
 
 			} else {
-				LOGe("Characteristic write failed, status: %d", status);
+				BleLog.LOGe(TAG, "Characteristic write failed, status: %d", status);
 
 				if (_characteristicsWriteCallback != null) {
 					_characteristicsWriteCallback.onError(BleErrors.ERROR_CHARACTERISTIC_WRITE_FAILED);
@@ -1259,7 +1261,7 @@ public class BleCore {
 			json.put(key, value);
 		} catch (JSONException e) {
 			e.printStackTrace();
-			Log.e(TAG, "Failed to encode json");
+			BleLog.LOGe(TAG, "Failed to encode json");
 		}
 	}
 
@@ -1296,7 +1298,7 @@ public class BleCore {
 			String value = json.getString(field);
 			return BleUtils.encodedStringToBytes(value);
 		} catch (JSONException e) {
-			Log.e(TAG, "failed to read bytes");
+			BleLog.LOGe(TAG, "failed to read bytes");
 			e.printStackTrace();
 		}
 
