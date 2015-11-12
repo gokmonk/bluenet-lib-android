@@ -191,7 +191,7 @@ public class BleCore {
 				switch (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
 					case BluetoothAdapter.STATE_OFF:
 						_connections = new HashMap<>();
-						_scanCallback = null;
+//						_scanCallback = null;
 						_initialized = false;
 
 						// if bluetooth is turned off, call onError on the bt state callback
@@ -294,7 +294,7 @@ public class BleCore {
 	/**
 	 * Reset all callbacks.
 	 */
-	public void destroy() {
+	public synchronized void destroy() {
 		if (_receiverRegistered) {
 			_context.unregisterReceiver(_receiver);
 			_receiverRegistered = false;
@@ -624,7 +624,7 @@ public class BleCore {
 		return startEndlessScan(new String[] {}, callback);
 	}
 
-	public boolean startEndlessScan(String[] uuids, IDataCallback callback) {
+	public synchronized boolean startEndlessScan(String[] uuids, IDataCallback callback) {
 
 		if (!isInitialized()) {
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
@@ -678,21 +678,10 @@ public class BleCore {
 		_coreScanCallback = new ScanCallback() {
 			@Override
 			public void onScanResult(int callbackType, ScanResult result) {
-
-				// [3.11.15] moved code into if statement, so that if scan is stopped but a scan
-				// result is still received, _scanning is not set to true again
-				if (_scanCallback != null) {
-					_scanning = true;
-
-					JSONObject scanResult = new JSONObject();
-					addDeviceInfo(scanResult, result.getDevice());
-					addProperty(scanResult, BleCoreTypes.PROPERTY_RSSI, result.getRssi());
-					if (result.getScanRecord() != null) {
-						addBytes(scanResult, BleCoreTypes.PROPERTY_ADVERTISEMENT, result.getScanRecord().getBytes());
-					}
-					setStatus(scanResult, BleCoreTypes.PROPERTY_SCAN_RESULT);
-
-					_scanCallback.onData(scanResult);
+				if (result.getScanRecord() != null) {
+					onDeviceScanned(result.getDevice(), result.getRssi(), result.getScanRecord().getBytes());
+				} else {
+					onDeviceScanned(result.getDevice(), result.getRssi(), new byte[]{});
 				}
 			}
 
@@ -706,12 +695,14 @@ public class BleCore {
 			@Override
 			public void onScanFailed(int errorCode) {
 				_scanning = false;
-				_scanCallback.onError(errorCode);
+				if (_scanCallback != null) {
+					_scanCallback.onError(errorCode);
+				}
 			}
 		};
 	}
 
-	public boolean stopEndlessScan(IStatusCallback callback) {
+	public synchronized boolean stopEndlessScan(IStatusCallback callback) {
 
 		if (!isInitialized()) {
 			if (callback != null) callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
@@ -743,6 +734,17 @@ public class BleCore {
 
 		@Override
 		public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
+			onDeviceScanned(device, rssi, scanRecord);
+		}
+
+	};
+
+	private synchronized void onDeviceScanned(BluetoothDevice device, int rssi, byte[] scanRecord) {
+
+		// [3.11.15] moved scanning = false into if statement, so that if scan is stopped but a scan
+		// result is still received, _scanning is not set to true again
+		if (_scanCallback != null) {
+			_scanning = true;
 
 			JSONObject scanResult = new JSONObject();
 			addDeviceInfo(scanResult, device);
@@ -750,12 +752,9 @@ public class BleCore {
 			addBytes(scanResult, BleCoreTypes.PROPERTY_ADVERTISEMENT, scanRecord);
 			setStatus(scanResult, BleCoreTypes.PROPERTY_SCAN_RESULT);
 
-			if (_scanCallback != null) {
-				_scanCallback.onData(scanResult);
-			}
+			_scanCallback.onData(scanResult);
 		}
-
-	};
+	}
 
 	//	@SuppressLint("NewApi")
 	private ScanCallback _coreScanCallback;
