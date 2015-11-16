@@ -37,10 +37,11 @@ public class BleErrors {
 	public static final int ERROR_STILL_CONNECTED = 224;
 	public static final int ERROR_RETURN_VALUE_PARSING = 225;
 	public static final int ERROR_ADVERTISEMENT_PARSING = 226;
+	public static final int ERROR_BLE_HARDWARE_MISSING = 227;
 
 	// BleExt
 
 	public static final int ERROR_WRONG_STATE = 500;
 	public static final int ERROR_JSON_PARSING = 501;
-			;
+
 }

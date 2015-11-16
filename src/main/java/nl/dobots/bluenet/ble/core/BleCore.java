@@ -21,6 +21,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -248,9 +249,18 @@ public class BleCore {
 	@SuppressLint("NewApi")
 	public void init(Context context, IStatusCallback callback) {
 		_context = context;
-		_btStateCallback = callback;
 
 		BleLog.LOGd(TAG, "Initialize BLE hardware");
+		if (!context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE) ||
+			Build.VERSION.SDK_INT < 18)
+		{
+			BleLog.LOGe(TAG, "Can't use library without BLE hardware!! Abort.");
+			callback.onError(BleErrors.ERROR_BLE_HARDWARE_MISSING);
+			return;
+		}
+
+		_btStateCallback = callback;
+
 		BluetoothManager bluetoothManager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
 		_bluetoothAdapter = bluetoothManager.getAdapter();
 
