@@ -29,22 +29,12 @@ public class Sampling {
 		}
 	}
 
-	/** Convert an array of weights to an cumulative sum array */
-	public static void cumulativeSum(float[] weights) {
-		normalize(weights);
-		for (int i=1; i<weights.length; i++) {
-			weights[i] += weights[i-1];
-		}
-	}
-
 	/**
 	 * Samples a new set using a low variance sampler from a array of weights
 	 * @return Array with selected indices of weights array
 	 */
 	public static int[] lowVarianceSampling(float[] normalizedWeights, int numSamples) {
 		int size = normalizedWeights.length;
-//		float[] normalizedWeights = weights.clone();
-//		normalize(normalizedWeights);
 		float rand = (float)Math.random() / size;
 
 		float c = normalizedWeights[0];
@@ -64,8 +54,8 @@ public class Sampling {
 	/** Sample using roulette wheel sampler from a array of weights
 	 *	@return Array with selected indices of weights array
 	 */
-	public static int[] rouletteWheelSampling(float[] weights, int numSamples) {
-		float[] cumSumWeights = weights.clone();
+	public static int[] rouletteWheelSampling(float[] normalizedWeights, int numSamples) {
+		float[] cumSumWeights = normalizedWeights.clone();
 		cumulativeSum(cumSumWeights);
 		int[] indices = new int[numSamples];
 
@@ -82,14 +72,18 @@ public class Sampling {
 		return indices;
 	}
 
+	/** Convert an array of weights to an cumulative sum array */
+	public static void cumulativeSum(float[] weights) {
+		for (int i=1; i<weights.length; i++) {
+			weights[i] += weights[i-1];
+		}
+	}
+
 	/**
 	 * Calculate the effective number of particles
 	 * see https://en.wikipedia.org/wiki/Particle_filter#Sequential_importance_sampling_.28SIS.29
 	 */
 	public static float numberOfEffectiveParticles(float[] normalizedWeights) {
-//		float[] normalizedWeights = normalizedWeights.clone();
-//		normalize(normalizedWeights);
-
 		float sum=0;
 		for (int i=0; i<normalizedWeights.length; i++) {
 			sum += normalizedWeights[i] * normalizedWeights[i];
