@@ -188,26 +188,27 @@ public class LandmarkParticleSet {
 
 	/** Get the particle variance in x, y and z */
 	private Covariance getParticleVariance() {
-		Covariance covariance = new Covariance();
-
-		// TODO: make sure we don't need to make a copy every time
-		float[] values = new float[_numParticles];
-		for (int i=0; i<_numParticles; i++) {
-			values[i] = _particleList.get(i).position.x;
-		}
-		covariance.x.x = (float)StatisticsMath.variance(values);
-
-		for (int i=0; i<_numParticles; i++) {
-			values[i] = _particleList.get(i).position.y;
-		}
-		covariance.y.y = (float)StatisticsMath.variance(values);
-
-		for (int i=0; i<_numParticles; i++) {
-			values[i] = _particleList.get(i).position.z;
-		}
-		covariance.z.z = (float)StatisticsMath.variance(values);
-
-		return covariance;
+//		Covariance covariance = new Covariance();
+//
+//		// TO DO: make sure we don't need to make a copy every time
+//		float[] values = new float[_numParticles];
+//		for (int i=0; i<_numParticles; i++) {
+//			values[i] = _particleList.get(i).position.x;
+//		}
+//		covariance.x.x = (float)StatisticsMath.variance(values);
+//
+//		for (int i=0; i<_numParticles; i++) {
+//			values[i] = _particleList.get(i).position.y;
+//		}
+//		covariance.y.y = (float)StatisticsMath.variance(values);
+//
+//		for (int i=0; i<_numParticles; i++) {
+//			values[i] = _particleList.get(i).position.z;
+//		}
+//		covariance.z.z = (float)StatisticsMath.variance(values);
+//
+//		return covariance;
+		return StatisticsMath.variance(_particleList);
 	}
 
 	private void syncWeightArray() {

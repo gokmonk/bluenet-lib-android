@@ -1,5 +1,11 @@
 package nl.dobots.slac.util;
 
+import java.util.List;
+
+import nl.dobots.slac.structs.Covariance;
+import nl.dobots.slac.structs.Landmark;
+import nl.dobots.slac.structs.LandmarkParticle;
+
 /**
  * Copyright (c) 2015 Bart van Vliet <bart@dobots.nl>. All rights reserved.
  * <p/>
@@ -36,5 +42,26 @@ public class StatisticsMath {
 			squaredSum += data[i]*data[i];
 		}
 		return (squaredSum - (sum*sum)/size) / size;
+	}
+
+	// TODO: make this function more generic
+	public static Covariance variance(List<LandmarkParticle> particles) {
+		double[] sum = {0,0,0};
+		double[] squaredSum = {0,0,0};
+		int size = particles.size();
+
+		for (LandmarkParticle particle : particles) {
+			sum[0] += particle.position.x;
+			sum[1] += particle.position.y;
+			sum[2] += particle.position.z;
+			squaredSum[0] += particle.position.x * particle.position.x;
+			squaredSum[1] += particle.position.y * particle.position.y;
+			squaredSum[2] += particle.position.z * particle.position.z;
+		}
+		Covariance covariance = new Covariance();
+		covariance.x.x = (float)((squaredSum[0] - sum[0]*sum[0]/size) / size);
+		covariance.y.y = (float)((squaredSum[0] - sum[0]*sum[0]/size) / size);
+		covariance.z.z = (float)((squaredSum[0] - sum[0]*sum[0]/size) / size);
+		return covariance;
 	}
 }
