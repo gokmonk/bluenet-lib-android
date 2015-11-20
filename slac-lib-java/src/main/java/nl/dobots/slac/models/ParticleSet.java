@@ -37,6 +37,9 @@ public class ParticleSet {
 	private List<Particle> _particleList;
 	private Set<String> _initializedLandmarks;
 	private LandmarkInitSet _landmarkInitSet;
+	private float[] _weights;
+	private float[] _normalizedWeights;
+	private boolean _weightArrayIsSynched = false;
 
 	public ParticleSet(int numParticles, float effectiveParticleThreshold) {
 		_numParticles = numParticles;
@@ -56,6 +59,8 @@ public class ParticleSet {
 				Config.INIT_MAX_VARIANCE
 		);
 
+		_weights = new float[_numParticles];
+		_normalizedWeights = new float[_numParticles];
 	}
 
 	/**
@@ -95,6 +100,9 @@ public class ParticleSet {
 		if (!_initializedLandmarks.contains(uid)) {
 			Position estimatedUserPos = userPositionEstimate();
 			_landmarkInitSet.processProximityMeasurement(uid, estimatedUserPos, distance);
+
+			// If the landmarks position variance is now low enough,
+			// then add it to the particles and remove from landmarkInitSet.
 			Position landmarkPositionEstimate = new Position();
 			Covariance landmarkPositionVariance = new Covariance();
 			if (_landmarkInitSet.getPositionEstimate(uid, landmarkPositionEstimate, landmarkPositionVariance)) {
@@ -109,6 +117,7 @@ public class ParticleSet {
 			for (Particle particle : _particleList) {
 				particle.processProximityObservation(uid, distance);
 			}
+			_weightArrayIsSynched = false;
 		}
 	}
 
@@ -117,30 +126,21 @@ public class ParticleSet {
 	 * Uses low variance sampling.
 	 */
 	public void resample() {
-		// TODO: keep up the weights, don't make a copy every time
-		float[] weights = new float[_numParticles];
-		for (int i=0; i<_numParticles; i++) {
-			weights[i] = _particleList.get(i).getWeight();
-		}
-		if (Sampling.numberOfEffectiveParticles(weights) < _effectiveParticleThreshold) {
+		syncWeightArray();
+		if (Sampling.numberOfEffectiveParticles(_normalizedWeights) < _effectiveParticleThreshold) {
 			List<Particle> newParticles = new ArrayList<>(_numParticles);
-			int[] indices = Sampling.lowVarianceSampling(weights, _numParticles);
+			int[] indices = Sampling.lowVarianceSampling(_normalizedWeights, _numParticles);
 			for (int i=0; i<_numParticles; i++) {
-				newParticles.add(new Particle(_particleList.get(i)));
+				newParticles.add(new Particle(_particleList.get(indices[i])));
 			}
 			_particleList = newParticles;
+			_weightArrayIsSynched = false;
 		}
 	}
 
 	/** Get a weighted average of all landmark estimates */
 	public Map<String, Landmark> getLandmarkEstimate() {
-		// TODO: keep up the weights, don't make a copy every time
-		float[] weights = new float[_numParticles];
-		for (int i=0; i<_numParticles; i++) {
-			weights[i] = _particleList.get(i).getWeight();
-		}
-		Sampling.normalize(weights);
-
+		syncWeightArray();
 		Map<String, Landmark> landmarks = new HashMap<>();
 
 		// Loop through all particles to get an estimate of the landmarks
@@ -150,16 +150,16 @@ public class ParticleSet {
 				Landmark landmark = particle.getLandmarks().get(key);
 				if (!landmarks.containsKey(key)) {
 					Landmark newLandmark = new Landmark();
-					newLandmark.position.x = weights[i] * landmark.position.x;
-					newLandmark.position.y = weights[i] * landmark.position.y;
-					newLandmark.position.z = weights[i] * landmark.position.z;
+					newLandmark.position.x = _normalizedWeights[i] * landmark.position.x;
+					newLandmark.position.y = _normalizedWeights[i] * landmark.position.y;
+					newLandmark.position.z = _normalizedWeights[i] * landmark.position.z;
 					newLandmark.name = landmark.name;
 					landmarks.put(key, newLandmark);
 				}
 				else {
-					landmarks.get(key).position.x += weights[i] * landmark.position.x;
-					landmarks.get(key).position.y += weights[i] * landmark.position.y;
-					landmarks.get(key).position.z += weights[i] * landmark.position.z;
+					landmarks.get(key).position.x += _normalizedWeights[i] * landmark.position.x;
+					landmarks.get(key).position.y += _normalizedWeights[i] * landmark.position.y;
+					landmarks.get(key).position.z += _normalizedWeights[i] * landmark.position.z;
 				}
 			}
 		}
@@ -168,18 +168,29 @@ public class ParticleSet {
 
 	/** Get the best estimate of the current user position */
 	private Position userPositionEstimate() {
-		// TODO: keep up the weights, don't make a copy every time
-		float[] weights = new float[_numParticles];
-		for (int i=0; i<_numParticles; i++) {
-			weights[i] = _particleList.get(i).getWeight();
-		}
-		Sampling.normalize(weights);
+		syncWeightArray();
+
 		Position pos = new Position(0,0,0);
 		for (int i=0; i<_numParticles; i++) {
-			pos.x += weights[i] * _particleList.get(i).getUser().getPosition().x;
-			pos.y += weights[i] * _particleList.get(i).getUser().getPosition().y;
-			pos.z += weights[i] * _particleList.get(i).getUser().getPosition().z;
+//			Position userPos = new Position(_particleList.get(i).getUser().getPosition());
+//			userPos.multiply(weights[i]);
+//			pos.add(userPos);
+			pos.x += _normalizedWeights[i] * _particleList.get(i).getUser().getPosition().x;
+			pos.y += _normalizedWeights[i] * _particleList.get(i).getUser().getPosition().y;
+			pos.z += _normalizedWeights[i] * _particleList.get(i).getUser().getPosition().z;
 		}
 		return pos;
+	}
+
+	private void syncWeightArray() {
+		if (_weightArrayIsSynched) {
+			return;
+		}
+		for (int i=0; i<_numParticles; i++) {
+			_weights[i] = _particleList.get(i).getWeight();
+		}
+		_normalizedWeights = _weights.clone();
+		Sampling.normalize(_normalizedWeights);
+		_weightArrayIsSynched = true;
 	}
 }

@@ -37,23 +37,24 @@ public class Sampling {
 		}
 	}
 
-	/** Samples a new set using a low variance sampler from a array of weights
-	 *	@return Array with selected indices of weights array
+	/**
+	 * Samples a new set using a low variance sampler from a array of weights
+	 * @return Array with selected indices of weights array
 	 */
-	public static int[] lowVarianceSampling(float[] weights, int numSamples) {
-		int size = weights.length;
-		float[] normalizedWeights = weights.clone();
-		normalize(normalizedWeights);
+	public static int[] lowVarianceSampling(float[] normalizedWeights, int numSamples) {
+		int size = normalizedWeights.length;
+//		float[] normalizedWeights = weights.clone();
+//		normalize(normalizedWeights);
 		float rand = (float)Math.random() / size;
 
-		float c = weights[0];
+		float c = normalizedWeights[0];
 		int i = 0;
 		int[] indices = new int[numSamples];
 
 		for (int j=0; j<numSamples; j++) {
 			float U = rand + j/size;
 			while (U > c) {
-				c += weights[++i];
+				c += normalizedWeights[++i];
 			}
 			indices[j] = i;
 		}
@@ -85,9 +86,9 @@ public class Sampling {
 	 * Calculate the effective number of particles
 	 * see https://en.wikipedia.org/wiki/Particle_filter#Sequential_importance_sampling_.28SIS.29
 	 */
-	public static float numberOfEffectiveParticles(float[] weights) {
-		float[] normalizedWeights = weights.clone();
-		normalize(normalizedWeights);
+	public static float numberOfEffectiveParticles(float[] normalizedWeights) {
+//		float[] normalizedWeights = normalizedWeights.clone();
+//		normalize(normalizedWeights);
 
 		float sum=0;
 		for (int i=0; i<normalizedWeights.length; i++) {

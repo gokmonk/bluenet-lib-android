@@ -50,4 +50,10 @@ public class Position {
 		y -= position.y;
 		z -= position.z;
 	}
+
+	public void multiply(float val) {
+		x *= val;
+		y *= val;
+		z *= val;
+	}
 }
