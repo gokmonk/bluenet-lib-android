@@ -317,9 +317,10 @@ public class BleLogger extends BroadcastReceiver implements ScanDeviceListener, 
 							for (int j=0; j<3; j++) {
 								float diff = (_orientationHistory.get(i))[j] - prevOrientation[j];
 								// Make sure -pi < diff < pi
-								if (diff > Math.PI) {
+								while (diff > Math.PI) {
 									diff -= (float) (2 * Math.PI);
-								} else if (diff < -Math.PI) {
+								}
+								while (diff < -Math.PI) {
 									diff += (float) (2 * Math.PI);
 								}
 								prevOrientation[j] += diff;
