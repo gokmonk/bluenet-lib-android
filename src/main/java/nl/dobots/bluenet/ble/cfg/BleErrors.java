@@ -38,6 +38,13 @@ public class BleErrors {
 	public static final int ERROR_RETURN_VALUE_PARSING = 225;
 	public static final int ERROR_ADVERTISEMENT_PARSING = 226;
 	public static final int ERROR_BLE_HARDWARE_MISSING = 227;
+	public static final int ERROR_NOTIFICATION_DESCRIPTOR_NOT_FOUND = 228;
+	public static final int ERROR_SUBSCRIBE_NOTIFICATION_FAILED = 229;
+	public static final int ERROR_DESCRIPTOR_READ_FAILED = 230;
+	public static final int ERROR_UNSUBSCRIBE_FAILED = 231;
+	public static final int ERROR_SUBSCRIBE_FAILED = 232;
+	public static final int ERROR_DESCRIPTOR_SET_FAILED = 233;
+	public static final int ERROR_UNSUBSCRIBE_NOTIFICATION_FAILED = 234;
 
 	// BleExt
 

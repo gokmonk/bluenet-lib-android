@@ -17,11 +17,13 @@ import nl.dobots.bluenet.ble.base.callbacks.IConfigurationCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDiscoveryCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.structs.BleAlertState;
 import nl.dobots.bluenet.ble.base.structs.BleConfiguration;
 import nl.dobots.bluenet.ble.base.structs.BleMeshMessage;
 import nl.dobots.bluenet.ble.base.structs.BleTrackedDevice;
+import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshData;
 import nl.dobots.bluenet.ble.cfg.BleTypes;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
@@ -1221,6 +1223,47 @@ public class BleBase extends BleCore {
 				});
 	}
 
+	public void readMeshData(String address, final IMeshDataCallback callback) {
+		BleLog.LOGd(TAG, "Reading mesh data...");
+		read(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
+			new IDataCallback() {
+				@Override
+				public void onData(JSONObject json) {
+					byte[] bytes = BleCore.getValue(json);
+					BleMeshData meshData = BleMeshDataFactory.fromBytes(bytes);
+					callback.onData(meshData);
+				}
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			});
+	}
+
+	public void subscribeMeshData(final String address, final IMeshDataCallback callback) {
+		BleLog.LOGd(TAG, "subscribing to mesh data...");
+		subscribe(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
+			new IDataCallback() {
+				@Override
+				public void onData(JSONObject json) {
+					if (BleCore.getStatus(json) == BleCoreTypes.CHARACTERISTIC_PROP_NOTIFY) {
+						// unfortunately notifications only report up to 23 bytes, so we can't use
+						// the value provided in the notification directly. however, we can now
+						// read the characteristic to get the full content
+						readMeshData(address, callback);
+//						byte[] bytes = BleCore.getValue(json);
+//						BleMeshData meshData = BleMeshDataFactory.fromBytes(bytes);
+//						callback.onData(meshData);
+					}
+				}
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+		});
+	}
 
 
 

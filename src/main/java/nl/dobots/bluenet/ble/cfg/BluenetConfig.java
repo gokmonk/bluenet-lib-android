@@ -11,6 +11,8 @@ package nl.dobots.bluenet.ble.cfg;
  */
 public class BluenetConfig {
 
+	public static final int BLE_DEVICE_ADDRESS_LENGTH = 6;
+
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Indoor Localization Service
 	public static final String INDOOR_LOCALIZATION_SERVICE_UUID =       "7e170000-429c-41aa-83d7-d91220abeb33";
@@ -53,6 +55,13 @@ public class BluenetConfig {
 	public static final String ALERT_SERVICE_UUID =                     "33690000-2a0a-11e5-b345-feff819cdc9f";
 	// Alert Service - Characteristics
 	public static final String CHAR_NEW_ALERT_UUID =                    "33690002-2a0a-11e5-b345-feff819cdc9f";
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Mesh Service
+	public static final String MESH_SERVICE_UUID =                     "0000fee4-0000-1000-8000-00805f9b34fb";
+	public static final String MESH_META_CHARACTERISTIC_UUID =         "2a1e0004-fd51-d882-8ba8-b98c0000cd1e";
+	public static final String MESH_DATA_CHARACTERISTIC_UUID =         "2a1e0005-fd51-d882-8ba8-b98c0000cd1e";
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////

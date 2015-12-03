@@ -1,7 +1,11 @@
 package nl.dobots.bluenet.ble.core;
 
+import java.util.UUID;
+
 public class BleCoreTypes {
 
+	public static final UUID CLIENT_CONFIGURATION_DESCRIPTOR_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
+	
 	// Characteristic properties
 	public static final String CHARACTERISTIC_PROP_EXTENDED_PROPERTIES = "extendedProperties";
 	public static final String CHARACTERISTIC_PROP_SIGNED_WRITE = "signedWrite";
@@ -32,4 +36,6 @@ public class BleCoreTypes {
 	public static final String STATUS_DISCOVERED = "discovered";
 	public static final String STATUS_WRITTEN = "written";
 
+	public static final String CHARACTERISTIC_UNSUBSCRIBED = "unsubscribed";
+	public static final String CHARACTERISTIC_SUBSCRIBED = "subscribed";
 }

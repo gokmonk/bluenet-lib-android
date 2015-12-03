@@ -11,7 +11,9 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 
 import nl.dobots.bluenet.ble.base.BleBase;
+import nl.dobots.bluenet.ble.base.BleMeshDataFactory;
 import nl.dobots.bluenet.ble.base.callbacks.IAlertCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
 import nl.dobots.bluenet.ble.base.structs.BleAlertState;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
@@ -3354,9 +3356,12 @@ public class BleExt {
 		}
 	}
 
-
-
-
+	public void subscribeMeshData(final IMeshDataCallback callback) {
+		if (isConnected(callback) && hasCharacteristic(BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID, callback)) {
+			BleLog.LOGd(TAG, "subscribe to mesh data");
+			_bleBase.subscribeMeshData(_targetAddress, callback);
+		}
+	}
 
 	/////////////////////////////////////////////////////////////////////////////////////
 
