@@ -161,6 +161,7 @@ public class BleScanService extends Service {
 	private boolean _scanning = false;
 	private boolean _wasScanning = false;
 	private boolean _initialized = false;
+	private boolean _paused;
 
 	private int _stopScanRetryNum = 0;
 
@@ -209,6 +210,9 @@ public class BleScanService extends Service {
 	 * @return the bluenet extended object used by this service
 	 */
 	public BleExt getBleExt() {
+		if (!_initialized) {
+			_ble.init(this, _btStateCallback);
+		}
 		return _ble;
 	}
 
@@ -328,6 +332,10 @@ public class BleScanService extends Service {
 	private Runnable _startScanRunnable = new Runnable() {
 		@Override
 		public void run() {
+
+			// wait until service is resumed before starting the next interval
+			while (_paused) {}
+
 			BleLog.LOGd(TAG, "starting scan interval ...");
 			if (_ble.startIntervalScan(new IBleDeviceCallback() {
 
@@ -484,6 +492,28 @@ public class BleScanService extends Service {
 	 */
 	public boolean isScanning() {
 		return _scanning;
+	}
+
+	/**
+	 * Set the service to paused. only possible if no scan active. service will wait until
+	 * resume is called before starting the next scan interval.
+	 * Use this if you want to call function on the service's ble object. If you don't pause,
+	 * and the service will start a new scan interval while you are still waiting for a function
+	 * to execute on the ble object, it might get interrupted or never return.
+	 * @return
+	 */
+	public boolean pause() {
+		if (isScanning()) return false;
+
+		_paused = true;
+		return true;
+	}
+
+	/**
+	 * Resume the service so that it starts/continues with scanning.
+	 */
+	public void resume() {
+		_paused = false;
 	}
 
 	/**

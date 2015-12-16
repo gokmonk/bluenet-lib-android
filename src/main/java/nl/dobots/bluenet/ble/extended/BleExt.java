@@ -9,9 +9,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import nl.dobots.bluenet.ble.base.BleBase;
-import nl.dobots.bluenet.ble.base.BleMeshDataFactory;
 import nl.dobots.bluenet.ble.base.callbacks.IAlertCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
 import nl.dobots.bluenet.ble.base.structs.BleAlertState;
@@ -80,6 +80,9 @@ public class BleExt {
 
 	// handler used for delayed execution and timeouts
 	private Handler _handler;
+
+	private ArrayList<String> _blackList;
+	private ArrayList<String> _whiteList;
 
 	public BleExt() {
 		_bleBase = new BleBase();
@@ -178,6 +181,38 @@ public class BleExt {
 	}
 
 	/**
+	 * Set the given addresses as black list. any address on the black list will be ignored
+	 * during a scan and not returned as a scan result
+	 * @param addresses the MAC addresses of the devices which should be ignored during a scan
+	 */
+	public void setBlackList(String[] addresses) {
+		_blackList = new ArrayList<>(Arrays.asList(addresses.clone()));
+	}
+
+	/**
+	 * Clear the black list again in order to get all devices during a scan
+	 */
+	public void clearBlackList() {
+		_blackList = null;
+	}
+
+	/**
+	 * Set the given addresses as white list. only devices on the white list will be returned
+	 * during a scan. any other device will be ignored.
+	 * @param addresses the MAC addresses of the devices which should be returned during a scan
+	 */
+	public void setWhiteList(String[] addresses) {
+		_whiteList = new ArrayList<>(Arrays.asList(addresses.clone()));
+	}
+
+	/**
+	 * Clear the white list again in order to get all devices during a scan
+	 */
+	public void clearWhiteList() {
+		_whiteList = null;
+	}
+
+	/**
 	 * Start scanning for devices. devices will be provided through the callback. see
 	 * startEndlessScan for details
 	 *
@@ -234,6 +269,13 @@ public class BleExt {
 					return;
 				}
 
+				if (_blackList != null && _blackList.contains(device.getAddress())) {
+					return;
+				}
+				if (_whiteList != null && !_whiteList.contains(device.getAddress())) {
+					return;
+				}
+
 				switch (_scanFilter) {
 					case crownstone:
 						// if filter set to crownstone, but device is not a crownstone, abort
@@ -280,6 +322,14 @@ public class BleExt {
 	public boolean stopScan(final IStatusCallback callback) {
 		_connectionState = BleDeviceConnectionState.initialized;
 		return _bleBase.stopEndlessScan(callback);
+	}
+
+	/**
+	 * Check if currently scanning for devices
+	 * @return true if scanning, false otherwise
+	 */
+	public boolean isScanning() {
+		return _bleBase.isScanning();
 	}
 
 	/**
@@ -513,7 +563,12 @@ public class BleExt {
 		connect(address, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
-				discoverServices(callback);
+				_handler.postDelayed(new Runnable() {
+					@Override
+					public void run() {
+						discoverServices(callback);
+					}
+				}, 500);
 			}
 
 			@Override
@@ -3443,7 +3498,7 @@ public class BleExt {
 			});
 		}
 	}
-	
+
 */
 
 }

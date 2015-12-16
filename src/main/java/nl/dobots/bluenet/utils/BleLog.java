@@ -2,8 +2,6 @@ package nl.dobots.bluenet.utils;
 
 import android.util.Log;
 
-import nl.dobots.bluenet.ble.core.BleCore;
-
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
  * <p/>

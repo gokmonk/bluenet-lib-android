@@ -1,10 +1,7 @@
 package nl.dobots.bluenet.ble.base.structs.mesh;
 
-import junit.framework.Assert;
-
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Arrays;
 
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.utils.BleUtils;

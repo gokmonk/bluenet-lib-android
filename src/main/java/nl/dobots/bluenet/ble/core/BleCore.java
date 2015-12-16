@@ -497,6 +497,7 @@ public class BleCore {
 		if (gatt == null) {
 			// todo: report error?
 			BleLog.LOGe(TAG, "gatt == null");
+			callback.onError(BleErrors.ERROR_NOT_CONNECTED);
 			return;
 		}
 
@@ -736,7 +737,7 @@ public class BleCore {
 		return true;
 	}
 
-	private boolean isScanning() {
+	public boolean isScanning() {
 		return _scanning;
 	}
 
