@@ -438,6 +438,17 @@ public class BleCore {
 
 		if (!result) {
 			BleLog.LOGe(TAG, ".. reconnect failed");
+			closeDevice(address, false, new IStatusCallback() {
+				@Override
+				public void onSuccess() {
+
+				}
+
+				@Override
+				public void onError(int error) {
+
+				}
+			});
 			callback.onError(BleErrors.ERROR_RECONNECT_FAILED);
 			return false;
 		}

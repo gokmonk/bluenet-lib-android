@@ -305,6 +305,7 @@ public class BleExt {
 
 			@Override
 			public void onError(int error) {
+				_connectionState = BleDeviceConnectionState.initialized;
 				callback.onError(error);
 			}
 		});
@@ -619,6 +620,7 @@ public class BleExt {
 			public void onError(int error) {
 				switch (error) {
 					case BleErrors.ERROR_NEVER_CONNECTED:
+					case BleErrors.ERROR_NOT_CONNECTED:
 						_connectionState = BleDeviceConnectionState.initialized;
 						break;
 				}
