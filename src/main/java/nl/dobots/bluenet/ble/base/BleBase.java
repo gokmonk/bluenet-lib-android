@@ -1265,6 +1265,21 @@ public class BleBase extends BleCore {
 		});
 	}
 
+	public void unsubscribeMeshData(final String address, final IMeshDataCallback callback) {
+		BleLog.LOGd(TAG, "subscribing to mesh data...");
+		unsubscribe(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
+				new IDataCallback() {
+					@Override
+					public void onData(JSONObject json) {
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				});
+	}
+
 
 
 /*

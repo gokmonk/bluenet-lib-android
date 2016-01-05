@@ -3418,10 +3418,24 @@ public class BleExt {
 		}
 	}
 
+	public void readMeshData(final IMeshDataCallback callback) {
+		if (isConnected(callback) && hasCharacteristic(BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID, callback)) {
+			BleLog.LOGd(TAG, "subscribe to mesh data");
+			_bleBase.readMeshData(_targetAddress, callback);
+		}
+	}
+
 	public void subscribeMeshData(final IMeshDataCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID, callback)) {
 			BleLog.LOGd(TAG, "subscribe to mesh data");
 			_bleBase.subscribeMeshData(_targetAddress, callback);
+		}
+	}
+
+	public void unsubscribeMeshData(final IMeshDataCallback callback) {
+		if (isConnected(callback) && hasCharacteristic(BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID, callback)) {
+			BleLog.LOGd(TAG, "unsubscribe from mesh data");
+			_bleBase.unsubscribeMeshData(_targetAddress, callback);
 		}
 	}
 
