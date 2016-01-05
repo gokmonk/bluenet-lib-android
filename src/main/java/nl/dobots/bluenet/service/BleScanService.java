@@ -346,6 +346,7 @@ public class BleScanService extends Service {
 
 					@Override
 					public void onError(int error) {
+						_scanning = false;
 						Log.e(TAG, "... scan interval error: " + error);
 						onEvent(EventListener.Event.BLUETOOTH_START_SCAN_ERROR);
 
@@ -359,12 +360,13 @@ public class BleScanService extends Service {
 				}))
 			{
 				Log.d(TAG, "... scan interval started");
-				_scanning = true;
+//				_scanning = true;
 				_stopScanRetryNum = 0;
 				onIntervalScanStart();
 				_intervalScanHandler.postDelayed(_stopScanRunnable, _scanInterval);
 			}
 			else {
+				_scanning = false;
 				onEvent(EventListener.Event.BLUETOOTH_START_SCAN_ERROR);
 			}
 		}
@@ -448,6 +450,8 @@ public class BleScanService extends Service {
 			_ble.init(this, _btStateCallback);
 		} else if (!_scanning) {
 			Log.i(TAG, "Start scan");
+			_scanning = true;
+			_intervalScanHandler.removeCallbacksAndMessages(null);
 			_intervalScanHandler.post(_startScanRunnable);
 		}
 	}

@@ -964,10 +964,13 @@ public class BleCore {
 
 			@Override
 			public void onError(int error) {
-				callback.onError(error);
+				// [05.01.16] only report error if close fails, otherwise, we get an error
+				//   from the disconnect, and then a success from the close, which is
+				//   more confusing than not getting any report back from the disconnect
+//				callback.onError(error);
 				// also try to close even if disconnect fails, but don't report
 				// the error if it fails
-				close(false);
+				close(true);
 			}
 		});
 	}

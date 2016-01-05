@@ -563,12 +563,19 @@ public class BleExt {
 		connect(address, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
-				_handler.postDelayed(new Runnable() {
-					@Override
-					public void run() {
-						discoverServices(callback);
-					}
-				}, 500);
+				/* [05.01.16] I am sometimes getting the behaviour that the connect first succeeds
+				 *   and then a couple ms later I receive a disconnect again. In such a case, delaying
+				 *   the discover leads to the library trying to discover services although a disconnect
+				 *   was received in between.
+				 *   If the delay is really necessary, we need to find a better solution
+				 */
+//				_handler.postDelayed(new Runnable() {
+//					@Override
+//					public void run() {
+//						discoverServices(callback);
+//					}
+//				}, 500);
+				discoverServices(callback);
 			}
 
 			@Override
