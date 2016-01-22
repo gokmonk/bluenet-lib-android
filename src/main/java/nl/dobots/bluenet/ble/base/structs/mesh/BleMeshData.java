@@ -72,4 +72,16 @@ public class BleMeshData {
 				", data=" + Arrays.toString(data) +
 				'}';
 	}
+
+	public int getDataLength() {
+		return dataLength;
+	}
+
+	public int getOpCode() {
+		return opCode;
+	}
+
+	public byte[] getData() {
+		return data;
+	}
 }

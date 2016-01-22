@@ -23,7 +23,7 @@ import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshScanData;
  */
 public class BleMeshDataFactory {
 
-	public static BleMeshData fromBytes(byte[] bytes) {
+	public static BleMeshHubData fromBytes(byte[] bytes) {
 
 		BleMeshHubData data = new BleMeshHubData(bytes);
 		switch (data.getMessageType()) {

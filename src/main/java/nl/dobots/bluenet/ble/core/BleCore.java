@@ -35,6 +35,7 @@ import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
@@ -1376,6 +1377,7 @@ public class BleCore {
 			setValue(json, characteristic.getValue());
 
 			if (_characteristicsNotificationCallback != null) {
+				BleLog.LOGd(TAG, "notification: %s", Arrays.toString(characteristic.getValue()));
 				_characteristicsNotificationCallback.onData(json);
 			}
 

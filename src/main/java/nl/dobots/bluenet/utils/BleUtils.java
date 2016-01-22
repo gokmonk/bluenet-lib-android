@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.UUID;
 
+import android.bluetooth.BluetoothAdapter;
 import android.util.Base64;
 
 public class BleUtils {
@@ -125,6 +126,10 @@ public class BleUtils {
 			result[i] = array[array.length - (i+1)];
 		}
 		return result;
+	}
+
+	public static boolean isValidAddress(String address) {
+		return BluetoothAdapter.checkBluetoothAddress(address);
 	}
 
 }

@@ -1,6 +1,7 @@
 package nl.dobots.bluenet.ble.base.callbacks;
 
 import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshData;
+import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshHubData;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -21,6 +22,6 @@ import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshData;
  */
 public interface IMeshDataCallback extends IBaseCallback {
 
-	void onData(BleMeshData data);
+	void onData(BleMeshHubData data);
 
 }

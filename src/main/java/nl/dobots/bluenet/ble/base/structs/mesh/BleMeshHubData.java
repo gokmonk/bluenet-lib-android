@@ -1,5 +1,6 @@
 package nl.dobots.bluenet.ble.base.structs.mesh;
 
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -48,7 +49,7 @@ import nl.dobots.bluenet.utils.BleUtils;
  *
  * @author Dominik Egger
  */
-public class BleMeshHubData extends BleMeshData {
+public class BleMeshHubData {
 
 	public static final int SCAN_MESSAGE = 101;
 
@@ -82,21 +83,25 @@ public class BleMeshHubData extends BleMeshData {
 	 * @param bytes byte array containing the mesh message
 	 */
 	public BleMeshHubData(byte[] bytes) {
-		super(bytes);
+//		super(bytes);
 
-		ByteBuffer bb = ByteBuffer.wrap(data);
-		bb.order(ByteOrder.LITTLE_ENDIAN);
+		try {
+			ByteBuffer bb = ByteBuffer.wrap(bytes);
+			bb.order(ByteOrder.LITTLE_ENDIAN);
 
-		// need to reverse the address because it is in little endian, and even though we
-		// set the byte order to little endian, arrays are still being read as is, and not
-		// reversed automatically
-		byte[] address = new byte[BluenetConfig.BLE_DEVICE_ADDRESS_LENGTH];
-		bb.get(address);
-		sourceAddress = BleUtils.reverse(address);
+			// need to reverse the address because it is in little endian, and even though we
+			// set the byte order to little endian, arrays are still being read as is, and not
+			// reversed automatically
+			byte[] address = new byte[BluenetConfig.BLE_DEVICE_ADDRESS_LENGTH];
+			bb.get(address);
+			sourceAddress = BleUtils.reverse(address);
 
-		messageType = bb.getShort();
-		payload = new byte[bb.remaining()];
-		bb.get(payload);
+			messageType = bb.getShort();
+			payload = new byte[bb.remaining()];
+			bb.get(payload);
+		} catch (BufferUnderflowException e) {
+
+		}
 	}
 
 	/**
@@ -112,9 +117,11 @@ public class BleMeshHubData extends BleMeshData {
 		bb.putShort((short) messageType);
 		bb.put(payload);
 
-		data = bb.array();
+		return bb.array();
 
-		return super.toArray();
+//		data = bb.array();
+
+//		return super.toArray();
 	}
 
 	public int getMessageType() {

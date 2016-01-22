@@ -82,34 +82,38 @@ public class BleMeshScanData extends BleMeshHubData {
 	public BleMeshScanData(byte[] bytes) {
 		super(bytes);
 
-		ByteBuffer bb = ByteBuffer.wrap(payload);
-		bb.order(ByteOrder.LITTLE_ENDIAN);
+		try {
+			ByteBuffer bb = ByteBuffer.wrap(payload);
+			bb.order(ByteOrder.LITTLE_ENDIAN);
 
-		timeStamp = new Date();
-		numDevices = bb.get();
+			timeStamp = new Date();
+			numDevices = bb.get();
 //		devices = new ScannedDevice[numDevices];
-		devices = new ArrayList<>();
+			devices = new ArrayList<>();
 
-		for (int i = 0; i < numDevices; ++i) {
-			ScannedDevice device = new ScannedDevice();
-			// need to reverse the address because it is in little endian, and even though we
-			// set the byte order to little endian, arrays are still being read as is, and not
-			// reversed automatically
-			byte[] address = new byte[BluenetConfig.BLE_DEVICE_ADDRESS_LENGTH];
-			bb.get(address);
-			device.address = BleUtils.reverse(address);
-			device.rssi = bb.get();
-			device.occurrences = bb.getShort();
+			for (int i = 0; i < numDevices; ++i) {
+				ScannedDevice device = new ScannedDevice();
+				// need to reverse the address because it is in little endian, and even though we
+				// set the byte order to little endian, arrays are still being read as is, and not
+				// reversed automatically
+				byte[] address = new byte[BluenetConfig.BLE_DEVICE_ADDRESS_LENGTH];
+				bb.get(address);
+				device.address = BleUtils.reverse(address);
+				device.rssi = bb.get();
+				device.occurrences = bb.getShort();
 //			devices[i] = device;
-			devices.add(device);
-		}
-
-		Collections.sort(devices, new Comparator<ScannedDevice>() {
-			@Override
-			public int compare(ScannedDevice lhs, ScannedDevice rhs) {
-				return -Integer.compare(lhs.getRssi(), rhs.getRssi());
+				devices.add(device);
 			}
-		});
+
+			Collections.sort(devices, new Comparator<ScannedDevice>() {
+				@Override
+				public int compare(ScannedDevice lhs, ScannedDevice rhs) {
+					return -Integer.compare(lhs.getRssi(), rhs.getRssi());
+				}
+			});
+		} catch (Exception e) {
+			
+		}
 	}
 
 	/**
