@@ -546,8 +546,8 @@ public class BleExt {
 		if (_detectedCharacteristics.indexOf(characteristicUuid) == -1) {
 			if (callback != null) {
 				callback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
-				return false;
 			}
+			return false;
 		}
 		return true;
 	}
