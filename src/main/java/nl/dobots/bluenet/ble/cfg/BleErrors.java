@@ -45,6 +45,7 @@ public class BleErrors {
 	public static final int ERROR_SUBSCRIBE_FAILED = 232;
 	public static final int ERROR_DESCRIPTOR_SET_FAILED = 233;
 	public static final int ERROR_UNSUBSCRIBE_NOTIFICATION_FAILED = 234;
+	public static final int ERROR_BLE_PERMISSION_DENIED = 235;
 
 	// BleExt
 

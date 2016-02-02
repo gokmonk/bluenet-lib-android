@@ -1,5 +1,6 @@
 package nl.dobots.bluenet.ble.extended;
 
+import android.app.Activity;
 import android.content.Context;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -627,6 +628,14 @@ public class BleExt {
 				callback.onError(error);
 			}
 		});
+	}
+
+	public void requestPermissions(Activity activity) {
+		_bleBase.requestPermissions(activity);
+	}
+
+	public boolean handlePermissionResult(int requestCode, String[] permissions, int[] grantResults, IStatusCallback callback) {
+		return _bleBase.handlePermissionResult(requestCode, permissions, grantResults, callback);
 	}
 
 //	abstract class CallbackRunnable implements Runnable {

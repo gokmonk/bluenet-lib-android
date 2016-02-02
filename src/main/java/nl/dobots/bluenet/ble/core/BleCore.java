@@ -1,7 +1,9 @@
 package nl.dobots.bluenet.ble.core;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
+import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothAdapter.LeScanCallback;
 import android.bluetooth.BluetoothDevice;
@@ -26,6 +28,8 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.ParcelUuid;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -34,6 +38,7 @@ import org.json.JSONObject;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.security.Permission;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -57,6 +62,8 @@ public class BleCore {
 
 	// Timeout for a bluetooth enable request. If timeout expires, an error is created
 	private static final int BLUETOOTH_ENABLE_TIMEOUT = 15000;
+
+	private static final int PERMISSIONS_REQUEST_LOCATION = 101;
 
 	// bluetooth adapter used for ble calls
 	private BluetoothAdapter _bluetoothAdapter;
@@ -237,6 +244,30 @@ public class BleCore {
 		}
 	}
 
+	public void requestPermissions(Activity activity) {
+		ActivityCompat.requestPermissions(activity,
+				new String[] {Manifest.permission.ACCESS_COARSE_LOCATION},
+				PERMISSIONS_REQUEST_LOCATION);
+
+	}
+
+	/**
+	 * @return return true if permission result was handled, false otherwise. if true, then
+	 *   the result will be passed using the callback.onSuccess or callback.onError functions
+	 */
+	public boolean handlePermissionResult(int requestCode, String[] permissions, int[] grantResults, IStatusCallback callback) {
+		switch (requestCode) {
+			case PERMISSIONS_REQUEST_LOCATION: {
+				if (grantResults.length > 0 &&	grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+					callback.onSuccess();
+				} else {
+					callback.onError(BleErrors.ERROR_BLE_PERMISSION_DENIED);
+				}
+				return true;
+			}
+		}
+		return false;
+	}
 	/**
 	 * Initializes the BLE Modules and tries to enable the Bluetooth adapter. Note, the callback
 	 * provided as parameter will persist. The callback will be triggered whenever the state of
@@ -258,6 +289,16 @@ public class BleCore {
 			BleLog.LOGe(TAG, "Can't use library without BLE hardware!! Abort.");
 			callback.onError(BleErrors.ERROR_BLE_HARDWARE_MISSING);
 			return;
+		}
+
+		if (Build.VERSION.SDK_INT >= 23) {
+			int permissionCheck = ContextCompat.checkSelfPermission(context,
+					Manifest.permission.ACCESS_COARSE_LOCATION);
+			if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
+				BleLog.LOGe(TAG, "Can't use library without BLE hardware!! Abort.");
+				callback.onError(BleErrors.ERROR_BLE_PERMISSION_DENIED);
+				return;
+			}
 		}
 
 		_btStateCallback = callback;
