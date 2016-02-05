@@ -1,11 +1,13 @@
 package nl.dobots.bluenet.ble.base;
 
 import android.os.Handler;
+import android.util.Log;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -25,7 +27,6 @@ import nl.dobots.bluenet.ble.base.structs.BleMeshMessage;
 import nl.dobots.bluenet.ble.base.structs.BleTrackedDevice;
 import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshData;
 import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshHubData;
-import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshScanData;
 import nl.dobots.bluenet.ble.cfg.BleTypes;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
@@ -1244,10 +1245,16 @@ public class BleBase extends BleCore {
 				});
 	}
 
-	ByteBuffer notificationBuffer = ByteBuffer.allocate(100);
+	ByteBuffer _notificationBuffer = ByteBuffer.allocate(100);
+	// set flag to false in case of buffer overflow. no other way to detect invalid messages
+	// if needed, could add message number?
+	boolean _notificationBufferValid = true;
+	// for backwards compatibility
+	boolean _hasStartMessageType = false;
 
 	public void subscribeMeshData(final String address, final IMeshDataCallback callback) {
 		BleLog.LOGd(TAG, "subscribing to mesh data...");
+		_hasStartMessageType = false;
 		subscribe(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
 			new IDataCallback() {
 				@Override
@@ -1258,23 +1265,42 @@ public class BleBase extends BleCore {
 
 						BleMeshHubData meshData;
 						BleMeshData meshDataPart = new BleMeshData(notificationBytes);
-						switch (meshDataPart.getOpCode()) {
-							case 0x0: {
+						try {
+							switch (meshDataPart.getOpCode()) {
+								case 0x0: {
 //								meshData = BleMeshDataFactory.fromBytes(notificationBytes);
 //								meshData = BleMeshDataFactory.fromBytes(meshDataPart.getData());
-								break;
+									break;
+								}
+								case 0x20: {
+									_hasStartMessageType = true;
+									_notificationBuffer.clear();
+									_notificationBufferValid = true;
+									_notificationBuffer.put(meshDataPart.getData());
+									break;
+								}
+								case 0x21: {
+									if (_notificationBufferValid) {
+										_notificationBuffer.put(meshDataPart.getData());
+									}
+									break;
+								}
+								case 0x22: {
+									if (_notificationBufferValid) {
+										_notificationBuffer.put(meshDataPart.getData());
+										meshData = BleMeshDataFactory.fromBytes(_notificationBuffer.array());
+										callback.onData((BleMeshHubData) meshData);
+									}
+									if (!_hasStartMessageType) {
+										_notificationBuffer.clear();
+										_notificationBufferValid = true;
+									}
+									break;
+								}
 							}
-							case 0x21: {
-								notificationBuffer.put(meshDataPart.getData());
-								break;
-							}
-							case 0x22: {
-								notificationBuffer.put(meshDataPart.getData());
-								meshData = BleMeshDataFactory.fromBytes(notificationBuffer.array());
-								callback.onData((BleMeshHubData) meshData);
-								notificationBuffer.clear();
-								break;
-							}
+						} catch (BufferOverflowException e) {
+							Log.e(TAG, "notification buffer overflow. missed some messages?!");
+							_notificationBufferValid = false;
 						}
 
 
