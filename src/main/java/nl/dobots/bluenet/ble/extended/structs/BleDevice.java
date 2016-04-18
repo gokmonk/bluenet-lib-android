@@ -33,6 +33,7 @@ public class BleDevice {
 	private static final String TAG = BleDevice.class.getCanonicalName();
 
 	// to be checked, obtained from http://data.altbeacon.org/android-distance.json
+	// device specific constants, these ones are for a Nexus 4/5
 	private static final double coeff1 = 0.42093;
 	private static final double coeff2 = 6.9476;
 	private static final double coeff3 = 0.54992;
@@ -169,7 +170,8 @@ public class BleDevice {
 	}
 
 	public void setRssi(int rssi) {
-		this._rssi = rssi;
+//		this._rssi = rssi;
+		updateRssiValue(new Date().getTime(), rssi);
 	}
 
 	public int getMajor() {
@@ -207,7 +209,10 @@ public class BleDevice {
 	public synchronized void updateRssiValue(long timestamp, int rssi) {
 		if (rssi != 127) {
 			this._rssi = rssi;
-			_rssiHistory.add(new RssiMeasurement(rssi, (new Date()).getTime()));
+			// todo: maybe also add a capacity limit, in case we only scan and never check
+			//   for rssi or distance values, we would only add and never remove any values
+			//   and the history will only grow
+			_rssiHistory.add(new RssiMeasurement(rssi, timestamp));
 		}
 
 		_averageRssi = null;
@@ -231,6 +236,11 @@ public class BleDevice {
 
 		this._rssiHistory = newHistory;
 		return hasChange;
+	}
+
+	public int getOccurrences() {
+		refreshHistory();
+		return _rssiHistory.size();
 	}
 
 	Comparator<RssiMeasurement> timeSorter = new Comparator<RssiMeasurement>() {

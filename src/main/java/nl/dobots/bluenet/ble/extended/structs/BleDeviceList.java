@@ -1,6 +1,7 @@
 package nl.dobots.bluenet.ble.extended.structs;
 
 import java.util.ArrayList;
+import java.util.Collection;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -21,13 +22,28 @@ import java.util.ArrayList;
  */
 public class BleDeviceList extends ArrayList<BleDevice> {
 
-	public boolean containsDevice(String address) {
-		for (BleDevice device : this) {
-			if (device.getAddress().equals(address)) {
-				return true;
-			}
-		}
-		return false;
+	public BleDeviceList() {
+		super();
 	}
 
+	public BleDeviceList(Collection<? extends BleDevice> collection) {
+		super(collection);
+	}
+
+	public boolean containsDevice(String address) {
+		return getDevice(address) != null;
+	}
+
+	public BleDeviceList clone() {
+		return (BleDeviceList)super.clone();
+	}
+
+	public BleDevice getDevice(String address) {
+		for (BleDevice device : this) {
+			if (device.getAddress().equals(address)) {
+				return device;
+			}
+		}
+		return null;
+	}
 }

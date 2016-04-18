@@ -38,7 +38,6 @@ import org.json.JSONObject;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.security.Permission;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -261,13 +260,30 @@ public class BleCore {
 				if (grantResults.length > 0 &&	grantResults[0] == PackageManager.PERMISSION_GRANTED) {
 					callback.onSuccess();
 				} else {
-					callback.onError(BleErrors.ERROR_BLE_PERMISSION_DENIED);
+					callback.onError(BleErrors.ERROR_BLE_PERMISSION_MISSING);
 				}
 				return true;
 			}
 		}
 		return false;
 	}
+
+	public String getLocalAddress() {
+		if (_bluetoothAdapter != null) {
+			return _bluetoothAdapter.getAddress();
+		}
+		BleLog.LOGe(TAG, "Bluetooth not initialized!");
+		return null;
+	}
+
+	public String getLocalName() {
+		if (_bluetoothAdapter != null) {
+			return _bluetoothAdapter.getName();
+		}
+		BleLog.LOGe(TAG, "Bluetooth not initialized!");
+		return null;
+	}
+
 	/**
 	 * Initializes the BLE Modules and tries to enable the Bluetooth adapter. Note, the callback
 	 * provided as parameter will persist. The callback will be triggered whenever the state of
@@ -295,8 +311,8 @@ public class BleCore {
 			int permissionCheck = ContextCompat.checkSelfPermission(context,
 					Manifest.permission.ACCESS_COARSE_LOCATION);
 			if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
-				BleLog.LOGe(TAG, "Can't use library without BLE hardware!! Abort.");
-				callback.onError(BleErrors.ERROR_BLE_PERMISSION_DENIED);
+				BleLog.LOGe(TAG, "BLE permissions not granted!! Abort.");
+				callback.onError(BleErrors.ERROR_BLE_PERMISSION_MISSING);
 				return;
 			}
 		}
@@ -773,7 +789,7 @@ public class BleCore {
 			return false;
 		}
 
-//		if (!isScanning()) {
+//		if (!isRunning()) {
 //			callback.onError(BleCoreTypes.ERROR_NOT_SCANNING);
 //			return false;
 //		}

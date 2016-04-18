@@ -85,6 +85,8 @@ public class BleExt {
 	private ArrayList<String> _blackList;
 	private ArrayList<String> _whiteList;
 
+	private IBleDeviceCallback _cloudScanCB;
+
 	public BleExt() {
 		_bleBase = new BleBase();
 
@@ -302,6 +304,10 @@ public class BleExt {
 				device = updateDevice(device);
 				// report the updated device
 				callback.onDeviceScanned(device);
+
+				if (_cloudScanCB != null) {
+					_cloudScanCB.onDeviceScanned(device);
+				}
 			}
 
 			@Override
@@ -332,6 +338,23 @@ public class BleExt {
 	 */
 	public boolean isScanning() {
 		return _bleBase.isScanning();
+	}
+
+	/**
+	 * Every time a device is scanned, the onDeviceScanned function of the
+	 * callback provided as scanCB parameter will trigger. Use this to enable
+	 * cloud upload, i.e. forward the scan to the crownstone-loopack-sdk
+	 * @param scanCB
+	 */
+	public void enableCloudUpload(IBleDeviceCallback scanCB) {
+		_cloudScanCB = scanCB;
+	}
+
+	/**
+	 * Disable cloud upload again
+	 */
+	public void disableCloudUpload() {
+		_cloudScanCB = null;
 	}
 
 	/**
