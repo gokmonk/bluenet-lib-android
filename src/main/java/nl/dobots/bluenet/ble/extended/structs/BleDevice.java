@@ -42,7 +42,7 @@ public class BleDevice {
 	enum DeviceType {
 		unknown,
 		crownstone,
-		dobeacon,
+		guidestone,
 		ibeacon,
 		fridge
 	}
@@ -110,11 +110,11 @@ public class BleDevice {
 	}
 
 	public boolean isIBeacon() {
-		return _type == DeviceType.ibeacon || _type == DeviceType.dobeacon;
+		return _type == DeviceType.ibeacon || _type == DeviceType.guidestone;
 	}
 
-	public boolean isDoBeacon() {
-		return _type == DeviceType.dobeacon;
+	public boolean isGuidestone() {
+		return _type == DeviceType.guidestone;
 	}
 
 	public boolean isCrownstone() {
@@ -131,9 +131,9 @@ public class BleDevice {
 				return DeviceType.crownstone;
 			}
 		}
-		if (json.has(BleTypes.PROPERTY_IS_DOBEACON)) {
-			if (json.getBoolean(BleTypes.PROPERTY_IS_DOBEACON)) {
-				return DeviceType.dobeacon;
+		if (json.has(BleTypes.PROPERTY_IS_GUIDESTONE)) {
+			if (json.getBoolean(BleTypes.PROPERTY_IS_GUIDESTONE)) {
+				return DeviceType.guidestone;
 			}
 		}
 		if (json.has(BleTypes.PROPERTY_IS_FRIDGE)) {

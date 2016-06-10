@@ -115,12 +115,12 @@ public class BleScanService extends Service {
 	 * values for EXTRA_SCAN_FILTER:
 	 *   FILTER_ALL: return all scanned BLE devices
 	 *   FILTER_CROWNSTONE: return only scanned crownstones
-	 *   FILTER_DOBEACON: return only scanned doBeacons
+	 *   FILTER_GUIDESTONE: return only scanned guidestones
 	 *   FILTER_IbEACON: return all scanned iBeacon devices
 	 */
 	public static final int FILTER_ALL = 0;
 	public static final int FILTER_CROWNSTONE = 1;
-	public static final int FILTER_DOBEACON = 2;
+	public static final int FILTER_GUIDESTONE = 2;
 	public static final int FILTER_IBEACON = 3;
 
 	/**
@@ -202,8 +202,8 @@ public class BleScanService extends Service {
 					return BleDeviceFilter.all;
 				case FILTER_CROWNSTONE:
 					return BleDeviceFilter.crownstone;
-				case FILTER_DOBEACON:
-					return BleDeviceFilter.doBeacon;
+				case FILTER_GUIDESTONE:
+					return BleDeviceFilter.guidestone;
 				case FILTER_IBEACON:
 					return BleDeviceFilter.iBeacon;
 			}
@@ -478,7 +478,7 @@ public class BleScanService extends Service {
 	 */
 	@Deprecated
 	public void startIntervalScan() {
-		startIntervalScan(BleDeviceFilter.doBeacon);
+		startIntervalScan(BleDeviceFilter.guidestone);
 	}
 
 	/**

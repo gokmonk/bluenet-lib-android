@@ -65,7 +65,7 @@ beaconNames = {
 }
 
 #############################################
-## Visualize rssi of each beacon over time ##
+## Visualize rssi of each stone over time ##
 #############################################
 
 rssis = {} # averaged rssi for each interval, per ble address

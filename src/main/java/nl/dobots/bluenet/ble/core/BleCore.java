@@ -846,8 +846,8 @@ public class BleCore {
 
 		try {
 			while (bb.hasRemaining()) {
-				int length = BleUtils.signedToUnsignedByte(bb.get());
-				int type = BleUtils.signedToUnsignedByte(bb.get());
+				int length = BleUtils.toUint8(bb.get());
+				int type = BleUtils.toUint8(bb.get());
 				if (type == search) {
 					byte[] result = new byte[length - 1];
 					bb.get(result, 0, length - 1);
@@ -1485,7 +1485,7 @@ public class BleCore {
 			} else {
 				BleLog.LOGe(TAG, "failed to read descriptor, status: %d", status);
 
-				if (_characteristicsNotificationCallback != null) {
+				if (_characteristicsWriteCallback != null) {
 					_characteristicsWriteCallback.onError(BleErrors.ERROR_DESCRIPTOR_READ_FAILED);
 				}
 

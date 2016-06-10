@@ -12,7 +12,7 @@ public enum BleDeviceFilter {
 
 	all,
 	crownstone,
-	doBeacon,
+	guidestone,
 	iBeacon,
 	fridge
 

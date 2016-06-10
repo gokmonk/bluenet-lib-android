@@ -16,8 +16,8 @@ package nl.dobots.bluenet.ble.base.structs;
  * Created on 15-7-15
  * Updated on 9-6-16 for protocol version 0.4.0
  *
- * This class is an object to hold and ease conversion of a Bluenet Configuration message. A
- * Configuration message is used to read and write to a configuration characteristic. A configuration
+ * This class is an object to hold and ease conversion of a Bluenet State message. A
+ * State message is used to read and write to a State characteristic. A State
  * message contains the following 4 fields:
  * 		* Type
  * 		* OpCode
@@ -30,7 +30,7 @@ package nl.dobots.bluenet.ble.base.structs;
  * 		-----------------------------------------------------------------------------
  *
  * 	The reserved byte is used for byte alignment of the length and payload.
- * 	Type defines the type of configuration and defines the layout of the payload, see
+ * 	Type defines the type of State and defines the layout of the payload, see
  * 	  @BluenetConfig for a list of possible types
  * 	Length defines the number of bytes used by the payload
  *
@@ -38,17 +38,17 @@ package nl.dobots.bluenet.ble.base.structs;
  *
  * @author Dominik Egger
  */
-public class BleConfiguration extends BleStreamMessage {
+public class BleState extends BleStreamMessage {
 
-	public BleConfiguration(int type, int opCode, int length, byte[] payload) {
+	public BleState(int type, int opCode, int length, byte[] payload) {
 		super(type, opCode, length, payload);
 	}
 
-	public BleConfiguration(int type, int length, byte[] payload) {
+	public BleState(int type, int length, byte[] payload) {
 		super(type, length, payload);
 	}
 
-	public BleConfiguration(byte[] bytes) {
+	public BleState(byte[] bytes) {
 		super(bytes);
 	}
 

@@ -15,7 +15,10 @@ import java.util.Arrays;
 import nl.dobots.bluenet.ble.base.BleBase;
 import nl.dobots.bluenet.ble.base.callbacks.IAlertCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
 import nl.dobots.bluenet.ble.base.structs.BleAlertState;
+import nl.dobots.bluenet.ble.base.structs.BleCommand;
+import nl.dobots.bluenet.ble.base.structs.BleState;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.core.BleCore;
@@ -33,6 +36,7 @@ import nl.dobots.bluenet.ble.extended.structs.BleDeviceMap;
 import nl.dobots.bluenet.ble.base.structs.BleMeshMessage;
 import nl.dobots.bluenet.ble.base.structs.BleTrackedDevice;
 import nl.dobots.bluenet.utils.BleLog;
+import nl.dobots.bluenet.utils.BleUtils;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -70,7 +74,7 @@ public class BleExt {
 	private String _targetAddress;
 
 	// filter, used to filter devices based on "type", eg. only report crownstone devices, or
-	// only report dobeacon devices
+	// only report guidestone devices
 	private BleDeviceFilter _scanFilter = BleDeviceFilter.all;
 
 	// current connection state
@@ -94,6 +98,16 @@ public class BleExt {
 		HandlerThread handlerThread = new HandlerThread("BleExtHandler");
 		handlerThread.start();
 		_handler = new Handler(handlerThread.getLooper());
+	}
+
+	/**
+	 * Get access to the base bluenet object. Only use it if you need to change some low level
+	 * settings. Usually this is Not necessary.
+	 * @return BleBase object used by this exented object to interact with the Android Bluetooth
+	 * functions
+	 */
+	public BleBase getBleBase() {
+		return _bleBase;
 	}
 
 	/**
@@ -284,8 +298,8 @@ public class BleExt {
 						// if filter set to crownstone, but device is not a crownstone, abort
 						if (!device.isCrownstone()) return;
 						break;
-					case doBeacon:
-						if (!device.isDoBeacon()) return;
+					case guidestone:
+						if (!device.isGuidestone()) return;
 						break;
 					case iBeacon:
 						// if filter set to beacon, but device is not a beacon, abort
@@ -569,11 +583,16 @@ public class BleExt {
 	public boolean hasCharacteristic(String characteristicUuid, IBaseCallback callback) {
 		if (_detectedCharacteristics.indexOf(characteristicUuid) == -1) {
 			if (callback != null) {
+				BleLog.LOGe(TAG, "characteristic not found");
 				callback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
 			}
 			return false;
 		}
 		return true;
+	}
+
+	public boolean hasCommandCharacteristic(IBaseCallback callback) {
+		return hasCharacteristic(BluenetConfig.CHAR_CONTROL_UUID, null);
 	}
 
 	/**
@@ -837,10 +856,14 @@ public class BleExt {
 	 * with address otherwise
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
-	public void readPwm(IIntegerCallback callback) {
-		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_PWM_UUID, callback)) {
+	public void readPwm(final IIntegerCallback callback) {
+		if (isConnected(callback)) {
 			BleLog.LOGd(TAG, "Reading current PWM value ...");
-			_bleBase.readPWM(_targetAddress, callback);
+			if (hasStateCharacteristics(null)) {
+				getState(BluenetConfig.STATE_SWITCH_STATE, 1, callback);
+			} else if (hasCharacteristic(BluenetConfig.CHAR_PWM_UUID, callback)) {
+				_bleBase.readPWM(_targetAddress, callback);
+			}
 		}
 	}
 
@@ -892,20 +915,15 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writePwm(int value, IStatusCallback callback) {
-		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_PWM_UUID, callback)) {
+		if (isConnected(callback)) {
 			BleLog.LOGd(TAG, "Set PWM to %d", value);
-			_bleBase.writePWM(_targetAddress, value, callback);
+			if (hasCommandCharacteristic(null)) {
+				BleLog.LOGd(TAG, "use control characteristic");
+				_bleBase.sendCommand(_targetAddress, new BleCommand(BluenetConfig.CMD_PWM, 1, new byte[]{(byte) value}), callback);
+			} else if (hasCharacteristic(BluenetConfig.CHAR_PWM_UUID, callback)) {
+				_bleBase.writePWM(_targetAddress, value, callback);
+			}
 		}
-	}
-
-	/**
-	 * Get access to the base bluenet object. Only use it if you need to change some low level
-	 * settings. Usually this is Not necessary.
-	 * @return BleBase object used by this exented object to interact with the Android Bluetooth
-	 * functions
-	 */
-	public BleBase getBleBase() {
-		return _bleBase;
 	}
 
 	/**
@@ -1058,6 +1076,34 @@ public class BleExt {
 		writePwm(address, 0, callback);
 	}
 
+	private void getState(int type, final int len, final IIntegerCallback callback) {
+		_bleBase.getState(_targetAddress, type, new IStateCallback() {
+			@Override
+			public void onSuccess(BleState state) {
+				if (state.getLength() == len) {
+					switch (len) {
+					case 1:
+						callback.onSuccess(BleUtils.toUint8(state.getPayload()[0]));
+						return;
+					case 2:
+						callback.onSuccess(BleUtils.byteArrayToShort(state.getPayload()));
+						return;
+					case 4:
+						callback.onSuccess(BleUtils.byteArrayToInt(state.getPayload()));
+						return;
+					}
+				} else {
+					callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
+
 	/**
 	 * Function to read the current consumption value from the device.
 	 *
@@ -1065,29 +1111,14 @@ public class BleExt {
 	 * with address otherwise
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
-	public void readCurrentConsumption(final IIntegerCallback callback) {
-		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_SAMPLE_CURRENT_UUID, callback) &&
-				hasCharacteristic(BluenetConfig.CHAR_CURRENT_CONSUMPTION_UUID, callback)) {
-			// Sample current
-			BleLog.LOGd(TAG, "Sampling Current ...");
-			_bleBase.sampleCurrent(_targetAddress, BluenetConfig.SAMPLE_CURRENT_CONSUMPTION, new IStatusCallback() {
-				@Override
-				public void onSuccess() {
-					// give some time for the sampling
-					_handler.postDelayed(new Runnable() {
-						@Override
-						public void run() {
-							BleLog.LOGd(TAG, "Reading CurrentConsumption value ...");
-							_bleBase.readCurrentConsumption(_targetAddress, callback);
-						}
-					}, 100);
-				}
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
+	public void readPowerConsumption(final IIntegerCallback callback) {
+		if (isConnected(callback)) {
+			BleLog.LOGd(TAG, "Reading power consumption value ...");
+			if (hasStateCharacteristics(null)) {
+				getState(BluenetConfig.STATE_POWER_USAGE, 4, callback);
+			} else if (hasCharacteristic(BluenetConfig.CHAR_POWER_CONSUMPTION_UUID, callback)) {
+				_bleBase.readPowerConsumption(_targetAddress, callback);
+			}
 		}
 	}
 
@@ -1098,14 +1129,14 @@ public class BleExt {
 	 * @param address the MAC address of the device
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
-	public void readCurrentConsumption(String address, final IIntegerCallback callback) {
+	public void readPowerConsumption(String address, final IIntegerCallback callback) {
 		if (checkConnection(address)) {
-			readCurrentConsumption(callback);
+			readPowerConsumption(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
 				@Override
 				public void execute(final IStatusCallback execCallback) {
-					readCurrentConsumption(new IIntegerCallback() {
+					readPowerConsumption(new IIntegerCallback() {
 						@Override
 						public void onSuccess(int result) {
 							callback.onSuccess(result);
@@ -1137,29 +1168,10 @@ public class BleExt {
 	 * with address otherwise
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
-	public void readCurrentCurve(final IByteArrayCallback callback) {
-		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_SAMPLE_CURRENT_UUID, callback) &&
-				hasCharacteristic(BluenetConfig.CHAR_CURRENT_CURVE_UUID, callback)) {
-			// Sample current
-			BleLog.LOGd(TAG, "Sampling Current ...");
-			_bleBase.sampleCurrent(_targetAddress, BluenetConfig.SAMPLE_CURRENT_CURVE, new IStatusCallback() {
-				@Override
-				public void onSuccess() {
-					// give some time for the sampling
-					_handler.postDelayed(new Runnable() {
-						@Override
-						public void run() {
-							BleLog.LOGd(TAG, "Reading CurrentCurve value ...");
-							_bleBase.readCurrentCurve(_targetAddress, callback);
-						}
-					}, 100);
-				}
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
+	public void readPowerSamples(final IByteArrayCallback callback) {
+		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_POWER_SAMPLES_UUID, callback)) {
+			BleLog.LOGd(TAG, "Reading CurrentCurve value ...");
+			_bleBase.readPowerSamples(_targetAddress, callback);
 		}
 	}
 
@@ -1170,125 +1182,17 @@ public class BleExt {
 	 * @param address the MAC address of the device
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
-	public void readCurrentCurve(String address, final IByteArrayCallback callback) {
+	public void readPowerSamples(String address, final IByteArrayCallback callback) {
 		if (checkConnection(address)) {
-			readCurrentCurve(callback);
+			readPowerSamples(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
 				@Override
 				public void execute(final IStatusCallback execCallback) {
-					readCurrentCurve(new IByteArrayCallback() {
+					readPowerSamples(new IByteArrayCallback() {
 						@Override
 						public void onSuccess(byte[] result) {
 							callback.onSuccess(result);
-							execCallback.onSuccess();
-						}
-
-						@Override
-						public void onError(int error) {
-							execCallback.onError(error);
-						}
-					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
-	}
-
-	/**
-	 * Function to read the current limit value from the device.
-	 *
-	 * Note: needs to be already connected or an error is created! Use overloaded function
-	 * with address otherwise
-	 * @param callback the callback which will get the read value on success, or an error otherwise
-	 */
-	public void readCurrentLimit(IIntegerCallback callback) {
-		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_CURRENT_LIMIT_UUID, callback)) {
-			BleLog.LOGd(TAG, "Reading CurrentLimit value ...");
-			_bleBase.readCurrentLimit(_targetAddress, callback);
-		}
-	}
-
-	/**
-	 * Function to read the current limit value from the device.
-	 *
-	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
-	 * @param address the MAC address of the device
-	 * @param callback the callback which will get the read value on success, or an error otherwise
-	 */
-	public void readCurrentLimit(String address, final IIntegerCallback callback) {
-		if (checkConnection(address)) {
-			readCurrentLimit(callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					readCurrentLimit(new IIntegerCallback() {
-						@Override
-						public void onSuccess(int result) {
-							callback.onSuccess(result);
-							execCallback.onSuccess();
-						}
-
-						@Override
-						public void onError(int error) {
-							execCallback.onError(error);
-						}
-					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
-	}
-
-	/**
-	 * Function to write the given current limit to the device.
-	 *
-	 * Note: needs to be already connected or an error is created! Use overloaded function
-	 * with address otherwise
-	 * @param value the value to be written to the device
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void writeCurrentLimit(int value, IStatusCallback callback) {
-		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_CURRENT_LIMIT_UUID, callback)) {
-			BleLog.LOGd(TAG, "Set CurrentLimit to %d", value);
-			_bleBase.writeCurrentLimit(_targetAddress, value, callback);
-		}
-	}
-
-	/**
-	 * Function to write the given current limit to the device.
-	 *
-	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
-	 * @param address the MAC address of the device
-	 * @param value the value to be written
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void writeCurrentLimit(String address, final int value, final IStatusCallback callback) {
-		if (checkConnection(address)) {
-			writeCurrentLimit(value, callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					writeCurrentLimit(value, new IStatusCallback() {
-						@Override
-						public void onSuccess() {
-							callback.onSuccess();
 							execCallback.onSuccess();
 						}
 
@@ -1325,9 +1229,14 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	private void writeReset(int value, IStatusCallback callback) {
-		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_RESET_UUID, callback)) {
+		if (isConnected(callback)) {
 			BleLog.LOGd(TAG, "Set Reset to %d", value);
-			_bleBase.writeReset(_targetAddress, value, callback);
+			if (hasCommandCharacteristic(null)) {
+				BleLog.LOGd(TAG, "use control characteristic");
+				_bleBase.sendCommand(_targetAddress, new BleCommand(BluenetConfig.CMD_RESET, 1, new byte[]{(byte) value}), callback);
+			} else if (hasCharacteristic(BluenetConfig.CHAR_RESET_UUID, callback)) {
+				_bleBase.writeReset(_targetAddress, value, callback);
+			}
 		}
 	}
 
@@ -1404,7 +1313,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void resetToBootloader(IStatusCallback callback) {
-		writeReset(BluenetConfig.RESET_BOOTLOADER, callback);
+		writeReset(BluenetConfig.RESET_DFU, callback);
 	}
 
 	/**
@@ -1416,7 +1325,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void resetToBootloader(String address, final IStatusCallback callback) {
-		writeReset(address, BluenetConfig.RESET_BOOTLOADER, callback);
+		writeReset(address, BluenetConfig.RESET_DFU, callback);
 	}
 
 	/**
@@ -1427,9 +1336,13 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void readTemperature(IIntegerCallback callback) {
-		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_TEMPERATURE_UUID, callback)) {
+		if (isConnected(callback)) {
 			BleLog.LOGd(TAG, "Reading Temperature value ...");
-			_bleBase.readTemperature(_targetAddress, callback);
+			if (hasStateCharacteristics(null)) {
+				getState(BluenetConfig.STATE_TEMPERATURE, 4, callback);
+			} else if (hasCharacteristic(BluenetConfig.CHAR_TEMPERATURE_UUID, callback)) {
+				_bleBase.readTemperature(_targetAddress, callback);
+			}
 		}
 	}
 
@@ -1482,7 +1395,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writeMeshMessage(BleMeshMessage value, IStatusCallback callback) {
-		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_MESH_UUID, callback)) {
+		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_MESH_CONTROL_UUID, callback)) {
 			BleLog.LOGd(TAG, "Set MeshMessage to %s", value.toString());
 			_bleBase.writeMeshMessage(_targetAddress, value, callback);
 		}
@@ -1540,9 +1453,13 @@ public class BleExt {
 	 * @return true if configuration characteristics are available, false otherwise
 	 */
 	public boolean hasConfigurationCharacteristics(IBaseCallback callback) {
-		return hasCharacteristic(BluenetConfig.CHAR_SELECT_CONFIGURATION_UUID, callback) &&
-				hasCharacteristic(BluenetConfig.CHAR_GET_CONFIGURATION_UUID, callback) &&
-				hasCharacteristic(BluenetConfig.CHAR_SET_CONFIGURATION_UUID, callback);
+		return hasCharacteristic(BluenetConfig.CHAR_CONFIG_CONTROL_UUID, callback) &&
+				hasCharacteristic(BluenetConfig.CHAR_CONFIG_READ_UUID, callback);
+	}
+
+	public boolean hasStateCharacteristics(IBaseCallback callback) {
+		return hasCharacteristic(BluenetConfig.CHAR_STATE_CONTROL_UUID, callback) &&
+				hasCharacteristic(BluenetConfig.CHAR_STATE_READ_UUID, callback);
 	}
 
 //	public void writeConfiguration(BleConfiguration value, IStatusCallback callback) {
@@ -3004,6 +2921,114 @@ public class BleExt {
 		}
 	}
 
+	/**
+	 * Function to read the current limit value from the device.
+	 *
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 * @param callback the callback which will get the read value on success, or an error otherwise
+	 */
+	public void getCurrentLimit(IIntegerCallback callback) {
+		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
+			BleLog.LOGd(TAG, "Reading CurrentLimit value ...");
+			_bleBase.getCurrentLimit(_targetAddress, callback);
+		}
+	}
+
+	/**
+	 * Function to read the current limit value from the device.
+	 *
+	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
+	 * @param address the MAC address of the device
+	 * @param callback the callback which will get the read value on success, or an error otherwise
+	 */
+	public void getCurrentLimit(String address, final IIntegerCallback callback) {
+		if (checkConnection(address)) {
+			getCurrentLimit(callback);
+		} else {
+			connectAndExecute(address, new IExecuteCallback() {
+				@Override
+				public void execute(final IStatusCallback execCallback) {
+					getCurrentLimit(new IIntegerCallback() {
+						@Override
+						public void onSuccess(int result) {
+							callback.onSuccess(result);
+							execCallback.onSuccess();
+						}
+
+						@Override
+						public void onError(int error) {
+							execCallback.onError(error);
+						}
+					});
+				}
+			}, new IStatusCallback() {
+				@Override
+				public void onSuccess() { /* don't care */ }
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			});
+		}
+	}
+
+	/**
+	 * Function to write the given current limit to the device.
+	 *
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 * @param value the value to be written to the device
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void setCurrentLimit(int value, IStatusCallback callback) {
+		if (isConnected(callback) && hasConfigurationCharacteristics(callback)) {
+			BleLog.LOGd(TAG, "Set CurrentLimit to %d", value);
+			_bleBase.setCurrentLimit(_targetAddress, value, callback);
+		}
+	}
+
+	/**
+	 * Function to write the given current limit to the device.
+	 *
+	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
+	 * @param address the MAC address of the device
+	 * @param value the value to be written
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void setCurrentLimit(String address, final int value, final IStatusCallback callback) {
+		if (checkConnection(address)) {
+			setCurrentLimit(value, callback);
+		} else {
+			connectAndExecute(address, new IExecuteCallback() {
+				@Override
+				public void execute(final IStatusCallback execCallback) {
+					setCurrentLimit(value, new IStatusCallback() {
+						@Override
+						public void onSuccess() {
+							callback.onSuccess();
+							execCallback.onSuccess();
+						}
+
+						@Override
+						public void onError(int error) {
+							execCallback.onError(error);
+						}
+					});
+				}
+			}, new IStatusCallback() {
+				@Override
+				public void onSuccess() { /* don't care */ }
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			});
+		}
+	}
+
 
 	//////////////////////////
 	// Localization service //
@@ -3017,7 +3042,7 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void readTrackedDevices(IByteArrayCallback callback) {
-		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_LIST_TRACKED_DEVICES_UUID, callback)) {
+		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_TRACKED_DEVICES_UUID, callback)) {
 			BleLog.LOGd(TAG, "Reading TrackedDevices value ...");
 			_bleBase.readTrackedDevices(_targetAddress, callback);
 		}
@@ -3071,7 +3096,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void addTrackedDevice(BleTrackedDevice value, IStatusCallback callback) {
-		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_ADD_TRACKED_DEVICE_UUID, callback)) {
+		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_TRACK_CONTROL_UUID, callback)) {
 			BleLog.LOGd(TAG, "Set TrackedDevice to %s", value.toString());
 			_bleBase.addTrackedDevice(_targetAddress, value, callback);
 		}
@@ -3125,7 +3150,7 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void listScannedDevices(IByteArrayCallback callback) {
-		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_DEVICE_LIST_UUID, callback)) {
+		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_SCANNED_DEVICES_UUID, callback)) {
 			BleLog.LOGd(TAG, "List scanned devices ...");
 			_bleBase.listScannedDevices(_targetAddress, callback);
 		}
@@ -3181,9 +3206,15 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writeScanDevices(boolean value, IStatusCallback callback) {
-		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_DEVICE_SCAN_UUID, callback)) {
+		if (isConnected(callback)) {
 			BleLog.LOGd(TAG, "Scan Devices: %b", value);
-			_bleBase.scanDevices(_targetAddress, value, callback);
+			if (hasCommandCharacteristic(null)) {
+				BleLog.LOGd(TAG, "use control characteristic");
+				int scan = (value ? 1 : 0);
+				_bleBase.sendCommand(_targetAddress, new BleCommand(BluenetConfig.CMD_SCAN_DEVICES, 1, new byte[]{(byte) scan}), callback);
+			} else if (hasCharacteristic(BluenetConfig.CHAR_SCAN_CONTROL_UUID, callback)) {
+				_bleBase.scanDevices(_targetAddress, value, callback);
+			}
 		}
 	}
 
