@@ -1,5 +1,7 @@
 package nl.dobots.bluenet.ble.base.structs;
 
+import nl.dobots.bluenet.utils.BleUtils;
+
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
  * <p/>
@@ -55,5 +57,29 @@ public class BleState extends BleStreamMessage {
 	@Override
 	public int getOpCode() {
 		return super.getOpCode();
+	}
+
+	public int getByteValue() {
+		return BleUtils.toUint8(getPayload()[0]);
+	}
+
+	public int getShortValue() {
+		return BleUtils.byteArrayToShort(getPayload());
+	}
+
+	public int getIntValue() {
+		return BleUtils.byteArrayToInt(getPayload());
+	}
+
+	public Integer getValue() {
+		switch (getLength()) {
+		case 1:
+			return getByteValue();
+		case 2:
+			return getShortValue();
+		case 4:
+			return getIntValue();
+		}
+		return null;
 	}
 }

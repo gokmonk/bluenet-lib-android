@@ -10,7 +10,9 @@ import org.json.JSONObject;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.UUID;
 
 import nl.dobots.bluenet.ble.base.callbacks.IAlertCallback;
@@ -22,6 +24,7 @@ import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
+import nl.dobots.bluenet.ble.base.callbacks.ISubscribeCallback;
 import nl.dobots.bluenet.ble.base.structs.BleAlertState;
 import nl.dobots.bluenet.ble.base.structs.BleCommand;
 import nl.dobots.bluenet.ble.base.structs.BleConfiguration;
@@ -113,8 +116,7 @@ public class BleBase extends BleCore {
 					public void onSuccess(byte[] result) {
 						int serviceUUID = BleUtils.byteArrayToShort(result, 0);
 						if (serviceUUID == BluenetConfig.CROWNSTONE_SERVICE_DATA_UUID ||
-							serviceUUID == BluenetConfig.GUIDESTONE_SERVICE_DATA_UUID)
-						{
+								serviceUUID == BluenetConfig.GUIDESTONE_SERVICE_DATA_UUID) {
 							parseServiceData(json, result);
 						}
 					}
@@ -250,7 +252,85 @@ public class BleBase extends BleCore {
 		});
 	}
 
+	private HashMap<UUID, ArrayList<IDataCallback>> _subscribers = new HashMap<>();
 
+	private ArrayList<IDataCallback> getSubscribers(UUID uuid) {
+		ArrayList<IDataCallback> callbacks = _subscribers.get(uuid);
+		if (callbacks == null) {
+			callbacks = new ArrayList<>();
+			_subscribers.put(uuid, callbacks);
+		}
+		return callbacks;
+	}
+
+	ISubscribeCallback notificationCallback = new ISubscribeCallback() {
+		@Override
+		public void onData(UUID uuidService, UUID uuidCharacteristic, JSONObject data) {
+			for (IDataCallback callback : getSubscribers(uuidCharacteristic)) {
+				callback.onData(data);
+			}
+		}
+
+		@Override
+		public void onError(UUID uuidService, UUID uuidCharacteristic, int error) {
+			for (IDataCallback callback : getSubscribers(uuidCharacteristic)) {
+				callback.onError(error);
+			}
+		}
+	};
+
+	public void subscribe(String address, String serviceUuid, String characteristicUuid, final IIntegerCallback statusCallback, final IDataCallback callback) {
+
+		UUID uuid = BleUtils.stringToUuid(characteristicUuid);
+		final ArrayList<IDataCallback> subscribers = getSubscribers(uuid);
+
+		if (subscribers.isEmpty()) {
+			subscribers.add(callback);
+			if (!super.subscribe(address, serviceUuid, characteristicUuid, new IStatusCallback() {
+				@Override
+				public void onError(int error) {
+					statusCallback.onError(error);
+				}
+
+				@Override
+				public void onSuccess() {
+					statusCallback.onSuccess(subscribers.indexOf(callback));
+				}
+			}, notificationCallback)) {
+				subscribers.remove(callback);
+			}
+		} else {
+			subscribers.add(callback);
+
+//			JSONObject json = new JSONObject();
+//			setStatus(json, BleCoreTypes.CHARACTERISTIC_SUBSCRIBED);
+//			callback.onData(json);
+			statusCallback.onSuccess(subscribers.indexOf(callback));
+		}
+
+	}
+
+	public void unsubscribe(String address, String serviceUuid, String characteristicUuid, int subscriberId, IStatusCallback statusCallback) {
+
+		UUID uuid = BleUtils.stringToUuid(characteristicUuid);
+		ArrayList<IDataCallback> subscribers = getSubscribers(uuid);
+
+		if (subscribers.remove(subscriberId) != null) {
+			if (subscribers.isEmpty()) {
+				super.unsubscribe(address, serviceUuid, characteristicUuid, statusCallback);
+			} else {
+
+//				JSONObject json = new JSONObject();
+//				setStatus(json, BleCoreTypes.CHARACTERISTIC_UNSUBSCRIBED);
+//				callback.onData(json);
+
+				statusCallback.onSuccess();
+			}
+		} else {
+			statusCallback.onError(BleErrors.WRONG_CALLBACK);
+//			callback.onError(BleErrors.WRONG_CALLBACK);
+		}
+	}
 
 	// Crownstone specific characteristic operations
 
@@ -1089,6 +1169,105 @@ public class BleBase extends BleCore {
 		});
 	}
 
+	public void enableStateNotification(final String address, final int stateType, final IStatusCallback callback) {
+		BleState state = new BleState(stateType, BluenetConfig.NOTIFY_VALUE, 0, new byte[]{});
+		byte[] bytes = state.toArray();
+		BleLog.LOGd(TAG, "notify state: write %d at service %s and characteristic %s", stateType, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_CONTROL_UUID);
+		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_CONTROL_UUID, bytes,
+				new IStatusCallback() {
+
+					@Override
+					public void onSuccess() {
+						BleLog.LOGd(TAG, "Successfully written to select state characteristic");
+						callback.onSuccess();
+					}
+
+					@Override
+					public void onError(int error) {
+						BleLog.LOGe(TAG, "Failed to write to select state characteristic");
+						callback.onError(error);
+					}
+				});
+	}
+
+//	private void subscribeState(String address, final IStateCallback callback) {
+//		subscribeState(address, callback, null);
+//	}
+
+	public void subscribeState(String address, final IStateCallback callback, final IIntegerCallback statusCallback) {
+
+		subscribe(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID,
+				statusCallback,
+				new IDataCallback() {
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+
+					@Override
+					public void onData(JSONObject json) {
+						final byte[] bytes = BleCore.getValue(json);
+						BleState state = new BleState(bytes);
+						BleLog.LOGd(TAG, "received state notification: %s", state.toString());
+						callback.onSuccess(state);
+					}
+				}
+		);
+	}
+
+	public void unsubscribeState(String address, int subscriberId) {
+		unsubscribe(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID,
+				subscriberId, new IStatusCallback() {
+					@Override
+					public void onSuccess() {
+						BleLog.LOGd(TAG, "unsubscribe state success");
+					}
+
+					@Override
+					public void onError(int error) {
+						BleLog.LOGe(TAG, "unsubscribe state error: %d", error);
+					}
+				});
+	}
+
+	private void unsubscribeState(String address, int subscriberId, final IStatusCallback callback) {
+		unsubscribe(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID,
+				subscriberId, callback);
+	}
+
+
+	public void getStateNotifications(final String address, final int type, final IStateCallback callback) {
+
+		final int[] subscriberId = new int[1];
+
+		subscribeState(address, callback, new IIntegerCallback() {
+			@Override
+			public void onSuccess(int result) {
+				subscriberId[0] = result;
+				enableStateNotification(address, type, new IStatusCallback() {
+
+					@Override
+					public void onSuccess() {
+						BleLog.LOGd(TAG, "notify state success");
+					}
+
+					@Override
+					public void onError(int error) {
+						unsubscribeState(address, subscriberId[0]);
+					}
+				});
+			}
+
+			@Override
+			public void onError(int error) {
+				BleLog.LOGe(TAG, "notify state error: %d", error);
+				callback.onError(error);
+			}
+		});
+	}
+
+
 	/**
 	 * Wrapper function which first calls select state, and on success calls the get state
 	 *
@@ -1098,79 +1277,63 @@ public class BleBase extends BleCore {
 	 */
 	public void getState(final String address, final int stateType, final IStateCallback callback) {
 
-		// todo: continue here
-//		subscribe(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID,
-//				new IDataCallback() {
-//
-//					@Override
-//					public void onError(int error) {
-//						BleLog.LOGe(TAG, "subscribe error: %d", error);
-//					}
-//
-//					@Override
-//					public void onData(JSONObject json) {
-//						if (BleCore.getStatus(json) == BleCoreTypes.CHARACTERISTIC_PROP_NOTIFY) {
-//							final byte[] bytes = BleCore.getValue(json);
-//							BleState state = new BleState(bytes);
-//							BleLog.LOGd(TAG, "received state notification: %s", state.toString());
-//							callback.onSuccess(state);
-//
-//							unsubscribe(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID,
-//									new IDataCallback() {
-//										@Override
-//										public void onData(JSONObject json) {
-//											BleLog.LOGd(TAG, "unsubscribe json: %s", json.toString());
-//										}
-//
-//										@Override
-//										public void onError(int error) {
-//											BleLog.LOGe(TAG, "unsubscribe error: %d", error);
-//										}
-//									});
-//						} else if (BleCore.getStatus(json) == BleCoreTypes.CHARACTERISTIC_SUBSCRIBED) {
-//							selectState(address, stateType, new IStatusCallback() {
-//								@Override
-//								public void onSuccess() {
-//								}
-//
-//								@Override
-//								public void onError(int error) {
-//									callback.onError(error);
-//									unsubscribe(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID,
-//											new IDataCallback() {
-//												@Override
-//												public void onData(JSONObject json) {
-//													BleLog.LOGd(TAG, "unsubscribe json: %s", json.toString());
-//												}
-//
-//												@Override
-//												public void onError(int error) {
-//													BleLog.LOGe(TAG, "unsubscribe error: %d", error);
-//												}
-//											});
-//								}
-//							});
-//						}
-//					}
-//				}
-//		);
-		selectState(address, stateType, new IStatusCallback() {
+		final int[] subscriberId = new int[1];
+
+		subscribeState(address, new IStateCallback() {
 			@Override
-			public void onSuccess() {
-				// todo: do we need a timeout here?
-//				_timeoutHandler.postDelayed(new Runnable() {
-//					@Override
-//					public void run() {
-						readState(address, callback);
-//					}
-//				}, 50);
+			public void onSuccess(BleState state) {
+				callback.onSuccess(state);
+				unsubscribeState(address, subscriberId[0]);
 			}
 
 			@Override
 			public void onError(int error) {
 				callback.onError(error);
+				unsubscribeState(address, subscriberId[0]);
+			}
+		}, new IIntegerCallback() {
+			@Override
+			public void onSuccess(int result) {
+				subscriberId[0] = result;
+				selectState(address, stateType, new IStatusCallback() {
+					@Override
+					public void onSuccess() {
+						// yippi, wait for state to come in on notification
+					}
+
+					@Override
+					public void onError(int error) {
+						// select failed, unsubscribe again
+						callback.onError(error);
+						unsubscribeState(address, subscriberId[0]);
+					}
+				});
+			}
+
+			@Override
+			public void onError(int error) {
+				// subscribe failed
+				callback.onError(error);
 			}
 		});
+
+//		selectState(address, stateType, new IStatusCallback() {
+//			@Override
+//			public void onSuccess() {
+//				// todo: do we need a timeout here?
+////				_timeoutHandler.postDelayed(new Runnable() {
+////					@Override
+////					public void run() {
+//						readState(address, callback);
+////					}
+////				}, 50);
+//			}
+//
+//			@Override
+//			public void onError(int error) {
+//				callback.onError(error);
+//			}
+//		});
 	}
 
 	/**
@@ -1442,11 +1605,23 @@ public class BleBase extends BleCore {
 	boolean _notificationBufferValid = true;
 	// for backwards compatibility
 	boolean _hasStartMessageType = false;
+	int _meshSubscriberId = 0;
 
 	public void subscribeMeshData(final String address, final IMeshDataCallback callback) {
 		BleLog.LOGd(TAG, "subscribing to mesh data...");
 		_hasStartMessageType = false;
 		subscribe(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
+			new IIntegerCallback() {
+				@Override
+				public void onSuccess(int result) {
+					_meshSubscriberId = result;
+				}
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			},
 			new IDataCallback() {
 				@Override
 				public void onData(JSONObject json) {
@@ -1546,9 +1721,10 @@ public class BleBase extends BleCore {
 	public void unsubscribeMeshData(final String address, final IMeshDataCallback callback) {
 		BleLog.LOGd(TAG, "subscribing to mesh data...");
 		unsubscribe(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
-				new IDataCallback() {
+				_meshSubscriberId,
+				new IStatusCallback() {
 					@Override
-					public void onData(JSONObject json) {
+					public void onSuccess() {
 					}
 
 					@Override

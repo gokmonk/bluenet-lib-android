@@ -36,7 +36,6 @@ import nl.dobots.bluenet.ble.extended.structs.BleDeviceMap;
 import nl.dobots.bluenet.ble.base.structs.BleMeshMessage;
 import nl.dobots.bluenet.ble.base.structs.BleTrackedDevice;
 import nl.dobots.bluenet.utils.BleLog;
-import nl.dobots.bluenet.utils.BleUtils;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -1076,22 +1075,30 @@ public class BleExt {
 		writePwm(address, 0, callback);
 	}
 
+	public void getStateNotifications(final int type, final int len, final IIntegerCallback callback) {
+		_bleBase.getStateNotifications(_targetAddress, type, new IStateCallback() {
+			@Override
+			public void onSuccess(BleState state) {
+				if (state.getLength() == len) {
+					callback.onSuccess(state.getValue());
+				} else {
+					callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
+
 	private void getState(int type, final int len, final IIntegerCallback callback) {
 		_bleBase.getState(_targetAddress, type, new IStateCallback() {
 			@Override
 			public void onSuccess(BleState state) {
 				if (state.getLength() == len) {
-					switch (len) {
-					case 1:
-						callback.onSuccess(BleUtils.toUint8(state.getPayload()[0]));
-						return;
-					case 2:
-						callback.onSuccess(BleUtils.byteArrayToShort(state.getPayload()));
-						return;
-					case 4:
-						callback.onSuccess(BleUtils.byteArrayToInt(state.getPayload()));
-						return;
-					}
+					callback.onSuccess(state.getValue());
 				} else {
 					callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				}
