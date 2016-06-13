@@ -30,7 +30,6 @@ import nl.dobots.bluenet.ble.base.callbacks.IDiscoveryCallback;
 import nl.dobots.bluenet.ble.extended.callbacks.IExecuteCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
-import nl.dobots.bluenet.ble.extended.callbacks.IStringCallback;
 import nl.dobots.bluenet.ble.extended.structs.BleDevice;
 import nl.dobots.bluenet.ble.extended.structs.BleDeviceMap;
 import nl.dobots.bluenet.ble.base.structs.MeshMsg;
@@ -590,7 +589,41 @@ public class BleExt {
 		return true;
 	}
 
-	public boolean hasCommandCharacteristic(IBaseCallback callback) {
+	/**
+	 * Helper function to check if the device has the configuration characteristics. to enable
+	 * configuration / settings, the device needs to have the following characteristics:
+	 * 		* CHAR_CONFIG_COTNROL_UUID (to select the configuration to be read or to write a new value
+	 * 							   to the configuration)
+	 * 		* CHAR_CONFIG_READ_UUID (to read the value of the configuration previously selected)
+	 * if one of the characteristics is missing, configuration is not available
+	 * @param callback the callback to be informed about an error
+	 * @return true if configuration characteristics are available, false otherwise
+	 */
+	public boolean hasConfigurationCharacteristics(IBaseCallback callback) {
+		return hasCharacteristic(BluenetConfig.CHAR_CONFIG_CONTROL_UUID, callback) &&
+				hasCharacteristic(BluenetConfig.CHAR_CONFIG_READ_UUID, callback);
+	}
+
+	/**
+	 * Helper function to check if the device has the state characteristics. to read state variables,
+	 * the device needs to have the following characteristics:
+	 * 		* CHAR_STATE_COTNROL_UUID (to select the state to be read)
+	 * 		* CHAR_STATE_READ_UUID (to read the value of the state previously selected)
+	 * if one of the characteristics is missing, state variables are not available
+	 * @param callback the callback to be informed about an error
+	 * @return true if state characteristics are available, false otherwise
+	 */
+	public boolean hasStateCharacteristics(IBaseCallback callback) {
+		return hasCharacteristic(BluenetConfig.CHAR_STATE_CONTROL_UUID, callback) &&
+				hasCharacteristic(BluenetConfig.CHAR_STATE_READ_UUID, callback);
+	}
+
+	/**
+	 * Helper function to check if the command control characteristic is avialable
+	 * @param callback the callback to be informed about an error
+	 * @return true if control characteristic is available, false otherwise
+	 */
+	public boolean hasControlCharacteristic(IBaseCallback callback) {
 		return hasCharacteristic(BluenetConfig.CHAR_CONTROL_UUID, null);
 	}
 
@@ -671,10 +704,27 @@ public class BleExt {
 		});
 	}
 
+	/**
+	 * Request permission to access BLE (locations) on Android > 6.0
+	 * @param activity activity which will be notified about the permission request result. The
+	 *                 activity will need to implement the onRequestPermissionsResult function and
+	 *                 the library function @handlePermissionResult.
+	 */
 	public void requestPermissions(Activity activity) {
 		_bleBase.requestPermissions(activity);
 	}
 
+	/**
+	 * Helper function which will handle the result of the permission request. call this function
+	 * from the activity's onActivityResult function
+	 * @param requestCode The request code, received in onRequestPermissionResult
+	 * @param permissions The requested permissions, received in onRequestPermissionResult
+	 * @param grantResults The grant results for the corresponding permissions
+	 *     which is either {@link android.content.pm.PackageManager#PERMISSION_GRANTED}
+	 *     or {@link android.content.pm.PackageManager#PERMISSION_DENIED}. Never null.
+	 * @param callback the callback function which will be informed about success or failure of the
+	 *                 permission request
+	 */
 	public boolean handlePermissionResult(int requestCode, String[] permissions, int[] grantResults, IStatusCallback callback) {
 		return _bleBase.handlePermissionResult(requestCode, permissions, grantResults, callback);
 	}
@@ -743,6 +793,10 @@ public class BleExt {
 		_handler.postDelayed(_delayedDisconnect, DELAYED_DISCONNECT_TIME);
 	}
 
+	/**
+	 * Clear the delayed disconnect, either when the timer expires, or if the device
+	 * disconnects for another reason
+	 */
 	private void clearDelayedDisconnect() {
 		if (_delayedDisconnect != null) {
 			_handler.removeCallbacks(_delayedDisconnect);
@@ -916,7 +970,7 @@ public class BleExt {
 	public void writePwm(int value, IStatusCallback callback) {
 		if (isConnected(callback)) {
 			BleLog.LOGd(TAG, "Set PWM to %d", value);
-			if (hasCommandCharacteristic(null)) {
+			if (hasControlCharacteristic(null)) {
 				BleLog.LOGd(TAG, "use control characteristic");
 				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_PWM, 1, new byte[]{(byte) value}), callback);
 			} else if (hasCharacteristic(BluenetConfig.CHAR_PWM_UUID, callback)) {
@@ -1074,42 +1128,115 @@ public class BleExt {
 	public void powerOff(String address, final IStatusCallback callback) {
 		writePwm(address, 0, callback);
 	}
-
-	public void getStateNotifications(final int type, final int len, final IIntegerCallback callback) {
-		_bleBase.getStateNotifications(_targetAddress, type, new IStateCallback() {
-			@Override
-			public void onSuccess(StateMsg state) {
-				if (state.getLength() == len) {
-					callback.onSuccess(state.getValue());
-				} else {
-					callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
-				}
-			}
-
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
-	}
-
-	private void getState(int type, final int len, final IIntegerCallback callback) {
-		_bleBase.getState(_targetAddress, type, new IStateCallback() {
-			@Override
-			public void onSuccess(StateMsg state) {
-				if (state.getLength() == len) {
-					callback.onSuccess(state.getValue());
-				} else {
-					callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
-				}
-			}
-
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
-	}
+//
+//	/**
+//	 * If permanently connected to a device, state notifications can be requested. this means that
+//	 * as soon as a state variable changes on the device, a notification will be sent and the
+//	 * callback will trigger with the new value
+//	 * Note: there is no version of this function with address parameter, as this functionality is
+//	 * only available if we are permanently connected. so it would make no sense to connect and
+//	 * disconnect again afterwards
+//	 * @param type type of state variable which should be notified, see @BleStateTypes
+//	 * @param len for verification, provide length of the variable, 1 for byte, 2 for short, etc.
+//	 * @param callback callback which should be informed about a new value update
+//	 */
+//	public void getStateNotifications(final int type, final int len, final IIntegerCallback callback) {
+//		if (isConnected(callback) && hasStateCharacteristics(callback)) {
+//			_bleBase.getStateNotifications(_targetAddress, type,
+//					new IIntegerCallback() {
+//						@Override
+//						public void onSuccess(int result) {
+//
+//						}
+//
+//						@Override
+//						public void onError(int error) {
+//
+//						}
+//					},
+//					new IStateCallback() {
+//						@Override
+//						public void onSuccess(StateMsg state) {
+//							if (state.getLength() == len) {
+//								callback.onSuccess(state.getValue());
+//							} else {
+//								callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+//							}
+//						}
+//
+//						@Override
+//						public void onError(int error) {
+//							callback.onError(error);
+//						}
+//					});
+//		}
+//	}
+//
+//	/**
+//	 * Function to read the value of the given state variable from the device.
+//	 *
+//	 * Note: needs to be already connected or an error is created! Use overloaded function
+//	 * with address otherwise
+//	 * @param callback the callback which will get the read value on success, or an error otherwise
+//	 */
+//	private void getState(int type, final int len, final IIntegerCallback callback) {
+//		if (isConnected(callback) && hasStateCharacteristics(callback)) {
+//			_bleBase.getState(_targetAddress, type, new IStateCallback() {
+//				@Override
+//				public void onSuccess(StateMsg state) {
+//					if (state.getLength() == len) {
+//						callback.onSuccess(state.getValue());
+//					} else {
+//						callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+//					}
+//				}
+//
+//				@Override
+//				public void onError(int error) {
+//					callback.onError(error);
+//				}
+//			});
+//		}
+//	}
+//
+//	/**
+//	 * Function to read the value of the given state variable from the device.
+//	 *
+//	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
+//	 * @param address the MAC address of the device
+//	 * @param callback the callback which will get the read value on success, or an error otherwise
+//	 */
+//	private void getState(String address, final int type, final int len, final IIntegerCallback callback) {
+//		if (checkConnection(address)) {
+//			getState(type, len, callback);
+//		} else {
+//			connectAndExecute(address, new IExecuteCallback() {
+//				@Override
+//				public void execute(final IStatusCallback execCallback) {
+//					getState(type, len, new IIntegerCallback() {
+//						@Override
+//						public void onSuccess(int result) {
+//							callback.onSuccess(result);
+//							execCallback.onSuccess();
+//						}
+//
+//						@Override
+//						public void onError(int error) {
+//							execCallback.onError(error);
+//						}
+//					});
+//				}
+//			}, new IStatusCallback() {
+//				@Override
+//				public void onSuccess() { /* don't care */ }
+//
+//				@Override
+//				public void onError(int error) {
+//					callback.onError(error);
+//				}
+//			});
+//		}
+//	}
 
 	/**
 	 * Function to read the current consumption value from the device.
@@ -1238,7 +1365,7 @@ public class BleExt {
 	private void writeReset(int value, IStatusCallback callback) {
 		if (isConnected(callback)) {
 			BleLog.LOGd(TAG, "Set Reset to %d", value);
-			if (hasCommandCharacteristic(null)) {
+			if (hasControlCharacteristic(null)) {
 				BleLog.LOGd(TAG, "use control characteristic");
 				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_RESET, 1, new byte[]{(byte) value}), callback);
 			} else if (hasCharacteristic(BluenetConfig.CHAR_RESET_UUID, callback)) {
@@ -1628,7 +1755,7 @@ public class BleExt {
 	public void writeScanDevices(boolean value, IStatusCallback callback) {
 		if (isConnected(callback)) {
 			BleLog.LOGd(TAG, "Scan Devices: %b", value);
-			if (hasCommandCharacteristic(null)) {
+			if (hasControlCharacteristic(null)) {
 				BleLog.LOGd(TAG, "use control characteristic");
 				int scan = (value ? 1 : 0);
 				_bleBase.sendCommand(getTargetAddress(), new CommandMsg(BluenetConfig.CMD_SCAN_DEVICES, 1, new byte[]{(byte) scan}), callback);
@@ -1923,26 +2050,6 @@ public class BleExt {
 			BleLog.LOGd(TAG, "unsubscribe from mesh data");
 			_bleBase.unsubscribeMeshData(getTargetAddress(), callback);
 		}
-	}
-
-	/**
-	 * Helper function to check if the device has the configuration characteristics. to enable
-	 * configuration / settings, the device needs to have all following three characteristics:
-	 * 		* CHAR_SELECT_CONFIGURATION_UUID (to select the configuration to be read)
-	 * 		* CHAR_GET_CONFIGURATION_UUID (to read the value of the configuration previously selected)
-	 * 		* CHAR_SET_CONFIGURATION_UUID (to set a new configuration value)
-	 * if one of the characteristics is missing, configuration is not available
-	 * @param callback the callback to be informed about an error
-	 * @return true if configuration characteristics are available, false otherwise
-	 */
-	public boolean hasConfigurationCharacteristics(IBaseCallback callback) {
-		return hasCharacteristic(BluenetConfig.CHAR_CONFIG_CONTROL_UUID, callback) &&
-				hasCharacteristic(BluenetConfig.CHAR_CONFIG_READ_UUID, callback);
-	}
-
-	public boolean hasStateCharacteristics(IBaseCallback callback) {
-		return hasCharacteristic(BluenetConfig.CHAR_STATE_CONTROL_UUID, callback) &&
-				hasCharacteristic(BluenetConfig.CHAR_STATE_READ_UUID, callback);
 	}
 
 //	public void writeConfiguration(ConfigurationMsg value, IStatusCallback callback) {

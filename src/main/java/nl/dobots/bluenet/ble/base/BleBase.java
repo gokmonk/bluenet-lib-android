@@ -421,10 +421,10 @@ public class BleBase extends BleCore {
 	 */
 	public void scanDevices(String address, boolean scan, final IStatusCallback callback) {
 		int value = scan ? 1 : 0;
-		if (BluenetConfig.USE_COMMAND_CHARACTERISTIC) {
-			BleLog.LOGd(TAG, "use control characteristic");
-			sendCommand(address, new CommandMsg(BluenetConfig.CMD_SCAN_DEVICES, 1, new byte[]{(byte) value}), callback);
-		} else {
+//		if (BluenetConfig.USE_COMMAND_CHARACTERISTIC) {
+//			BleLog.LOGd(TAG, "use control characteristic");
+//			sendCommand(address, new CommandMsg(BluenetConfig.CMD_SCAN_DEVICES, 1, new byte[]{(byte) value}), callback);
+//		} else {
 			BleLog.LOGd(TAG, "writeScanDevices: write %d at service %s and characteristic %s", value, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_SCAN_CONTROL_UUID);
 			write(address, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_SCAN_CONTROL_UUID, new byte[]{(byte) value},
 					new IStatusCallback() {
@@ -441,7 +441,7 @@ public class BleBase extends BleCore {
 							callback.onError(error);
 						}
 					});
-		}
+//		}
 	}
 
 	/**
@@ -706,13 +706,14 @@ public class BleBase extends BleCore {
 				});
 	}
 
-	private void unsubscribeState(String address, int subscriberId, final IStatusCallback callback) {
+	public void unsubscribeState(String address, int subscriberId, final IStatusCallback callback) {
 		unsubscribe(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID,
 				subscriberId, callback);
 	}
 
 
-	public void getStateNotifications(final String address, final int type, final IStateCallback callback) {
+	public void getStateNotifications(final String address, final int type, final IIntegerCallback statusCallback,
+									  final IStateCallback callback) {
 
 		final int[] subscriberId = new int[1];
 
@@ -725,6 +726,7 @@ public class BleBase extends BleCore {
 						@Override
 						public void onSuccess() {
 							BleLog.LOGd(TAG, "notify state success");
+							statusCallback.onSuccess(subscriberId[0]);
 						}
 
 						@Override
@@ -993,10 +995,10 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writeReset(String address, int value, final IStatusCallback callback) {
-		if (BluenetConfig.USE_COMMAND_CHARACTERISTIC) {
-			BleLog.LOGd(TAG, "use control characteristic");
-			sendCommand(address, new CommandMsg(BluenetConfig.CMD_RESET, 1, new byte[]{(byte) value}), callback);
-		} else {
+//		if (BluenetConfig.USE_COMMAND_CHARACTERISTIC) {
+//			BleLog.LOGd(TAG, "use control characteristic");
+//			sendCommand(address, new CommandMsg(BluenetConfig.CMD_RESET, 1, new byte[]{(byte) value}), callback);
+//		} else {
 			BleLog.LOGd(TAG, "reset: write %d at service %s and characteristic %s", value, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_RESET_UUID);
 			write(address, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_RESET_UUID, new byte[]{(byte) value},
 					new IStatusCallback() {
@@ -1013,7 +1015,7 @@ public class BleBase extends BleCore {
 							callback.onError(error);
 						}
 					});
-		}
+//		}
 	}
 
 	public void readAlert(String address, final IAlertCallback callback) {

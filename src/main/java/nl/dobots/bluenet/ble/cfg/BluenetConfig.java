@@ -12,9 +12,6 @@ package nl.dobots.bluenet.ble.cfg;
  */
 public class BluenetConfig {
 
-	public static final boolean USE_COMMAND_CHARACTERISTIC = true;
-	public static final boolean USE_STATE_CHARACTERISTIC = true;
-
 	public static final int BLE_DEVICE_ADDRESS_LENGTH = 6;
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
