@@ -1,9 +1,7 @@
-package nl.dobots.bluenet.ble.base.callbacks;
-
-import nl.dobots.bluenet.ble.base.structs.StateMsg;
+package nl.dobots.bluenet.ble.base;
 
 /**
- * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
+ * Copyright (c) 2016 Dominik Egger <dominik@dobots.nl>. All rights reserved.
  * <p/>
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 3, as
@@ -15,14 +13,20 @@ import nl.dobots.bluenet.ble.base.structs.StateMsg;
  * version 3 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  * <p/>
- * Created on 15-7-15
- *
- * Returns a ble state message on success
+ * Created on 13-6-16
  *
  * @author Dominik Egger
  */
-public interface IStateCallback extends IBaseCallback {
+public class BleBaseState {
 
-	void onSuccess(StateMsg state);
+	public static final String TAG = BleBaseState.class.getCanonicalName();
+
+	private BleBase _bleBase;
+
+	public BleBaseState(BleBase bleBase) {
+		_bleBase = bleBase;
+	}
+
+
 
 }

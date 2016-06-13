@@ -1,6 +1,6 @@
-package nl.dobots.bluenet.ble.base.callbacks;
+package nl.dobots.bluenet.ble.extended.callbacks;
 
-import nl.dobots.bluenet.ble.base.structs.StateMsg;
+import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -17,12 +17,10 @@ import nl.dobots.bluenet.ble.base.structs.StateMsg;
  * <p/>
  * Created on 15-7-15
  *
- * Returns a ble state message on success
- *
  * @author Dominik Egger
  */
-public interface IStateCallback extends IBaseCallback {
+public interface IBooleanCallback extends IBaseCallback {
 
-	void onSuccess(StateMsg state);
+	void onSuccess(boolean value);
 
 }

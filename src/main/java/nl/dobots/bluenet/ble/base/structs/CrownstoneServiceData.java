@@ -25,11 +25,11 @@ import nl.dobots.bluenet.utils.BleLog;
  *
  * @author Dominik Egger
  */
-public class BleCrownstoneServiceData extends JSONObject {
+public class CrownstoneServiceData extends JSONObject {
 
-	private static final String TAG = BleCrownstoneServiceData.class.getCanonicalName();
+	private static final String TAG = CrownstoneServiceData.class.getCanonicalName();
 
-	public BleCrownstoneServiceData(byte[] bytes) {
+	public CrownstoneServiceData(byte[] bytes) {
 		super();
 
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
@@ -45,11 +45,11 @@ public class BleCrownstoneServiceData extends JSONObject {
 //		setAccumulatedEnergy(bb.getInt());
 	}
 
-	public BleCrownstoneServiceData(String json) throws JSONException {
+	public CrownstoneServiceData(String json) throws JSONException {
 		super(json);
 	}
 
-	public BleCrownstoneServiceData(JSONObject obj) throws JSONException {
+	public CrownstoneServiceData(JSONObject obj) throws JSONException {
 		this(obj.toString());
 	}
 

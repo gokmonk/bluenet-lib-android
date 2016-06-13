@@ -5,6 +5,7 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
+import nl.dobots.bluenet.utils.BleUtils;
 
 /**
  * Copyright (c) 2016 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -44,7 +45,7 @@ import nl.dobots.bluenet.ble.cfg.BluenetConfig;
  *
  * @author Dominik Egger
  */
-public class BleStreamMessage {
+public class StreamMsg {
 
 	// the type of the stream, see @BluenetConfig for a list of possible types
 	private int type;
@@ -62,7 +63,7 @@ public class BleStreamMessage {
 	 * @param length number of bytes of the payload
 	 * @param payload payload (actual stream value to be written)
 	 */
-	public BleStreamMessage(int type, int opCode, int length, byte[] payload) {
+	public StreamMsg(int type, int opCode, int length, byte[] payload) {
 		this.type = type;
 		this.opCode = opCode;
 		this.length = length;
@@ -78,7 +79,7 @@ public class BleStreamMessage {
 	 * @param length number of bytes of the payload
 	 * @param payload payload (actual stream value to be written)
 	 */
-	public BleStreamMessage(int type, int length, byte[] payload) {
+	public StreamMsg(int type, int length, byte[] payload) {
 		this.type = type;
 		this.opCode = BluenetConfig.WRITE_VALUE;
 		this.length = length;
@@ -89,7 +90,7 @@ public class BleStreamMessage {
 	 * Creates a ble stream message by parsing the byte array
 	 * @param bytes byte array containing a stream message
 	 */
-	public BleStreamMessage(byte[] bytes) {
+	public StreamMsg(byte[] bytes) {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
@@ -182,6 +183,36 @@ public class BleStreamMessage {
 	 */
 	public byte[] getPayload() {
 		return payload;
+	}
+
+	public int getByteValue() { return getPayload()[0]; }
+
+	public int getUint8Value() {
+		return BleUtils.toUint8(getPayload()[0]);
+	}
+
+	public int getShortValue() {
+		return BleUtils.byteArrayToShort(getPayload());
+	}
+
+	public int getIntValue() {
+		return BleUtils.byteArrayToInt(getPayload());
+	}
+
+//	public Integer getValue() {
+//		switch (getLength()) {
+//			case 1:
+//				return getUint8Value();
+//			case 2:
+//				return getShortValue();
+//			case 4:
+//				return getIntValue();
+//		}
+//		return null;
+//	}
+
+	public boolean getBooleanValue() {
+		return getUint8Value() != 0;
 	}
 
 //	public void setPayload(byte[] payload) {

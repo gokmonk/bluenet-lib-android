@@ -1,6 +1,6 @@
 package nl.dobots.bluenet.ble.base.callbacks;
 
-import nl.dobots.bluenet.ble.base.structs.BleAlertState;
+import nl.dobots.bluenet.ble.base.structs.AlertState;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -21,6 +21,6 @@ import nl.dobots.bluenet.ble.base.structs.BleAlertState;
  */
 public interface IAlertCallback extends IBaseCallback {
 
-	void onSuccess(BleAlertState state);
+	void onSuccess(AlertState state);
 
 }

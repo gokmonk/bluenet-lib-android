@@ -96,7 +96,7 @@ public class BluenetConfig {
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Command types
+	// CommandMsg types
 	public static final char CMD_SWITCH =                               0;    // 0x00
 	public static final char CMD_PWM =                                  1;    // 0x01
 	public static final char CMD_SET_TIME =                             2;    // 0x02
@@ -228,5 +228,8 @@ public class BluenetConfig {
 	public static final int DEVICE_CROWNSTONE =                         1;
 	public static final int DEVICE_GUIDESTONE =                           2;
 	public static final int DEVICE_FRIDGE =                             3;
+	// constant used to convert the advertisement interval from ms to the unit expected by the
+	// characteristic (increments of 0.625 ms)
+	public static final double ADVERTISEMENT_INCREMENT = 0.625;
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 }

@@ -105,12 +105,12 @@ public class BleMeshScanData extends BleMeshHubData {
 				devices.add(device);
 			}
 
-			Collections.sort(devices, new Comparator<ScannedDevice>() {
-				@Override
-				public int compare(ScannedDevice lhs, ScannedDevice rhs) {
-					return -Integer.compare(lhs.getRssi(), rhs.getRssi());
-				}
-			});
+//			Collections.sort(devices, new Comparator<ScannedDevice>() {
+//				@Override
+//				public int compare(ScannedDevice lhs, ScannedDevice rhs) {
+//					return -Integer.compare(lhs.getRssi(), rhs.getRssi());
+//				}
+//			});
 		} catch (Exception e) {
 			
 		}

@@ -1,7 +1,5 @@
 package nl.dobots.bluenet.ble.base.structs;
 
-import nl.dobots.bluenet.utils.BleUtils;
-
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
  * <p/>
@@ -18,8 +16,8 @@ import nl.dobots.bluenet.utils.BleUtils;
  * Created on 15-7-15
  * Updated on 9-6-16 for protocol version 0.4.0
  *
- * This class is an object to hold and ease conversion of a Bluenet State message. A
- * State message is used to read and write to a State characteristic. A State
+ * This class is an object to hold and ease conversion of a Bluenet Configuration message. A
+ * Configuration message is used to read and write to a configuration characteristic. A configuration
  * message contains the following 4 fields:
  * 		* Type
  * 		* OpCode
@@ -32,7 +30,7 @@ import nl.dobots.bluenet.utils.BleUtils;
  * 		-----------------------------------------------------------------------------
  *
  * 	The reserved byte is used for byte alignment of the length and payload.
- * 	Type defines the type of State and defines the layout of the payload, see
+ * 	Type defines the type of configuration and defines the layout of the payload, see
  * 	  @BluenetConfig for a list of possible types
  * 	Length defines the number of bytes used by the payload
  *
@@ -40,46 +38,22 @@ import nl.dobots.bluenet.utils.BleUtils;
  *
  * @author Dominik Egger
  */
-public class BleState extends BleStreamMessage {
+public class ConfigurationMsg extends StreamMsg {
 
-	public BleState(int type, int opCode, int length, byte[] payload) {
+	public ConfigurationMsg(int type, int opCode, int length, byte[] payload) {
 		super(type, opCode, length, payload);
 	}
 
-	public BleState(int type, int length, byte[] payload) {
+	public ConfigurationMsg(int type, int length, byte[] payload) {
 		super(type, length, payload);
 	}
 
-	public BleState(byte[] bytes) {
+	public ConfigurationMsg(byte[] bytes) {
 		super(bytes);
 	}
 
 	@Override
 	public int getOpCode() {
 		return super.getOpCode();
-	}
-
-	public int getByteValue() {
-		return BleUtils.toUint8(getPayload()[0]);
-	}
-
-	public int getShortValue() {
-		return BleUtils.byteArrayToShort(getPayload());
-	}
-
-	public int getIntValue() {
-		return BleUtils.byteArrayToInt(getPayload());
-	}
-
-	public Integer getValue() {
-		switch (getLength()) {
-		case 1:
-			return getByteValue();
-		case 2:
-			return getShortValue();
-		case 4:
-			return getIntValue();
-		}
-		return null;
 	}
 }
