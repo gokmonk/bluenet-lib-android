@@ -1165,7 +1165,7 @@ public class BleCore {
 		return true;
 	}
 
-	public boolean subscribe(String address, String serviceUuid, String characteristicUuid, IStatusCallback statusCallback, ISubscribeCallback callback) {
+	protected boolean subscribe(String address, String serviceUuid, String characteristicUuid, IStatusCallback statusCallback, ISubscribeCallback callback) {
 
 		UUID uuidService = BleUtils.stringToUuid(serviceUuid);
 		UUID uuidCharacteristic = BleUtils.stringToUuid(characteristicUuid);
@@ -1235,7 +1235,7 @@ public class BleCore {
 		return true;
 	}
 
-	public boolean unsubscribe(String address, String serviceUuid, String characteristicUuid, IStatusCallback statusCallback) {
+	protected boolean unsubscribe(String address, String serviceUuid, String characteristicUuid, IStatusCallback statusCallback) {
 
 		UUID uuidService = BleUtils.stringToUuid(serviceUuid);
 		UUID uuidCharacteristic = BleUtils.stringToUuid(characteristicUuid);

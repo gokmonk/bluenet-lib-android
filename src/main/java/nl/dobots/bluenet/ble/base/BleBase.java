@@ -39,7 +39,7 @@ import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.core.BleCore;
 import nl.dobots.bluenet.ble.core.BleCoreTypes;
-import nl.dobots.bluenet.ble.extended.callbacks.IStringCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
 import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
@@ -51,6 +51,30 @@ public class BleBase extends BleCore {
 	// to the select configuration characteristic, then wait for a moment for the device to process
 	// the request before reading from the get configuration characteristic
 	private Handler _timeoutHandler = new Handler();
+
+	/** Hashmap of all subscribers, based on characeristic UUID */
+	private HashMap<UUID, ArrayList<IDataCallback>> _subscribers = new HashMap<>();
+
+	/**
+	 * "global" subscribe callback will be given to all subscribe calls of the BleCore. The
+	 * gatt notifications (or errors) will then be delegated based on the characteristic uuid to all
+	 * subscribers of that uuid
+	 */
+	ISubscribeCallback notificationCallback = new ISubscribeCallback() {
+		@Override
+		public void onData(UUID uuidService, UUID uuidCharacteristic, JSONObject data) {
+			for (IDataCallback callback : getSubscribers(uuidCharacteristic)) {
+				callback.onData(data);
+			}
+		}
+
+		@Override
+		public void onError(UUID uuidService, UUID uuidCharacteristic, int error) {
+			for (IDataCallback callback : getSubscribers(uuidCharacteristic)) {
+				callback.onError(error);
+			}
+		}
+	};
 
 	/**
 	 * Start an endless scan, without defining any UUIDs to filter for. the scan will continue
@@ -132,6 +156,16 @@ public class BleBase extends BleCore {
 		});
 	}
 
+	/**
+	 * Helper function to parse manufacturing data of an advertisement/scan response packet. Use
+	 * @parseAdvertisement first to retrieve the manufacturing data (type 0xFF), and pass it to
+	 * this function together with the json object. it will populate the json object with the data
+	 * parsed from the manufacData array.
+	 *
+	 * @param json the json object in which the data should be included
+	 * @param manufacData the byte array containing the manufacturing data
+	 */
+	@Deprecated
 	private void parseDoBotsData(JSONObject json, byte[] manufacData) {
 		ByteBuffer bb = ByteBuffer.wrap(manufacData);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
@@ -162,6 +196,15 @@ public class BleBase extends BleCore {
 		}
 	}
 
+	/**
+	 * Helper function to parse the crownstone service data of an advertisement/scan response packet.
+	 * Use @parseAdvertisement first to retrieve the service data (type 0x16), and pass it to
+	 * this function together with the json object. it will populate the json object with the data
+	 * parsed from the serviceData array.
+	 *
+	 * @param json the json object in which the data should be included
+	 * @param serviceData the byte array containing the service data
+	 */
 	private void parseServiceData(JSONObject json, byte[] serviceData) {
 		ByteBuffer bb = ByteBuffer.wrap(serviceData);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
@@ -252,8 +295,11 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	private HashMap<UUID, ArrayList<IDataCallback>> _subscribers = new HashMap<>();
-
+	/**
+	 * Helper function to return the list of subscribers for a given uuid.
+	 * @param uuid uuid for which the list should be returned
+	 * @return list of subscribers
+	 */
 	private ArrayList<IDataCallback> getSubscribers(UUID uuid) {
 		ArrayList<IDataCallback> callbacks = _subscribers.get(uuid);
 		if (callbacks == null) {
@@ -263,22 +309,21 @@ public class BleBase extends BleCore {
 		return callbacks;
 	}
 
-	ISubscribeCallback notificationCallback = new ISubscribeCallback() {
-		@Override
-		public void onData(UUID uuidService, UUID uuidCharacteristic, JSONObject data) {
-			for (IDataCallback callback : getSubscribers(uuidCharacteristic)) {
-				callback.onData(data);
-			}
-		}
-
-		@Override
-		public void onError(UUID uuidService, UUID uuidCharacteristic, int error) {
-			for (IDataCallback callback : getSubscribers(uuidCharacteristic)) {
-				callback.onError(error);
-			}
-		}
-	};
-
+	/**
+	 * Subscribe to a characteristic. This can be called several times for different callbacks. a
+	 * list of subscribers is kept with a subscriberId, so that different functions can subscribe
+	 * to the same characteristic.
+	 * the statusCallback will return in the onSuccess call the subscriber id, this id will be needed
+	 * to unsubscribe afterwards.
+	 *
+	 * @param address the address of the device
+	 * @param serviceUuid the uuid of the service containing the characteristic
+	 * @param characteristicUuid the uuid of the characteristic which should be subscribed to
+	 * @param statusCallback the callback which will be informed about success or failure.
+	 *                       in case of success, the onSuccess function will return the subscriber
+	 *                       id which is needed for unsubscribing afterwards
+	 * @param callback the callback which will be triggered every time a gatt notification arrives
+	 */
 	public void subscribe(String address, String serviceUuid, String characteristicUuid,
 						  final IIntegerCallback statusCallback, final IDataCallback callback) {
 
@@ -311,6 +356,16 @@ public class BleBase extends BleCore {
 
 	}
 
+	/**
+	 * Unsubscribe from the characteristic. Requires the subscriberId which was returned
+	 * in the statusCallback's onSuccess function during the subscribe call.
+	 *
+	 * @param address the address of the device
+	 * @param serviceUuid the uuid of the service containing the characteristic
+	 * @param characteristicUuid the uuid of the characteristic which should be subscribed to
+	 * @param subscriberId id obtained from the subscribeState call
+	 * @param statusCallback the callback which will be informed about success or failure.
+	 */
 	public void unsubscribe(String address, String serviceUuid, String characteristicUuid,
 							int subscriberId, IStatusCallback statusCallback) {
 
@@ -413,6 +468,59 @@ public class BleBase extends BleCore {
 	}
 
 	/**
+	 * Write the given value to the Relay characteristic on the device
+	 * @param address the MAC address of the device
+	 * @param relayOn true if the relay should be switched on, false otherwise
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void writeRelay(String address, boolean relayOn, final IStatusCallback callback) {
+		int value = relayOn ? 100 : 0;
+		BleLog.LOGd(TAG, "write %d at service %s and characteristic %s", value, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID);
+		write(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID, new byte[]{(byte) value},
+				new IStatusCallback() {
+
+					@Override
+					public void onSuccess() {
+						BleLog.LOGd(TAG, "Successfully written to Relay characteristic");
+						callback.onSuccess();
+					}
+
+					@Override
+					public void onError(int error) {
+						BleLog.LOGe(TAG, "Failed to write to relay characteristic");
+						callback.onError(error);
+					}
+				}
+		);
+	}
+
+	/**
+	 * Read the Relay characteristic on the device and return the current Relay value as an integer
+	 * @param address the MAC address of the device
+	 * @param callback the callback which will get the read value on success, or an error otherwise
+	 */
+	public void readRelay(String address, final IBooleanCallback callback) {
+
+		BleLog.LOGd(TAG, "read Relay at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID);
+		read(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID, new IDataCallback() {
+
+			@Override
+			public void onError(int error) {
+				BleLog.LOGe(TAG, "Failed to read Relay characteristic");
+				callback.onError(error);
+			}
+
+			@Override
+			public void onData(JSONObject json) {
+				byte[] bytes = BleCore.getValue(json);
+				boolean result = BleUtils.toUint8(bytes[0]) > 0;
+				BleLog.LOGd(TAG, "Relay: %b", result);
+				callback.onSuccess(result);
+			}
+		});
+	}
+
+	/**
 	 * Write to the device scan characteristic to start or stop a scan for BLE devices. After
 	 * starting a scan, it will run indefinite until this function is called again to stop it.
 	 * @param address the MAC address of the device
@@ -421,27 +529,22 @@ public class BleBase extends BleCore {
 	 */
 	public void scanDevices(String address, boolean scan, final IStatusCallback callback) {
 		int value = scan ? 1 : 0;
-//		if (BluenetConfig.USE_COMMAND_CHARACTERISTIC) {
-//			BleLog.LOGd(TAG, "use control characteristic");
-//			sendCommand(address, new CommandMsg(BluenetConfig.CMD_SCAN_DEVICES, 1, new byte[]{(byte) value}), callback);
-//		} else {
-			BleLog.LOGd(TAG, "writeScanDevices: write %d at service %s and characteristic %s", value, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_SCAN_CONTROL_UUID);
-			write(address, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_SCAN_CONTROL_UUID, new byte[]{(byte) value},
-					new IStatusCallback() {
+		BleLog.LOGd(TAG, "writeScanDevices: write %d at service %s and characteristic %s", value, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_SCAN_CONTROL_UUID);
+		write(address, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_SCAN_CONTROL_UUID, new byte[]{(byte) value},
+				new IStatusCallback() {
 
-						@Override
-						public void onSuccess() {
-							BleLog.LOGd(TAG, "Successfully written to writeScanDevices characteristic");
-							callback.onSuccess();
-						}
+					@Override
+					public void onSuccess() {
+						BleLog.LOGd(TAG, "Successfully written to writeScanDevices characteristic");
+						callback.onSuccess();
+					}
 
-						@Override
-						public void onError(int error) {
-							BleLog.LOGe(TAG, "Failed to write to writeScanDevices characteristic");
-							callback.onError(error);
-						}
-					});
-//		}
+					@Override
+					public void onError(int error) {
+						BleLog.LOGe(TAG, "Failed to write to writeScanDevices characteristic");
+						callback.onError(error);
+					}
+				});
 	}
 
 	/**
@@ -533,13 +636,13 @@ public class BleBase extends BleCore {
 			@Override
 			public void onSuccess() {
 				// todo: do we need a timeout here?
-//				_timeoutHandler.postDelayed(new Runnable() {
-//					@Override
-//					public void run() {
-//						readConfiguration(address, callback);
-//					}
-//				}, 50);
-				readConfiguration(address, callback);
+				_timeoutHandler.postDelayed(new Runnable() {
+					@Override
+					public void run() {
+						readConfiguration(address, callback);
+					}
+				}, 50);
+//				readConfiguration(address, callback);
 			}
 
 			@Override
@@ -644,6 +747,14 @@ public class BleBase extends BleCore {
 		});
 	}
 
+	/**
+	 * Enables state variable notifications on the device. every time the value changes, the device
+	 * will write a StateMsg with opCode notification to the ConfigRead characteristic
+	 *
+	 * @param address the address of the device
+	 * @param stateType the state variable for which notifications should be enabled, see @BleStateTypes
+	 * @param callback the callback which will be informed about success or failure of the enable call
+	 */
 	public void enableStateNotification(final String address, final int stateType, final IStatusCallback callback) {
 		StateMsg state = new StateMsg(stateType, BluenetConfig.NOTIFY_VALUE, 0, new byte[]{});
 		byte[] bytes = state.toArray();
@@ -669,6 +780,17 @@ public class BleBase extends BleCore {
 //		subscribeState(address, callback, null);
 //	}
 
+	/**
+	 * Subscribe to the StateRead characteristic to receive gatt notifications. the statusCallback's
+	 * onSuccess function will be triggered on success with the subscriber id. this id is needed
+	 * for unsubscribing afterwards.
+	 *
+	 * @param address the address of the device
+	 * @param statusCallback the callback which will be informed about success or failure.
+	 *                       in case of success, the onSuccess function will return the subscriber
+	 *                       id which is needed for unsubscribing afterwards
+	 * @param callback the callback which will be triggered every time a gatt notification arrives
+	 */
 	public void subscribeState(String address, final IIntegerCallback statusCallback, final IStateCallback callback) {
 
 		subscribe(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID,
@@ -691,6 +813,13 @@ public class BleBase extends BleCore {
 		);
 	}
 
+	/**
+	 * Unsubscribe from the StateRead characteristic. Requires the subscriberId which was returned
+	 * in the statusCallback's onSuccess function during the subscribeState call.
+	 *
+	 * @param address the address of the device
+	 * @param subscriberId id obtained from the subscribeState call
+	 */
 	public void unsubscribeState(String address, int subscriberId) {
 		unsubscribe(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID,
 				subscriberId, new IStatusCallback() {
@@ -706,43 +835,73 @@ public class BleBase extends BleCore {
 				});
 	}
 
+	/**
+	 * Unsubscribe from the StateRead characteristic. Requires the subscriberId which was returned
+	 * in the statusCallback's onSuccess function during the subscribeState call.
+	 *
+	 * @param address the address of the device
+	 * @param subscriberId id obtained from the subscribeState call
+	 * @param callback the callback which will be informed about success or failure.
+	 */
 	public void unsubscribeState(String address, int subscriberId, final IStatusCallback callback) {
 		unsubscribe(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID,
 				subscriberId, callback);
 	}
 
-
+	/**
+	 * Helper function to get state notifications. it will first subscribe to the StateRead characteristic
+	 * if that is successful, it will enable notifications for the state variable specified. After that,
+	 * every time the state variable is updated on the device, the callback's onSuccess function is called.
+	 *
+	 * @param address the address of the device
+	 * @param type the state variable for which notifications should be enabled, see @BleStateTypes
+	 * @param statusCallback the callback which will be informed about success or failure of the enable/subscribe
+	 *                       calls
+	 * @param callback the callback which will be triggered for every notification / state variable update
+	 */
 	public void getStateNotifications(final String address, final int type, final IIntegerCallback statusCallback,
 									  final IStateCallback callback) {
 
 		final int[] subscriberId = new int[1];
 
 		subscribeState(address, new IIntegerCallback() {
-				@Override
-				public void onSuccess(int result) {
-					subscriberId[0] = result;
-					enableStateNotification(address, type, new IStatusCallback() {
+					@Override
+					public void onSuccess(int result) {
+						subscriberId[0] = result;
+						enableStateNotification(address, type, new IStatusCallback() {
 
-						@Override
-						public void onSuccess() {
-							BleLog.LOGd(TAG, "notify state success");
-							statusCallback.onSuccess(subscriberId[0]);
+							@Override
+							public void onSuccess() {
+								BleLog.LOGd(TAG, "notify state success");
+								statusCallback.onSuccess(subscriberId[0]);
+							}
+
+							@Override
+							public void onError(int error) {
+								unsubscribeState(address, subscriberId[0]);
+							}
+						});
+					}
+
+					@Override
+					public void onError(int error) {
+						BleLog.LOGe(TAG, "notify state error: %d", error);
+						callback.onError(error);
+					}
+				},
+				new IStateCallback() {
+					@Override
+					public void onSuccess(StateMsg state) {
+						if (state.getOpCode() == BluenetConfig.NOTIFY_VALUE) {
+							callback.onSuccess(state);
 						}
+					}
 
-						@Override
-						public void onError(int error) {
-							unsubscribeState(address, subscriberId[0]);
-						}
-					});
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
 				}
-
-				@Override
-				public void onError(int error) {
-					BleLog.LOGe(TAG, "notify state error: %d", error);
-					callback.onError(error);
-				}
-			},
-			callback
 		);
 	}
 

@@ -1,4 +1,4 @@
-package nl.dobots.bluenet.ble.extended.callbacks;
+package nl.dobots.bluenet.ble.base.callbacks;
 
 import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
 

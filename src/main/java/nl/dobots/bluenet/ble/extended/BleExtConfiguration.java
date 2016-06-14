@@ -2,17 +2,12 @@ package nl.dobots.bluenet.ble.extended;
 
 import nl.dobots.bluenet.ble.base.BleBase;
 import nl.dobots.bluenet.ble.base.BleBaseConfiguration;
-import nl.dobots.bluenet.ble.base.callbacks.IConfigurationCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
-import nl.dobots.bluenet.ble.base.structs.ConfigurationMsg;
-import nl.dobots.bluenet.ble.cfg.BleErrors;
-import nl.dobots.bluenet.ble.cfg.BluenetConfig;
-import nl.dobots.bluenet.ble.extended.callbacks.IBooleanCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
 import nl.dobots.bluenet.ble.extended.callbacks.IExecuteCallback;
 import nl.dobots.bluenet.ble.extended.callbacks.IStringCallback;
 import nl.dobots.bluenet.utils.BleLog;
-import nl.dobots.bluenet.utils.BleUtils;
 
 /**
  * Copyright (c) 2016 Dominik Egger <dominik@dobots.nl>. All rights reserved.

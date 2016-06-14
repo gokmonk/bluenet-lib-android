@@ -54,11 +54,11 @@ public class StateMsg extends StreamMsg {
 		super(bytes);
 	}
 
-//	@Override
-//	public int getOpCode() {
-//		return super.getOpCode();
-//	}
-//
+	@Override
+	public int getOpCode() {
+		return super.getOpCode();
+	}
+
 //	public int getUint8Value() {
 //		return BleUtils.toUint8(getPayload()[0]);
 //	}

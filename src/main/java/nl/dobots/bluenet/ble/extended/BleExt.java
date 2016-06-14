@@ -14,6 +14,7 @@ import java.util.Arrays;
 
 import nl.dobots.bluenet.ble.base.BleBase;
 import nl.dobots.bluenet.ble.base.callbacks.IAlertCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
 import nl.dobots.bluenet.ble.base.structs.AlertState;
@@ -89,8 +90,12 @@ public class BleExt {
 
 	private IBleDeviceCallback _cloudScanCB;
 
+	private BleExtState _bleExtState;
+
 	public BleExt() {
 		_bleBase = new BleBase();
+
+		_bleExtState = new BleExtState(this);
 
 		// create handler with its own thread
 		HandlerThread handlerThread = new HandlerThread("BleExtHandler");
@@ -913,7 +918,7 @@ public class BleExt {
 		if (isConnected(callback)) {
 			BleLog.LOGd(TAG, "Reading current PWM value ...");
 			if (hasStateCharacteristics(null)) {
-				getState(BluenetConfig.STATE_SWITCH_STATE, 1, callback);
+				_bleExtState.getSwitchState(_targetAddress, callback);
 			} else if (hasCharacteristic(BluenetConfig.CHAR_PWM_UUID, callback)) {
 				_bleBase.readPWM(_targetAddress, callback);
 			}
@@ -997,6 +1002,138 @@ public class BleExt {
 				@Override
 				public void execute(final IStatusCallback execCallback) {
 					writePwm(value, new IStatusCallback() {
+						@Override
+						public void onSuccess() {
+							callback.onSuccess();
+							execCallback.onSuccess();
+						}
+
+						@Override
+						public void onError(int error) {
+							execCallback.onError(error);
+						}
+					});
+				}
+			}, new IStatusCallback() {
+				@Override
+				public void onSuccess() { /* don't care */ }
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			});
+		}
+	}
+
+	/**
+	 * Function to read the current relay value from the device.
+	 * callback returns true if relay is on, false otherwise
+	 *
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 * @param callback the callback which will get the read value on success, or an error otherwise
+	 */
+	public void readRelay(final IBooleanCallback callback) {
+		if (isConnected(callback)) {
+			BleLog.LOGd(TAG, "Reading current Relay value ...");
+			if (hasStateCharacteristics(null)) {
+				_bleExtState.getSwitchState(_targetAddress, new IIntegerCallback() {
+					@Override
+					public void onSuccess(int result) {
+						callback.onSuccess(result > 0);
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				});
+			} else if (hasCharacteristic(BluenetConfig.CHAR_RELAY_UUID, callback)) {
+				_bleBase.readRelay(_targetAddress, callback);
+			}
+		}
+	}
+
+	/**
+	 * Function to read the current relay value from the device. Connects to the device if not already
+	 * connected, and/or delays the disconnect if necessary.
+	 * callback returns true if relay is on, false otherwise
+	 *
+	 * @param address the MAC address of the device from which the Relay value should be read
+	 * @param callback the callback which will get the read value on success, or an error otherwise
+	 */
+	public void readRelay(String address, final IBooleanCallback callback) {
+		if (checkConnection(address)) {
+			readRelay(callback);
+		} else {
+			connectAndExecute(address, new IExecuteCallback() {
+				@Override
+				public void execute(final IStatusCallback execCallback) {
+					readRelay(new IBooleanCallback() {
+						@Override
+						public void onSuccess(boolean result) {
+							callback.onSuccess(result);
+							execCallback.onSuccess();
+						}
+
+						@Override
+						public void onError(int error) {
+							execCallback.onError(error);
+						}
+					});
+				}
+			}, new IStatusCallback() {
+				@Override
+				public void onSuccess() { /* don't care */ }
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			});
+		}
+	}
+
+	/**
+	 * Function to write the given Relay value to the device.
+	 *
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 * @param relayOn true if the relay should be switched on, false otherwise
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void writeRelay(boolean relayOn, IStatusCallback callback) {
+		if (isConnected(callback)) {
+			BleLog.LOGd(TAG, "Set Relay to %b", relayOn);
+			if (hasControlCharacteristic(null)) {
+				BleLog.LOGd(TAG, "use control characteristic");
+				int value = relayOn ? 100 : 0;
+				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_SWITCH, 1, new byte[]{(byte) value}), callback);
+			} else if (hasCharacteristic(BluenetConfig.CHAR_RELAY_UUID, callback)) {
+				_bleBase.writeRelay(_targetAddress, relayOn, callback);
+			}
+		}
+	}
+
+	/**
+	 * Function to write the given Relay value to the device. Connects to the device if not already
+	 * connected, and/or delays the disconnect if necessary.
+	 *
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 * @param address the MAC address of the device to which the Relay value should be written
+	 * @param relayOn true if the relay should be switched on, false otherwise
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void writeRelay(String address, final boolean relayOn, final IStatusCallback callback) {
+		if (checkConnection(address)) {
+			writeRelay(relayOn, callback);
+		} else {
+			connectAndExecute(address, new IExecuteCallback() {
+				@Override
+				public void execute(final IStatusCallback execCallback) {
+					writeRelay(relayOn, new IStatusCallback() {
 						@Override
 						public void onSuccess() {
 							callback.onSuccess();
@@ -1249,7 +1386,7 @@ public class BleExt {
 		if (isConnected(callback)) {
 			BleLog.LOGd(TAG, "Reading power consumption value ...");
 			if (hasStateCharacteristics(null)) {
-				getState(BluenetConfig.STATE_POWER_USAGE, 4, callback);
+				_bleExtState.getPowerUsage(_targetAddress, callback);
 			} else if (hasCharacteristic(BluenetConfig.CHAR_POWER_CONSUMPTION_UUID, callback)) {
 				_bleBase.readPowerConsumption(_targetAddress, callback);
 			}
@@ -1473,7 +1610,7 @@ public class BleExt {
 		if (isConnected(callback)) {
 			BleLog.LOGd(TAG, "Reading Temperature value ...");
 			if (hasStateCharacteristics(null)) {
-				getState(BluenetConfig.STATE_TEMPERATURE, 4, callback);
+				_bleExtState.getTemperature(_targetAddress, callback);
 			} else if (hasCharacteristic(BluenetConfig.CHAR_TEMPERATURE_UUID, callback)) {
 				_bleBase.readTemperature(_targetAddress, callback);
 			}

@@ -223,8 +223,11 @@ public class BluenetConfig {
 	// Device Type Identifiers
 	public static final int DEVICE_UNDEF =                              0;
 	public static final int DEVICE_CROWNSTONE =                         1;
-	public static final int DEVICE_GUIDESTONE =                           2;
+	public static final int DEVICE_GUIDESTONE =                         2;
 	public static final int DEVICE_FRIDGE =                             3;
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// constant used to convert the advertisement interval from ms to the unit expected by the
 	// characteristic (increments of 0.625 ms)
 	public static final double ADVERTISEMENT_INCREMENT = 0.625;
