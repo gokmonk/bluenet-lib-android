@@ -20,14 +20,14 @@ import nl.dobots.bluenet.utils.BleUtils;
  *
  * @author Dominik Egger
  */
-public class BleAlertState {
+public class AlertState {
 
 	private int alertNum;
 
 	private boolean temperatureLowActive;
 	private boolean temperatureHighActive;
 
-	public BleAlertState(int state, int num) {
+	public AlertState(int state, int num) {
 		alertNum = num;
 		temperatureLowActive = BleUtils.isBitSet(state, BluenetConfig.ALERT_TEMP_LOW_POS);
 		temperatureHighActive = BleUtils.isBitSet(state, BluenetConfig.ALERT_TEMP_HIGH_POS);

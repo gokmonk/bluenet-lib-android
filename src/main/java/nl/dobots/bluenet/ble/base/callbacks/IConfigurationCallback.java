@@ -1,6 +1,6 @@
 package nl.dobots.bluenet.ble.base.callbacks;
 
-import nl.dobots.bluenet.ble.base.structs.BleConfiguration;
+import nl.dobots.bluenet.ble.base.structs.ConfigurationMsg;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -23,6 +23,6 @@ import nl.dobots.bluenet.ble.base.structs.BleConfiguration;
  */
 public interface IConfigurationCallback extends IBaseCallback {
 
-	void onSuccess(BleConfiguration configuration);
+	void onSuccess(ConfigurationMsg configuration);
 
 }

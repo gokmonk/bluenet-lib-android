@@ -72,6 +72,16 @@ public class BleUtils {
 		return Base64.encodeToString(bytes, Base64.NO_WRAP);
 	}
 
+	public static int byteArrayToInt(byte[] bytes) {
+		return byteArrayToShort(bytes, 0);
+	}
+
+	public static int byteArrayToInt(byte[] bytes, int offset) {
+		ByteBuffer bb = ByteBuffer.wrap(bytes);
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+		return bb.getInt(offset);
+	}
+
 	public static int byteArrayToShort(byte[] bytes) {
 		return byteArrayToShort(bytes, 0);
 	}
@@ -89,7 +99,7 @@ public class BleUtils {
 		return bb.array();
 	}
 
-	public static int signedToUnsignedByte(byte b) {
+	public static int toUint8(byte b) {
 		return b & 0xFF;
 	}
 

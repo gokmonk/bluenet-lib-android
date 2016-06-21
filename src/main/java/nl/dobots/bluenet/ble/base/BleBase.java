@@ -10,7 +10,9 @@ import org.json.JSONObject;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.UUID;
 
 import nl.dobots.bluenet.ble.base.callbacks.IAlertCallback;
@@ -20,11 +22,16 @@ import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDiscoveryCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
-import nl.dobots.bluenet.ble.base.structs.BleAlertState;
-import nl.dobots.bluenet.ble.base.structs.BleConfiguration;
-import nl.dobots.bluenet.ble.base.structs.BleMeshMessage;
-import nl.dobots.bluenet.ble.base.structs.BleTrackedDevice;
+import nl.dobots.bluenet.ble.base.callbacks.ISubscribeCallback;
+import nl.dobots.bluenet.ble.base.structs.AlertState;
+import nl.dobots.bluenet.ble.base.structs.CommandMsg;
+import nl.dobots.bluenet.ble.base.structs.ConfigurationMsg;
+import nl.dobots.bluenet.ble.base.structs.CrownstoneServiceData;
+import nl.dobots.bluenet.ble.base.structs.MeshMsg;
+import nl.dobots.bluenet.ble.base.structs.StateMsg;
+import nl.dobots.bluenet.ble.base.structs.TrackedDeviceMsg;
 import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshData;
 import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshHubData;
 import nl.dobots.bluenet.ble.cfg.BleTypes;
@@ -32,7 +39,7 @@ import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.core.BleCore;
 import nl.dobots.bluenet.ble.core.BleCoreTypes;
-import nl.dobots.bluenet.ble.extended.callbacks.IStringCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
 import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
@@ -42,8 +49,32 @@ public class BleBase extends BleCore {
 
 	// handler used for delayed execution, e.g. a to get the configuration we need to write first
 	// to the select configuration characteristic, then wait for a moment for the device to process
-	// the request before reading from the get configution characteristic
+	// the request before reading from the get configuration characteristic
 	private Handler _timeoutHandler = new Handler();
+
+	/** Hashmap of all subscribers, based on characeristic UUID */
+	private HashMap<UUID, ArrayList<IDataCallback>> _subscribers = new HashMap<>();
+
+	/**
+	 * "global" subscribe callback will be given to all subscribe calls of the BleCore. The
+	 * gatt notifications (or errors) will then be delegated based on the characteristic uuid to all
+	 * subscribers of that uuid
+	 */
+	ISubscribeCallback notificationCallback = new ISubscribeCallback() {
+		@Override
+		public void onData(UUID uuidService, UUID uuidCharacteristic, JSONObject data) {
+			for (IDataCallback callback : getSubscribers(uuidCharacteristic)) {
+				callback.onData(data);
+			}
+		}
+
+		@Override
+		public void onError(UUID uuidService, UUID uuidCharacteristic, int error) {
+			for (IDataCallback callback : getSubscribers(uuidCharacteristic)) {
+				callback.onError(error);
+			}
+		}
+	};
 
 	/**
 	 * Start an endless scan, without defining any UUIDs to filter for. the scan will continue
@@ -104,11 +135,37 @@ public class BleBase extends BleCore {
 					}
 				});
 
+				parseAdvertisement(advertisement, 0x16, new IByteArrayCallback() {
+					@Override
+					public void onSuccess(byte[] result) {
+						int serviceUUID = BleUtils.byteArrayToShort(result, 0);
+						if (serviceUUID == BluenetConfig.CROWNSTONE_SERVICE_DATA_UUID ||
+								serviceUUID == BluenetConfig.GUIDESTONE_SERVICE_DATA_UUID) {
+							parseServiceData(json, result);
+						}
+					}
+
+					@Override
+					public void onError(int error) {
+						BleLog.LOGd(TAG, "json: " + json.toString());
+					}
+				});
+
 				callback.onData(json);
 			}
 		});
 	}
 
+	/**
+	 * Helper function to parse manufacturing data of an advertisement/scan response packet. Use
+	 * @parseAdvertisement first to retrieve the manufacturing data (type 0xFF), and pass it to
+	 * this function together with the json object. it will populate the json object with the data
+	 * parsed from the manufacData array.
+	 *
+	 * @param json the json object in which the data should be included
+	 * @param manufacData the byte array containing the manufacturing data
+	 */
+	@Deprecated
 	private void parseDoBotsData(JSONObject json, byte[] manufacData) {
 		ByteBuffer bb = ByteBuffer.wrap(manufacData);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
@@ -123,8 +180,8 @@ public class BleBase extends BleCore {
 						BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE, true);
 						break;
 					}
-					case BluenetConfig.DEVICE_DOBEACON: {
-						BleCore.addProperty(json, BleTypes.PROPERTY_IS_DOBEACON, true);
+					case BluenetConfig.DEVICE_GUIDESTONE: {
+						BleCore.addProperty(json, BleTypes.PROPERTY_IS_GUIDESTONE, true);
 						break;
 					}
 					case BluenetConfig.DEVICE_FRIDGE: {
@@ -140,6 +197,30 @@ public class BleBase extends BleCore {
 	}
 
 	/**
+	 * Helper function to parse the crownstone service data of an advertisement/scan response packet.
+	 * Use @parseAdvertisement first to retrieve the service data (type 0x16), and pass it to
+	 * this function together with the json object. it will populate the json object with the data
+	 * parsed from the serviceData array.
+	 *
+	 * @param json the json object in which the data should be included
+	 * @param serviceData the byte array containing the service data
+	 */
+	private void parseServiceData(JSONObject json, byte[] serviceData) {
+		ByteBuffer bb = ByteBuffer.wrap(serviceData);
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+
+		int serviceUUID = bb.getShort();
+
+		if (serviceUUID == BluenetConfig.CROWNSTONE_SERVICE_DATA_UUID) {
+			BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE, true);
+			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData(bb.array());
+			BleCore.addProperty(json, BleTypes.PROPERTY_SERVICE_DATA, crownstoneServiceData);
+		} else if (serviceUUID == BluenetConfig.GUIDESTONE_SERVICE_DATA_UUID) {
+			BleCore.addProperty(json, BleTypes.PROPERTY_IS_GUIDESTONE, true);
+		}
+	}
+
+	/**
 	 * Helper function to parse iBeacon data from a byte array into a JSON object
 	 * @param scanResult the json object in which the data should be included
 	 * @param manufacData the byte array containing the ibeacon data
@@ -151,7 +232,11 @@ public class BleBase extends BleCore {
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 		int companyId = bb.getShort();
 
+		// ibeacon data is in big endian format
 		bb.order(ByteOrder.BIG_ENDIAN);
+		// advertisement id is actually two seperate bits, first bit is the iBeacon type (0x02),
+		// the second is the iBeacon length (0x15), but they are fixed to these values, so we can
+		// compare them together
 		int advertisementId = bb.getShort();
 
 		if (companyId == BluenetConfig.APPLE_COMPANY_ID && advertisementId == BluenetConfig.IBEACON_ADVERTISEMENT_ID) {
@@ -210,7 +295,99 @@ public class BleBase extends BleCore {
 		});
 	}
 
+	/**
+	 * Helper function to return the list of subscribers for a given uuid.
+	 * @param uuid uuid for which the list should be returned
+	 * @return list of subscribers
+	 */
+	private ArrayList<IDataCallback> getSubscribers(UUID uuid) {
+		ArrayList<IDataCallback> callbacks = _subscribers.get(uuid);
+		if (callbacks == null) {
+			callbacks = new ArrayList<>();
+			_subscribers.put(uuid, callbacks);
+		}
+		return callbacks;
+	}
 
+	/**
+	 * Subscribe to a characteristic. This can be called several times for different callbacks. a
+	 * list of subscribers is kept with a subscriberId, so that different functions can subscribe
+	 * to the same characteristic.
+	 * the statusCallback will return in the onSuccess call the subscriber id, this id will be needed
+	 * to unsubscribe afterwards.
+	 *
+	 * @param address the address of the device
+	 * @param serviceUuid the uuid of the service containing the characteristic
+	 * @param characteristicUuid the uuid of the characteristic which should be subscribed to
+	 * @param statusCallback the callback which will be informed about success or failure.
+	 *                       in case of success, the onSuccess function will return the subscriber
+	 *                       id which is needed for unsubscribing afterwards
+	 * @param callback the callback which will be triggered every time a gatt notification arrives
+	 */
+	public void subscribe(String address, String serviceUuid, String characteristicUuid,
+						  final IIntegerCallback statusCallback, final IDataCallback callback) {
+
+		UUID uuid = BleUtils.stringToUuid(characteristicUuid);
+		final ArrayList<IDataCallback> subscribers = getSubscribers(uuid);
+
+		if (subscribers.isEmpty()) {
+			subscribers.add(callback);
+			if (!super.subscribe(address, serviceUuid, characteristicUuid, new IStatusCallback() {
+				@Override
+				public void onError(int error) {
+					statusCallback.onError(error);
+				}
+
+				@Override
+				public void onSuccess() {
+					statusCallback.onSuccess(subscribers.indexOf(callback));
+				}
+			}, notificationCallback)) {
+				subscribers.remove(callback);
+			}
+		} else {
+			subscribers.add(callback);
+
+//			JSONObject json = new JSONObject();
+//			setStatus(json, BleCoreTypes.CHARACTERISTIC_SUBSCRIBED);
+//			callback.onData(json);
+			statusCallback.onSuccess(subscribers.indexOf(callback));
+		}
+
+	}
+
+	/**
+	 * Unsubscribe from the characteristic. Requires the subscriberId which was returned
+	 * in the statusCallback's onSuccess function during the subscribe call.
+	 *
+	 * @param address the address of the device
+	 * @param serviceUuid the uuid of the service containing the characteristic
+	 * @param characteristicUuid the uuid of the characteristic which should be subscribed to
+	 * @param subscriberId id obtained from the subscribeState call
+	 * @param statusCallback the callback which will be informed about success or failure.
+	 */
+	public void unsubscribe(String address, String serviceUuid, String characteristicUuid,
+							int subscriberId, IStatusCallback statusCallback) {
+
+		UUID uuid = BleUtils.stringToUuid(characteristicUuid);
+		ArrayList<IDataCallback> subscribers = getSubscribers(uuid);
+
+		if (subscribers.remove(subscriberId) != null) {
+			if (subscribers.isEmpty()) {
+				super.unsubscribe(address, serviceUuid, characteristicUuid, statusCallback);
+			} else {
+
+//				JSONObject json = new JSONObject();
+//				setStatus(json, BleCoreTypes.CHARACTERISTIC_UNSUBSCRIBED);
+//				callback.onData(json);
+
+				statusCallback.onSuccess();
+			}
+		} else {
+			statusCallback.onError(BleErrors.WRONG_CALLBACK);
+//			callback.onError(BleErrors.WRONG_CALLBACK);
+		}
+	}
 
 	// Crownstone specific characteristic operations
 
@@ -270,6 +447,7 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void readPWM(String address, final IIntegerCallback callback) {
+
 		BleLog.LOGd(TAG, "read pwm at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_PWM_UUID);
 		read(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_PWM_UUID, new IDataCallback() {
 
@@ -282,8 +460,61 @@ public class BleBase extends BleCore {
 			@Override
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
-				int result = BleUtils.signedToUnsignedByte(bytes[0]);
+				int result = BleUtils.toUint8(bytes[0]);
 				BleLog.LOGd(TAG, "pwm: %d", result);
+				callback.onSuccess(result);
+			}
+		});
+	}
+
+	/**
+	 * Write the given value to the Relay characteristic on the device
+	 * @param address the MAC address of the device
+	 * @param relayOn true if the relay should be switched on, false otherwise
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void writeRelay(String address, boolean relayOn, final IStatusCallback callback) {
+		int value = relayOn ? 100 : 0;
+		BleLog.LOGd(TAG, "write %d at service %s and characteristic %s", value, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID);
+		write(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID, new byte[]{(byte) value},
+				new IStatusCallback() {
+
+					@Override
+					public void onSuccess() {
+						BleLog.LOGd(TAG, "Successfully written to Relay characteristic");
+						callback.onSuccess();
+					}
+
+					@Override
+					public void onError(int error) {
+						BleLog.LOGe(TAG, "Failed to write to relay characteristic");
+						callback.onError(error);
+					}
+				}
+		);
+	}
+
+	/**
+	 * Read the Relay characteristic on the device and return the current Relay value as an integer
+	 * @param address the MAC address of the device
+	 * @param callback the callback which will get the read value on success, or an error otherwise
+	 */
+	public void readRelay(String address, final IBooleanCallback callback) {
+
+		BleLog.LOGd(TAG, "read Relay at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID);
+		read(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID, new IDataCallback() {
+
+			@Override
+			public void onError(int error) {
+				BleLog.LOGe(TAG, "Failed to read Relay characteristic");
+				callback.onError(error);
+			}
+
+			@Override
+			public void onData(JSONObject json) {
+				byte[] bytes = BleCore.getValue(json);
+				boolean result = BleUtils.toUint8(bytes[0]) > 0;
+				BleLog.LOGd(TAG, "Relay: %b", result);
 				callback.onSuccess(result);
 			}
 		});
@@ -298,8 +529,8 @@ public class BleBase extends BleCore {
 	 */
 	public void scanDevices(String address, boolean scan, final IStatusCallback callback) {
 		int value = scan ? 1 : 0;
-		BleLog.LOGd(TAG, "writeScanDevices: write %d at service %s and characteristic %s", value, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_DEVICE_SCAN_UUID);
-		write(address, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_DEVICE_SCAN_UUID, new byte[]{(byte) value},
+		BleLog.LOGd(TAG, "writeScanDevices: write %d at service %s and characteristic %s", value, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_SCAN_CONTROL_UUID);
+		write(address, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_SCAN_CONTROL_UUID, new byte[]{(byte) value},
 				new IStatusCallback() {
 
 					@Override
@@ -323,8 +554,8 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will get the list on success, or an error otherwise
 	 */
 	public void listScannedDevices(String address, final IByteArrayCallback callback) {
-		BleLog.LOGd(TAG, "read device list at service %s and characteristic %s", BluenetConfig.CHAR_DEVICE_LIST_UUID, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID);
-		read(address, BluenetConfig.CHAR_DEVICE_LIST_UUID, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, new IDataCallback() {
+		BleLog.LOGd(TAG, "read device list at service %s and characteristic %s", BluenetConfig.CHAR_SCANNED_DEVICES_UUID, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID);
+		read(address, BluenetConfig.CHAR_SCANNED_DEVICES_UUID, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, new IDataCallback() {
 			@Override
 			public void onError(int error) {
 				BleLog.LOGe(TAG, "Failed to read device list characteristic");
@@ -348,9 +579,9 @@ public class BleBase extends BleCore {
 	 * @param address the MAC address of the device
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
-	public void readCurrentConsumption(String address, final IIntegerCallback callback) {
-		BleLog.LOGd(TAG, "read current consumption at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_CURRENT_CONSUMPTION_UUID);
-		read(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_CURRENT_CONSUMPTION_UUID, new IDataCallback() {
+	public void readPowerConsumption(String address, final IIntegerCallback callback) {
+		BleLog.LOGd(TAG, "read current consumption at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_CONSUMPTION_UUID);
+		read(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_CONSUMPTION_UUID, new IDataCallback() {
 			@Override
 			public void onError(int error) {
 				BleLog.LOGe(TAG, "Failed to read current consumption characteristic");
@@ -361,39 +592,11 @@ public class BleBase extends BleCore {
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
 				// todo: check if current consumption is only 1 byte
-				int value = BleUtils.signedToUnsignedByte(bytes[0]);
+				int value = BleUtils.toUint8(bytes[0]);
 				BleLog.LOGd(TAG, "current consumption: %d", value);
 				callback.onSuccess(value);
 			}
 		});
-	}
-
-	/**
-	 * Write to the sample current characteristic to start the current sampling. The value parameter
-	 * determines what result is expected. This is necessary to get a valid result for the calls to
-	 * readCurrentConsumption and readCurrentCurve
-	 * @param address the MAC address of the device
-	 * @param value determines the type of sampling, can be either SAMPLE_CURRENT_CONSUMPTION or
-	 *              SAMPLE_CURRENT_CURVE
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void sampleCurrent(String address, int value, final IStatusCallback callback) {
-		BleLog.LOGd(TAG, "sample current: write %d at service %s and characteristic %s", value, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_SAMPLE_CURRENT_UUID);
-		write(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_SAMPLE_CURRENT_UUID, new byte[]{(byte) value},
-				new IStatusCallback() {
-
-					@Override
-					public void onSuccess() {
-						BleLog.LOGd(TAG, "Successfully written to sample current characteristic");
-						callback.onSuccess();
-					}
-
-					@Override
-					public void onError(int error) {
-						BleLog.LOGe(TAG, "Failed to write to sample current characteristic");
-						callback.onError(error);
-					}
-				});
 	}
 
 	/**
@@ -402,9 +605,9 @@ public class BleBase extends BleCore {
 	 * @param address the MAC address of the device
 	 * @param callback the callback which will get the curve on success, or an error otherwise
 	 */
-	public void readCurrentCurve(String address, final IByteArrayCallback callback) {
-		BleLog.LOGd(TAG, "read current curve at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_CURRENT_CURVE_UUID);
-		read(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_CURRENT_CURVE_UUID, new IDataCallback() {
+	public void readPowerSamples(String address, final IByteArrayCallback callback) {
+		BleLog.LOGd(TAG, "read current curve at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID);
+		read(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID, new IDataCallback() {
 			@Override
 			public void onError(int error) {
 				BleLog.LOGe(TAG, "Failed to read current curve characteristic");
@@ -421,505 +624,14 @@ public class BleBase extends BleCore {
 	}
 
 	/**
-	 * Write the floor to the configuration
-	 * @param address the MAC address of the device
-	 * @param value the new floor value
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void setFloor(String address, int value, final IStatusCallback callback) {
-		BleConfiguration configuration = new BleConfiguration(BluenetConfig.CONFIG_TYPE_FLOOR, 1, new byte[] {(byte)value});
-		writeConfiguration(address, configuration, callback);
-	}
-
-	/**
-	 * Get the floor from the configuration
-	 * @param address the MAC address of the device
-	 * @param callback the callback which will get the value on success, or an error otherwise
-	 */
-	public void getFloor(String address, final IIntegerCallback callback) {
-		getConfiguration(address, BluenetConfig.CONFIG_TYPE_FLOOR, new IConfigurationCallback() {
-			@Override
-			public void onSuccess(BleConfiguration configuration) {
-				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
-					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
-				} else {
-					int floor = configuration.getPayload()[0];
-					BleLog.LOGd(TAG, "floor: %d", floor);
-					callback.onSuccess(floor);
-				}
-			}
-
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
-	}
-
-	/**
-	 * Write the wifi value to the configuration
-	 * @param address the MAC address of the device
-	 * @param value the new wifi value
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void setWifi(String address, String value, final IStatusCallback callback) {
-		BleConfiguration configuration = new BleConfiguration(BluenetConfig.CONFIG_TYPE_WIFI, value.length(), value.getBytes());
-		writeConfiguration(address, configuration, callback);
-	}
-
-	/**
-	 * Get the ip from the configuration
-	 * @param address the MAC address of the device
-	 * @param callback the callback which will get the value on success, or an error otherwise
-	 */
-	public void getIp(String address, final IStringCallback callback) {
-		getConfiguration(address, BluenetConfig.CONFIG_TYPE_WIFI, new IConfigurationCallback() {
-			@Override
-			public void onSuccess(BleConfiguration configuration) {
-				if (configuration.getLength() == 0) {
-					BleLog.LOGe(TAG, "empty name received!");
-					onError(BleErrors.ERROR_EMPTY_VALUE);
-				} else {
-					String deviceName = new String(configuration.getPayload());
-					BleLog.LOGd(TAG, "device name: %s", deviceName);
-					callback.onSuccess(deviceName);
-				}
-			}
-
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
-	}
-
-	/**
-	 * Write the tx power to the configuration. This can be one of the following values:
-	 *  -30, -20, -16, -12, -8, -4, 0, or 4
-	 * @param address the MAC address of the device
-	 * @param value the new tx power
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void setTxPower(String address, int value, final IStatusCallback callback) {
-		BleConfiguration configuration = new BleConfiguration(BluenetConfig.CONFIG_TYPE_TX_POWER, 1, new byte[]{(byte)value});
-		writeConfiguration(address, configuration, callback);
-	}
-
-	/**
-	 * Get the tx power from the configuration
-	 * @param address the MAC address of the device
-	 * @param callback the callback which will get the value on success, or an error otherwise
-	 */
-	public void getTxPower(String address, final IIntegerCallback callback) {
-		getConfiguration(address, BluenetConfig.CONFIG_TYPE_TX_POWER, new IConfigurationCallback() {
-			@Override
-			public void onSuccess(BleConfiguration configuration) {
-				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
-					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
-				} else {
-					int txPower = configuration.getPayload()[0];
-					BleLog.LOGd(TAG, "tx power: %d", txPower);
-					callback.onSuccess(txPower);
-				}
-			}
-
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
-	}
-
-	// constant used to convert the advertisement interval from ms to the unit expected by the
-	// characteristic (increments of 0.625 ms)
-	private static final double ADVERTISEMENT_INCREMENT = 0.625;
-
-	/**
-	 * Write the advertisement interval (in ms) to the configuration
-	 * @param address the MAC address of the device
-	 * @param value advertisement interval (in ms)
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void setAdvertisementInterval(String address, int value, final IStatusCallback callback) {
-		// convert ms to value used by the crownstone (which is in increments of 0.625 ms)
-		int advertisementInterval = (int)Math.floor(value / ADVERTISEMENT_INCREMENT);
-		BleConfiguration configuration = new BleConfiguration(BluenetConfig.CONFIG_TYPE_ADV_INTERVAL, 2, BleUtils.shortToByteArray(advertisementInterval));
-		writeConfiguration(address, configuration, callback);
-	}
-
-	/**
-	 * Get the advertisement interval from the configuration
-	 * @param address the MAC address of the device
-	 * @param callback the callback which will get the value on success, or an error otherwise
-	 */
-	public void getAdvertisementInterval(String address, final IIntegerCallback callback) {
-		getConfiguration(address, BluenetConfig.CONFIG_TYPE_ADV_INTERVAL, new IConfigurationCallback() {
-			@Override
-			public void onSuccess(BleConfiguration configuration) {
-				if (configuration.getLength() != 2) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
-					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
-				} else {
-					int advertisementInterval = (int) (BleUtils.byteArrayToShort(configuration.getPayload()) * ADVERTISEMENT_INCREMENT);
-					BleLog.LOGd(TAG, "advertisement interval: %d", advertisementInterval);
-					callback.onSuccess(advertisementInterval);
-				}
-			}
-
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
-	}
-
-	/**
-	 * Write the beacon major to the configuration
-	 * @param address the MAC address of the device
-	 * @param value new beacon major
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void setBeaconMajor(String address, int value, final IStatusCallback callback) {
-		BleConfiguration configuration = new BleConfiguration(BluenetConfig.CONFIG_TYPE_IBEACON_MAJOR, 2, BleUtils.shortToByteArray(value));
-		writeConfiguration(address, configuration, callback);
-	}
-
-	/**
-	 * Get the beacon major from the configuration
-	 * @param address the MAC address of the device
-	 * @param callback the callback which will get the value on success, or an error otherwise
-	 */
-	public void getBeaconMajor(String address, final IIntegerCallback callback) {
-		getConfiguration(address, BluenetConfig.CONFIG_TYPE_IBEACON_MAJOR, new IConfigurationCallback() {
-			@Override
-			public void onSuccess(BleConfiguration configuration) {
-				if (configuration.getLength() != 2) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
-					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
-				} else {
-					int major = BleUtils.byteArrayToShort(configuration.getPayload());
-					BleLog.LOGd(TAG, "major: %d", major);
-					callback.onSuccess(major);
-				}
-			}
-
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
-	}
-
-	/**
-	 * Write the beacon minor to the configuration
-	 * @param address the MAC address of the device
-	 * @param value new beacon minor
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void setBeaconMinor(String address, int value, final IStatusCallback callback) {
-		BleConfiguration configuration = new BleConfiguration(BluenetConfig.CONFIG_TYPE_IBEACON_MINOR, 2, BleUtils.shortToByteArray(value));
-		writeConfiguration(address, configuration, callback);
-	}
-
-	/**
-	 * Get the beacon minor from the configuration
-	 * @param address the MAC address of the device
-	 * @param callback the callback which will get the value on success, or an error otherwise
-	 */
-	public void getBeaconMinor(String address, final IIntegerCallback callback) {
-		getConfiguration(address, BluenetConfig.CONFIG_TYPE_IBEACON_MINOR, new IConfigurationCallback() {
-			@Override
-			public void onSuccess(BleConfiguration configuration) {
-				if (configuration.getLength() != 2) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
-					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
-				} else {
-					int minor = BleUtils.byteArrayToShort(configuration.getPayload());
-					BleLog.LOGd(TAG, "major: %d", minor);
-					callback.onSuccess(minor);
-				}
-			}
-
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
-	}
-
-	/**
-	 * Write the beacon calibrated rssi (rssi at 1m) to the configuration
-	 * @param address the MAC address of the device
-	 * @param value new beacon calibrated rssi
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void setBeaconCalibratedRssi(String address, int value, final IStatusCallback callback) {
-		BleConfiguration configuration = new BleConfiguration(BluenetConfig.CONFIG_TYPE_IBEACON_RSSI, 1, new byte[]{(byte)value});
-		writeConfiguration(address, configuration, callback);
-	}
-
-	/**
-	 * Get the beacon calibrated rssi (rssi at 1m) from the configuration
-	 * @param address the MAC address of the device
-	 * @param callback the callback which will get the value on success, or an error otherwise
-	 */
-	public void getBeaconCalibratedRssi(String address, final IIntegerCallback callback) {
-		getConfiguration(address, BluenetConfig.CONFIG_TYPE_IBEACON_RSSI, new IConfigurationCallback() {
-			@Override
-			public void onSuccess(BleConfiguration configuration) {
-				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
-					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
-				} else {
-					int calibratedRssi = configuration.getPayload()[0];
-					BleLog.LOGd(TAG, "rssi at 1 m: %d", calibratedRssi);
-					callback.onSuccess(calibratedRssi);
-				}
-			}
-
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
-	}
-
-	/**
-	 * Write the beacon proximity UUID to the configuration
-	 * @param address the MAC address of the device
-	 * @param value new beacon proximity UUID
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void setBeaconProximityUuid(String address, String value, final IStatusCallback callback) {
-		byte[] bytes = BleUtils.uuidToBytes(value);
-		BleConfiguration configuration = new BleConfiguration(BluenetConfig.CONFIG_TYPE_IBEACON_PROXIMITY_UUID, bytes.length, bytes);
-		writeConfiguration(address, configuration, callback);
-	}
-
-	/**
-	 * Get the beacon proximity UUID from the configuration
-	 * @param address the MAC address of the device
-	 * @param callback the callback which will get the value on success, or an error otherwise
-	 */
-	public void getBeaconProximityUuid(String address, final IStringCallback callback) {
-		getConfiguration(address, BluenetConfig.CONFIG_TYPE_IBEACON_PROXIMITY_UUID, new IConfigurationCallback() {
-			@Override
-			public void onSuccess(BleConfiguration configuration) {
-				if (configuration.getLength() != 16) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
-					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
-				} else {
-					String proximityUuid = BleUtils.bytesToUuid(configuration.getPayload());
-					BleLog.LOGd(TAG, "proximity UUID: %s", proximityUuid);
-					callback.onSuccess(proximityUuid);
-				}
-			}
-
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
-	}
-
-	/**
-	 * Write the device name to the configuration
-	 * @param address the MAC address of the device
-	 * @param value new device name
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void setDeviceName(String address, String value, final IStatusCallback callback) {
-		byte[] bytes = value.getBytes();
-		BleConfiguration configuration = new BleConfiguration(BluenetConfig.CONFIG_TYPE_NAME, bytes.length, bytes);
-		writeConfiguration(address, configuration, callback);
-	}
-
-	/**
-	 * Get the device name from the configuration
-	 * @param address the MAC address of the device
-	 * @param callback the callback which will get the value on success, or an error otherwise
-	 */
-	public void getDeviceName(String address, final IStringCallback callback) {
-		getConfiguration(address, BluenetConfig.CONFIG_TYPE_NAME, new IConfigurationCallback() {
-			@Override
-			public void onSuccess(BleConfiguration configuration) {
-				if (configuration.getLength() == 0) {
-					BleLog.LOGe(TAG, "empty name received!");
-					onError(BleErrors.ERROR_EMPTY_VALUE);
-				} else {
-					String deviceName = new String(configuration.getPayload());
-					BleLog.LOGd(TAG, "device name: %s", deviceName);
-					callback.onSuccess(deviceName);
-				}
-			}
-
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
-	}
-
-	/**
-	 * Write the device type to the configuration
-	 * @param address the MAC address of the device
-	 * @param value new device type
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void setDeviceType(String address, String value, final IStatusCallback callback) {
-		byte[] bytes = value.getBytes();
-		BleConfiguration configuration = new BleConfiguration(BluenetConfig.CONFIG_TYPE_DEVICE_TYPE, bytes.length, bytes);
-		writeConfiguration(address, configuration, callback);
-	}
-
-	/**
-	 * Get the device type from the configuration
-	 * @param address the MAC address of the device
-	 * @param callback the callback which will get the value on success, or an error otherwise
-	 */
-	public void getDeviceType(String address, final IStringCallback callback) {
-		getConfiguration(address, BluenetConfig.CONFIG_TYPE_DEVICE_TYPE, new IConfigurationCallback() {
-			@Override
-			public void onSuccess(BleConfiguration configuration) {
-				if (configuration.getLength() == 0) {
-					BleLog.LOGe(TAG, "empty device type received!");
-					onError(BleErrors.ERROR_EMPTY_VALUE);
-				} else {
-					String deviceType = new String(configuration.getPayload());
-					BleLog.LOGd(TAG, "device type: %s", deviceType);
-					callback.onSuccess(deviceType);
-				}
-			}
-
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
-	}
-
-	/**
-	 * Write the room to the configuration
-	 * @param address the MAC address of the device
-	 * @param value new room
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void setRoom(String address, String value, final IStatusCallback callback) {
-		byte[] bytes = value.getBytes();
-		BleConfiguration configuration = new BleConfiguration(BluenetConfig.CONFIG_TYPE_ROOM, bytes.length, bytes);
-		writeConfiguration(address, configuration, callback);
-	}
-
-	/**
-	 * Get the room from the configuration
-	 * @param address the MAC address of the device
-	 * @param callback the callback which will get the value on success, or an error otherwise
-	 */
-	public void getRoom(String address, final IStringCallback callback) {
-		getConfiguration(address, BluenetConfig.CONFIG_TYPE_ROOM, new IConfigurationCallback() {
-			@Override
-			public void onSuccess(BleConfiguration configuration) {
-				if (configuration.getLength() == 0) {
-					BleLog.LOGe(TAG, "empty room received!");
-					onError(BleErrors.ERROR_EMPTY_VALUE);
-				} else {
-					String room = new String(configuration.getPayload());
-					BleLog.LOGd(TAG, "room: %s", room);
-					callback.onSuccess(room);
-				}
-			}
-
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
-	}
-
-	/**
-	 * Write the minimum environment temperature to the configuration
-	 * @param address the MAC address of the device
-	 * @param value new minimum environment temperature
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void setMinEnvTemp(String address, int value, final IStatusCallback callback) {
-		BleConfiguration configuration = new BleConfiguration(BluenetConfig.CONFIG_TYPE_MIN_ENV_TEMP, 1, new byte[]{(byte)value});
-		writeConfiguration(address, configuration, callback);
-	}
-
-	/**
-	 * Get the minimum environment temperature from the configuration
-	 * @param address the MAC address of the device
-	 * @param callback the callback which will get the value on success, or an error otherwise
-	 */
-	public void getMinEnvTemp(String address, final IIntegerCallback callback) {
-		getConfiguration(address, BluenetConfig.CONFIG_TYPE_MIN_ENV_TEMP, new IConfigurationCallback() {
-			@Override
-			public void onSuccess(BleConfiguration configuration) {
-				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
-					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
-				} else {
-					int temperature = configuration.getPayload()[0];
-					BleLog.LOGd(TAG, "min environment temperature: %d", temperature);
-					callback.onSuccess(temperature);
-				}
-			}
-
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
-	}
-
-	/**
-	 * Write the maximum environment temperature to the configuration
-	 * @param address the MAC address of the device
-	 * @param value new maximum environment temperature
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void setMaxEnvTemp(String address, int value, final IStatusCallback callback) {
-		BleConfiguration configuration = new BleConfiguration(BluenetConfig.CONFIG_TYPE_MAX_ENV_TEMP, 1, new byte[]{(byte)value});
-		writeConfiguration(address, configuration, callback);
-	}
-
-	/**
-	 * Get the maximum environment temperature from the configuration
-	 * @param address the MAC address of the device
-	 * @param callback the callback which will get the value on success, or an error otherwise
-	 */
-	public void getMaxEnvTemp(String address, final IIntegerCallback callback) {
-		getConfiguration(address, BluenetConfig.CONFIG_TYPE_MAX_ENV_TEMP, new IConfigurationCallback() {
-			@Override
-			public void onSuccess(BleConfiguration configuration) {
-				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
-					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
-				} else {
-					int temperature = configuration.getPayload()[0];
-					BleLog.LOGd(TAG, "max environment temperature: %d", temperature);
-					callback.onSuccess(temperature);
-				}
-			}
-
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
-	}
-
-	/**
 	 * Wrapper function which first calls select configuration, and on success calls the get configuration
 	 *
 	 * @param address the address of the device
-	 * @param configurationType the configuration type, see enum BleConfiguration Types in BluenetConfig.
+	 * @param configurationType the configuration type, see enum ConfigurationMsg Types in BluenetConfig.
 	 * @param callback callback function to be called with the read configuration object
 	 */
-	public void getConfiguration(final String address, int configurationType, final IConfigurationCallback callback) {
+	public void getConfiguration(final String address, final int configurationType, final IConfigurationCallback callback) {
+
 		selectConfiguration(address, configurationType, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
@@ -930,6 +642,7 @@ public class BleBase extends BleCore {
 						readConfiguration(address, callback);
 					}
 				}, 50);
+//				readConfiguration(address, callback);
 			}
 
 			@Override
@@ -941,17 +654,17 @@ public class BleBase extends BleCore {
 
 	/**
 	 * Write the configuration value to the set configuration characteristic. the configuration is a
-	 * BleConfiguration object which starts with a byte for the configuration type, then 1 byte
+	 * ConfigurationMsg object which starts with a byte for the configuration type, then 1 byte
 	 * reserved for byte alignment, 2 bytes for the length of the payload data, and the payload
 	 * data
 	 * @param address the address of the device
 	 * @param configuration configuration to be written to the set configuration characteristic
 	 * @param callback callback function to be called on success or error
 	 */
-	public void writeConfiguration(String address, BleConfiguration configuration, final IStatusCallback callback) {
+	public void writeConfiguration(String address, ConfigurationMsg configuration, final IStatusCallback callback) {
 		byte[] bytes = configuration.toArray();
-		BleLog.LOGd(TAG, "configuration: write %s at service %s and characteristic %s", Arrays.toString(bytes), BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_SET_CONFIGURATION_UUID);
-		write(address, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_SET_CONFIGURATION_UUID, bytes,
+		BleLog.LOGd(TAG, "configuration: write %s at service %s and characteristic %s", Arrays.toString(bytes), BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONFIG_CONTROL_UUID);
+		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONFIG_CONTROL_UUID, bytes,
 				new IStatusCallback() {
 
 					@Override
@@ -977,16 +690,18 @@ public class BleBase extends BleCore {
 	}
 
 	/**
-	 * Write to the select configuration characteristic to select a configuration that we want to
+	 * Write to the configuration control characteristic to select a configuration that we want to
 	 * read afterwards. Need to delay the call to readConfiguration to give the device some time
 	 * to process the request.
 	 * @param address the address of the device
-	 * @param configurationType the configuration type, see enum BleConfiguration Types in BluenetConfig.
+	 * @param configurationType the configuration type, see enum ConfigurationMsg Types in BluenetConfig.
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void selectConfiguration(String address, int configurationType, final IStatusCallback callback) {
-		BleLog.LOGd(TAG, "select configuration: write %d at service %s and characteristic %s", configurationType, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_SELECT_CONFIGURATION_UUID);
-		write(address, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_SELECT_CONFIGURATION_UUID, new byte[]{(byte) configurationType},
+	private void selectConfiguration(String address, int configurationType, final IStatusCallback callback) {
+		ConfigurationMsg configuration = new ConfigurationMsg(configurationType, BluenetConfig.READ_VALUE, 0, new byte[]{});
+		byte[] bytes = configuration.toArray();
+		BleLog.LOGd(TAG, "select configuration: write %d at service %s and characteristic %s", configurationType, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONFIG_CONTROL_UUID);
+		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONFIG_CONTROL_UUID, bytes,
 				new IStatusCallback() {
 
 					@Override
@@ -1013,9 +728,9 @@ public class BleBase extends BleCore {
 	 * @param address the address of the device
 	 * @param callback callback function to be called with the read configuration object
 	 */
-	public void readConfiguration(String address, final IConfigurationCallback callback) {
-		BleLog.LOGd(TAG, "read configuration at service %s and characteristic %s", BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_GET_CONFIGURATION_UUID);
-		read(address, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_GET_CONFIGURATION_UUID, new IDataCallback() {
+	private void readConfiguration(String address, final IConfigurationCallback callback) {
+		BleLog.LOGd(TAG, "read configuration at service %s and characteristic %s", BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONFIG_READ_UUID);
+		read(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONFIG_READ_UUID, new IDataCallback() {
 			@Override
 			public void onError(int error) {
 				BleLog.LOGe(TAG, "Failed to read configuration characteristic");
@@ -1025,11 +740,335 @@ public class BleBase extends BleCore {
 			@Override
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
-				BleConfiguration configuration = new BleConfiguration(bytes);
-				BleLog.LOGd(TAG, "read configuration: %d", configuration.toString());
+				ConfigurationMsg configuration = new ConfigurationMsg(bytes);
+				BleLog.LOGd(TAG, "read configuration: %s", configuration.toString());
 				callback.onSuccess(configuration);
 			}
 		});
+	}
+
+	/**
+	 * Enables state variable notifications on the device. every time the value changes, the device
+	 * will write a StateMsg with opCode notification to the ConfigRead characteristic
+	 *
+	 * @param address the address of the device
+	 * @param stateType the state variable for which notifications should be enabled, see @BleStateTypes
+	 * @param callback the callback which will be informed about success or failure of the enable call
+	 */
+	public void enableStateNotification(final String address, final int stateType, final IStatusCallback callback) {
+		StateMsg state = new StateMsg(stateType, BluenetConfig.NOTIFY_VALUE, 0, new byte[]{});
+		byte[] bytes = state.toArray();
+		BleLog.LOGd(TAG, "notify state: write %d at service %s and characteristic %s", stateType, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_CONTROL_UUID);
+		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_CONTROL_UUID, bytes,
+				new IStatusCallback() {
+
+					@Override
+					public void onSuccess() {
+						BleLog.LOGd(TAG, "Successfully written to select state characteristic");
+						callback.onSuccess();
+					}
+
+					@Override
+					public void onError(int error) {
+						BleLog.LOGe(TAG, "Failed to write to select state characteristic");
+						callback.onError(error);
+					}
+				});
+	}
+
+//	private void subscribeState(String address, final IStateCallback callback) {
+//		subscribeState(address, callback, null);
+//	}
+
+	/**
+	 * Subscribe to the StateRead characteristic to receive gatt notifications. the statusCallback's
+	 * onSuccess function will be triggered on success with the subscriber id. this id is needed
+	 * for unsubscribing afterwards.
+	 *
+	 * @param address the address of the device
+	 * @param statusCallback the callback which will be informed about success or failure.
+	 *                       in case of success, the onSuccess function will return the subscriber
+	 *                       id which is needed for unsubscribing afterwards
+	 * @param callback the callback which will be triggered every time a gatt notification arrives
+	 */
+	public void subscribeState(String address, final IIntegerCallback statusCallback, final IStateCallback callback) {
+
+		subscribe(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID,
+				statusCallback,
+				new IDataCallback() {
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+
+					@Override
+					public void onData(JSONObject json) {
+						final byte[] bytes = BleCore.getValue(json);
+						StateMsg state = new StateMsg(bytes);
+						BleLog.LOGd(TAG, "received state notification: %s", state.toString());
+						callback.onSuccess(state);
+					}
+				}
+		);
+	}
+
+	/**
+	 * Unsubscribe from the StateRead characteristic. Requires the subscriberId which was returned
+	 * in the statusCallback's onSuccess function during the subscribeState call.
+	 *
+	 * @param address the address of the device
+	 * @param subscriberId id obtained from the subscribeState call
+	 */
+	public void unsubscribeState(String address, int subscriberId) {
+		unsubscribe(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID,
+				subscriberId, new IStatusCallback() {
+					@Override
+					public void onSuccess() {
+						BleLog.LOGd(TAG, "unsubscribe state success");
+					}
+
+					@Override
+					public void onError(int error) {
+						BleLog.LOGe(TAG, "unsubscribe state error: %d", error);
+					}
+				});
+	}
+
+	/**
+	 * Unsubscribe from the StateRead characteristic. Requires the subscriberId which was returned
+	 * in the statusCallback's onSuccess function during the subscribeState call.
+	 *
+	 * @param address the address of the device
+	 * @param subscriberId id obtained from the subscribeState call
+	 * @param callback the callback which will be informed about success or failure.
+	 */
+	public void unsubscribeState(String address, int subscriberId, final IStatusCallback callback) {
+		unsubscribe(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID,
+				subscriberId, callback);
+	}
+
+	/**
+	 * Helper function to get state notifications. it will first subscribe to the StateRead characteristic
+	 * if that is successful, it will enable notifications for the state variable specified. After that,
+	 * every time the state variable is updated on the device, the callback's onSuccess function is called.
+	 *
+	 * @param address the address of the device
+	 * @param type the state variable for which notifications should be enabled, see @BleStateTypes
+	 * @param statusCallback the callback which will be informed about success or failure of the enable/subscribe
+	 *                       calls
+	 * @param callback the callback which will be triggered for every notification / state variable update
+	 */
+	public void getStateNotifications(final String address, final int type, final IIntegerCallback statusCallback,
+									  final IStateCallback callback) {
+
+		final int[] subscriberId = new int[1];
+
+		subscribeState(address, new IIntegerCallback() {
+					@Override
+					public void onSuccess(int result) {
+						subscriberId[0] = result;
+						enableStateNotification(address, type, new IStatusCallback() {
+
+							@Override
+							public void onSuccess() {
+								BleLog.LOGd(TAG, "notify state success");
+								statusCallback.onSuccess(subscriberId[0]);
+							}
+
+							@Override
+							public void onError(int error) {
+								unsubscribeState(address, subscriberId[0]);
+							}
+						});
+					}
+
+					@Override
+					public void onError(int error) {
+						BleLog.LOGe(TAG, "notify state error: %d", error);
+						callback.onError(error);
+					}
+				},
+				new IStateCallback() {
+					@Override
+					public void onSuccess(StateMsg state) {
+						if (state.getOpCode() == BluenetConfig.NOTIFY_VALUE) {
+							callback.onSuccess(state);
+						}
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				}
+		);
+	}
+
+
+	/**
+	 * Wrapper function which first calls select state, and on success calls the get state
+	 *
+	 * @param address the address of the device
+	 * @param stateType the state type, see enum StateMsg Types in BluenetConfig.
+	 * @param callback callback function to be called with the read state object
+	 */
+	public void getState(final String address, final int stateType, final IStateCallback callback) {
+
+		final int[] subscriberId = new int[1];
+
+		subscribeState(address,
+			new IIntegerCallback() {
+				@Override
+				public void onSuccess(int result) {
+					subscriberId[0] = result;
+					selectState(address, stateType, new IStatusCallback() {
+						@Override
+						public void onSuccess() {
+							// yippi, wait for state to come in on notification
+						}
+
+						@Override
+						public void onError(int error) {
+							// select failed, unsubscribe again
+							callback.onError(error);
+							unsubscribeState(address, subscriberId[0]);
+						}
+					});
+				}
+
+				@Override
+				public void onError(int error) {
+					// subscribe failed
+					callback.onError(error);
+				}
+			},
+			new IStateCallback() {
+				@Override
+				public void onSuccess(StateMsg state) {
+					callback.onSuccess(state);
+					unsubscribeState(address, subscriberId[0]);
+				}
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+					unsubscribeState(address, subscriberId[0]);
+				}
+			}
+		);
+
+//		selectState(address, stateType, new IStatusCallback() {
+//			@Override
+//			public void onSuccess() {
+//				// todo: do we need a timeout here?
+////				_timeoutHandler.postDelayed(new Runnable() {
+////					@Override
+////					public void run() {
+//						readState(address, callback);
+////					}
+////				}, 50);
+//			}
+//
+//			@Override
+//			public void onError(int error) {
+//				callback.onError(error);
+//			}
+//		});
+	}
+
+	/**
+	 * Write to the state control characteristic to select a state variable that we want to
+	 * read afterwards. Need to delay the call to readState to give the device some time
+	 * to process the request.
+	 * @param address the address of the device
+	 * @param stateType the state type, see enum StateMsg Types in BluenetConfig.
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void selectState(String address, int stateType, final IStatusCallback callback) {
+		StateMsg state = new StateMsg(stateType, BluenetConfig.READ_VALUE, 0, new byte[]{});
+		byte[] bytes = state.toArray();
+		BleLog.LOGd(TAG, "select state: write %d at service %s and characteristic %s", stateType, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_CONTROL_UUID);
+		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_CONTROL_UUID, bytes,
+				new IStatusCallback() {
+
+					@Override
+					public void onSuccess() {
+						BleLog.LOGd(TAG, "Successfully written to select state characteristic");
+						callback.onSuccess();
+					}
+
+					@Override
+					public void onError(int error) {
+						BleLog.LOGe(TAG, "Failed to write to select state characteristic");
+						callback.onError(error);
+					}
+				});
+	}
+
+	/**
+	 * Read the get state characteristic to get the state value which was
+	 * previously requested. Need to call selectState first to select a state variable
+	 * to be read.
+	 * Note: Need to delay the call to readState to give the device some time
+	 * to process the request.
+	 * Consider using @getState instead
+	 * @param address the address of the device
+	 * @param callback callback function to be called with the read state object
+	 */
+	public void readState(String address, final IStateCallback callback) {
+		BleLog.LOGd(TAG, "read state at service %s and characteristic %s", BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID);
+		read(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID, new IDataCallback() {
+			@Override
+			public void onError(int error) {
+				BleLog.LOGe(TAG, "Failed to read state characteristic");
+				callback.onError(error);
+			}
+
+			@Override
+			public void onData(JSONObject json) {
+				byte[] bytes = BleCore.getValue(json);
+				StateMsg state = new StateMsg(bytes);
+				BleLog.LOGd(TAG, "read state: %s", state.toString());
+				callback.onSuccess(state);
+			}
+		});
+	}
+
+	/**
+	 * Send the give command to the control characteristic. the device then executes the command defined
+	 * by the command parameter
+	 * @param address the address of the device
+	 * @param command command to be executed on the device
+	 * @param callback callback function to be called on success or error
+	 */
+	public void sendCommand(String address, CommandMsg command, final IStatusCallback callback) {
+		byte[] bytes = command.toArray();
+		BleLog.LOGd(TAG, "control command: write %s at service %s and characteristic %s", Arrays.toString(bytes), BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONTROL_UUID);
+		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONTROL_UUID, bytes,
+				new IStatusCallback() {
+
+					@Override
+					public void onSuccess() {
+						BleLog.LOGd(TAG, "Successfully written to control characteristic");
+						// delay probably not needed anymore since we decoupled characteristic writes
+						// from interrupt in firmware
+						callback.onSuccess();
+//						// we need to give the crownstone some time to handle the control command
+//						_timeoutHandler.postDelayed(new Runnable() {
+//							@Override
+//							public void run() {
+//								callback.onSuccess();
+//							}
+//						}, 200);
+					}
+
+					@Override
+					public void onError(int error) {
+						BleLog.LOGe(TAG, "Failed to write to control characteristic");
+						callback.onError(error);
+					}
+				});
 	}
 
 	/**
@@ -1039,9 +1078,9 @@ public class BleBase extends BleCore {
 	 * @param message the mesh message to be sent into the mesh
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void writeMeshMessage(String address, BleMeshMessage message, final IStatusCallback callback) {
-		BleLog.LOGd(TAG, "mesh message: write %s at service %s and characteristic %s", message.toString(), BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_MESH_UUID);
-		write(address, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_MESH_UUID, message.toArray(),
+	public void writeMeshMessage(String address, MeshMsg message, final IStatusCallback callback) {
+		BleLog.LOGd(TAG, "mesh message: write %s at service %s and characteristic %s", message.toString(), BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_MESH_CONTROL_UUID);
+		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_MESH_CONTROL_UUID, message.toArray(),
 				new IStatusCallback() {
 
 					@Override
@@ -1059,62 +1098,13 @@ public class BleBase extends BleCore {
 	}
 
 	/**
-	 * Write the given value to the current limit characteristic
-	 * @param address the address of the device
-	 * @param value new current limit
-	 * @param callback the callback which will be informed about success or failure
-	 */
-	public void writeCurrentLimit(String address, int value, final IStatusCallback callback) {
-		BleLog.LOGd(TAG, "current limit: write %d at service %s and characteristic %s", value, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_CURRENT_LIMIT_UUID);
-		write(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_CURRENT_LIMIT_UUID, new byte[]{(byte) value},
-				new IStatusCallback() {
-
-					@Override
-					public void onSuccess() {
-						BleLog.LOGd(TAG, "Successfully written to current limit characteristic");
-						callback.onSuccess();
-					}
-
-					@Override
-					public void onError(int error) {
-						BleLog.LOGe(TAG, "Failed to write to current limit characteristic");
-						callback.onError(error);
-					}
-				});
-	}
-
-	/**
-	 * Read the current limit characteristic to get the current limit
-	 * @param address the address of the device
-	 * @param callback the callback which will get the value on success, or an error otherwise
-	 */
-	public void readCurrentLimit(String address, final IIntegerCallback callback) {
-		BleLog.LOGd(TAG, "read current limit at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_CURRENT_LIMIT_UUID);
-		read(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_CURRENT_LIMIT_UUID, new IDataCallback() {
-			@Override
-			public void onError(int error) {
-				BleLog.LOGe(TAG, "Failed to read current limit characteristic");
-				callback.onError(error);
-			}
-
-			@Override
-			public void onData(JSONObject json) {
-				byte[] bytes = BleCore.getValue(json);
-				int currentLimit = BleUtils.signedToUnsignedByte(bytes[0]);
-				BleLog.LOGd(TAG, "current limit: %d", currentLimit);
-				callback.onSuccess(currentLimit);
-			}
-		});
-	}
-
-	/**
 	 * Read the list tracked devices characteristic to get the list of tracked devices
 	 * @param address the address of the device
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void readTrackedDevices(String address, final IByteArrayCallback callback) {
-		BleLog.LOGd(TAG, "read tracked devices at service %s and characteristic %s", BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_LIST_TRACKED_DEVICES_UUID);
-		read(address, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_LIST_TRACKED_DEVICES_UUID, new IDataCallback() {
+		BleLog.LOGd(TAG, "read tracked devices at service %s and characteristic %s", BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_TRACKED_DEVICES_UUID);
+		read(address, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_TRACKED_DEVICES_UUID, new IDataCallback() {
 			@Override
 			public void onError(int error) {
 				BleLog.LOGe(TAG, "Failed to read tracked devices characteristic");
@@ -1138,9 +1128,9 @@ public class BleBase extends BleCore {
 	 * @param device device to be tracked
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void addTrackedDevice(String address, BleTrackedDevice device, final IStatusCallback callback) {
-		BleLog.LOGd(TAG, "add tracked device: write %d at service %s and characteristic %s", device.toString(), BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_ADD_TRACKED_DEVICE_UUID);
-		write(address, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_ADD_TRACKED_DEVICE_UUID, device.toArray(),
+	public void addTrackedDevice(String address, TrackedDeviceMsg device, final IStatusCallback callback) {
+		BleLog.LOGd(TAG, "add tracked device: write %d at service %s and characteristic %s", device.toString(), BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_TRACK_CONTROL_UUID);
+		write(address, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_TRACK_CONTROL_UUID, device.toArray(),
 				new IStatusCallback() {
 
 					@Override
@@ -1164,22 +1154,27 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writeReset(String address, int value, final IStatusCallback callback) {
-		BleLog.LOGd(TAG, "reset: write %d at service %s and characteristic %s", value, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_RESET_UUID);
-		write(address, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_RESET_UUID, new byte[]{(byte) value},
-				new IStatusCallback() {
+//		if (BluenetConfig.USE_COMMAND_CHARACTERISTIC) {
+//			BleLog.LOGd(TAG, "use control characteristic");
+//			sendCommand(address, new CommandMsg(BluenetConfig.CMD_RESET, 1, new byte[]{(byte) value}), callback);
+//		} else {
+			BleLog.LOGd(TAG, "reset: write %d at service %s and characteristic %s", value, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_RESET_UUID);
+			write(address, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_RESET_UUID, new byte[]{(byte) value},
+					new IStatusCallback() {
 
-					@Override
-					public void onSuccess() {
-						BleLog.LOGd(TAG, "Successfully written to reset characteristic");
-						callback.onSuccess();
-					}
+						@Override
+						public void onSuccess() {
+							BleLog.LOGd(TAG, "Successfully written to reset characteristic");
+							callback.onSuccess();
+						}
 
-					@Override
-					public void onError(int error) {
-						BleLog.LOGe(TAG, "Failed to write to reset characteristic");
-						callback.onError(error);
-					}
-				});
+						@Override
+						public void onError(int error) {
+							BleLog.LOGe(TAG, "Failed to write to reset characteristic");
+							callback.onError(error);
+						}
+					});
+//		}
 	}
 
 	public void readAlert(String address, final IAlertCallback callback) {
@@ -1195,10 +1190,10 @@ public class BleBase extends BleCore {
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
 				try {
-					int alertValue = BleUtils.signedToUnsignedByte(bytes[0]);
-					int num = BleUtils.signedToUnsignedByte(bytes[1]);
+					int alertValue = BleUtils.toUint8(bytes[0]);
+					int num = BleUtils.toUint8(bytes[1]);
 					BleLog.LOGd(TAG, "Alert: %d, num: %d", alertValue, num);
-					callback.onSuccess(new BleAlertState(alertValue, num));
+					callback.onSuccess(new AlertState(alertValue, num));
 				} catch (Exception e) {
 					callback.onError(BleErrors.ERROR_RETURN_VALUE_PARSING);
 				}
@@ -1251,11 +1246,23 @@ public class BleBase extends BleCore {
 	boolean _notificationBufferValid = true;
 	// for backwards compatibility
 	boolean _hasStartMessageType = false;
+	int _meshSubscriberId = 0;
 
 	public void subscribeMeshData(final String address, final IMeshDataCallback callback) {
 		BleLog.LOGd(TAG, "subscribing to mesh data...");
 		_hasStartMessageType = false;
 		subscribe(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
+			new IIntegerCallback() {
+				@Override
+				public void onSuccess(int result) {
+					_meshSubscriberId = result;
+				}
+
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			},
 			new IDataCallback() {
 				@Override
 				public void onData(JSONObject json) {
@@ -1355,58 +1362,17 @@ public class BleBase extends BleCore {
 	public void unsubscribeMeshData(final String address, final IMeshDataCallback callback) {
 		BleLog.LOGd(TAG, "subscribing to mesh data...");
 		unsubscribe(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
-				new IDataCallback() {
-					@Override
-					public void onData(JSONObject json) {
-					}
-
-					@Override
-					public void onError(int error) {
-						callback.onError(error);
-					}
-				});
-	}
-
-
-
-/*
-	public void readTemplate(String address, final IIntegerCallback callback) {
-		BleLog.LOGd(TAG, "read xxx at service %s and characteristic %s", BluenetConfig.yyy, BluenetConfig.zzz);
-		read(address, BluenetConfig.yyy, BluenetConfig.zzz, new IDataCallback() {
-			@Override
-			public void onError(int error) {
-				BleLog.LOGe(TAG, "Failed to read xxx characteristic");
-				callback.onError(error);
-			}
-
-			@Override
-			public void onData(JSONObject json) {
-				byte[] bytes = BleCore.getValue(json);
-				BleLog.LOGd(TAG, "xxx: %d", uuu);
-				callback.onSuccess(uuu);
-			}
-		});
-	}
-
-
-	public void writeTemplate(String address, int value, final IStatusCallback callback) {
-		BleLog.LOGd(TAG, "xxx: write %d at service %s and characteristic %s", uuu, BluenetConfig.yyy, BluenetConfig.zzz);
-		write(address, BluenetConfig.yyy, BluenetConfig.zzz, new byte[]{uuu},
+				_meshSubscriberId,
 				new IStatusCallback() {
-
 					@Override
 					public void onSuccess() {
-						BleLog.LOGd(TAG, "Successfully written to xxx characteristic");
-						callback.onSuccess();
 					}
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGe(TAG, "Failed to write to xxx characteristic");
 						callback.onError(error);
 					}
 				});
 	}
-*/
 
 }

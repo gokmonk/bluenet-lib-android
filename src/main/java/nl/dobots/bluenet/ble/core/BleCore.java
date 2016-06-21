@@ -38,7 +38,6 @@ import org.json.JSONObject;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.security.Permission;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -48,6 +47,7 @@ import java.util.UUID;
 import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
+import nl.dobots.bluenet.ble.base.callbacks.ISubscribeCallback;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
@@ -261,13 +261,30 @@ public class BleCore {
 				if (grantResults.length > 0 &&	grantResults[0] == PackageManager.PERMISSION_GRANTED) {
 					callback.onSuccess();
 				} else {
-					callback.onError(BleErrors.ERROR_BLE_PERMISSION_DENIED);
+					callback.onError(BleErrors.ERROR_BLE_PERMISSION_MISSING);
 				}
 				return true;
 			}
 		}
 		return false;
 	}
+
+	public String getLocalAddress() {
+		if (_bluetoothAdapter != null) {
+			return _bluetoothAdapter.getAddress();
+		}
+		BleLog.LOGe(TAG, "Bluetooth not initialized!");
+		return null;
+	}
+
+	public String getLocalName() {
+		if (_bluetoothAdapter != null) {
+			return _bluetoothAdapter.getName();
+		}
+		BleLog.LOGe(TAG, "Bluetooth not initialized!");
+		return null;
+	}
+
 	/**
 	 * Initializes the BLE Modules and tries to enable the Bluetooth adapter. Note, the callback
 	 * provided as parameter will persist. The callback will be triggered whenever the state of
@@ -295,8 +312,8 @@ public class BleCore {
 			int permissionCheck = ContextCompat.checkSelfPermission(context,
 					Manifest.permission.ACCESS_COARSE_LOCATION);
 			if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
-				BleLog.LOGe(TAG, "Can't use library without BLE hardware!! Abort.");
-				callback.onError(BleErrors.ERROR_BLE_PERMISSION_DENIED);
+				BleLog.LOGe(TAG, "BLE permissions not granted!! Abort.");
+				callback.onError(BleErrors.ERROR_BLE_PERMISSION_MISSING);
 				return;
 			}
 		}
@@ -773,7 +790,7 @@ public class BleCore {
 			return false;
 		}
 
-//		if (!isScanning()) {
+//		if (!isRunning()) {
 //			callback.onError(BleCoreTypes.ERROR_NOT_SCANNING);
 //			return false;
 //		}
@@ -830,8 +847,8 @@ public class BleCore {
 
 		try {
 			while (bb.hasRemaining()) {
-				int length = BleUtils.signedToUnsignedByte(bb.get());
-				int type = BleUtils.signedToUnsignedByte(bb.get());
+				int length = BleUtils.toUint8(bb.get());
+				int type = BleUtils.toUint8(bb.get());
 				if (type == search) {
 					byte[] result = new byte[length - 1];
 					bb.get(result, 0, length - 1);
@@ -1148,42 +1165,44 @@ public class BleCore {
 		return true;
 	}
 
-	public boolean subscribe(String address, String serviceUuid, String characteristicUuid, IDataCallback callback) {
+	protected boolean subscribe(String address, String serviceUuid, String characteristicUuid, IStatusCallback statusCallback, ISubscribeCallback callback) {
+
+		UUID uuidService = BleUtils.stringToUuid(serviceUuid);
+		UUID uuidCharacteristic = BleUtils.stringToUuid(characteristicUuid);
 
 		if (!isInitialized()) {
 			BleLog.LOGe(TAG, ".. not initialized");
-			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
+			statusCallback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return false;
 		}
 
 		Connection connection = _connections.get(address);
 		if (connection == null) {
 			BleLog.LOGe(TAG, ".. never connected");
-			callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
+			statusCallback.onError(BleErrors.ERROR_NEVER_CONNECTED);
 			return false;
 		}
 
 		if (connection.getConnectionState() != ConnectionState.CONNECTED) {
 			BleLog.LOGe(TAG, ".. not connected");
-			callback.onError(BleErrors.ERROR_NOT_CONNECTED);
+			statusCallback.onError(BleErrors.ERROR_NOT_CONNECTED);
 			return false;
 		}
 
 		BluetoothGatt gatt = connection.getGatt();
-		BluetoothGattService service = gatt.getService(BleUtils.stringToUuid(serviceUuid));
+		BluetoothGattService service = gatt.getService(uuidService);
 
 		if (service == null) {
 			BleLog.LOGe(TAG, ".. service not found!");
-			callback.onError(BleErrors.ERROR_SERVICE_NOT_FOUND);
+			statusCallback.onError(BleErrors.ERROR_SERVICE_NOT_FOUND);
 			return false;
 		}
 
-		UUID uuid = BleUtils.stringToUuid(characteristicUuid);
-		BluetoothGattCharacteristic characteristic = service.getCharacteristic(uuid);
+		BluetoothGattCharacteristic characteristic = service.getCharacteristic(uuidCharacteristic);
 
 		if (characteristic == null) {
 			BleLog.LOGe(TAG, ".. characteristic not found!");
-			callback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
+			statusCallback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
 			return false;
 		}
 
@@ -1191,7 +1210,7 @@ public class BleCore {
 
 		if (descriptor == null) {
 			BleLog.LOGe(TAG, ".. descriptor not found!");
-			callback.onError(BleErrors.ERROR_NOTIFICATION_DESCRIPTOR_NOT_FOUND);
+			statusCallback.onError(BleErrors.ERROR_NOTIFICATION_DESCRIPTOR_NOT_FOUND);
 			return false;
 		}
 
@@ -1199,58 +1218,61 @@ public class BleCore {
 		boolean result = descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
 		if (!result) {
 			BleLog.LOGe(TAG, ".. failed to set descriptor for notifications!");
-			callback.onError(BleErrors.ERROR_DESCRIPTOR_SET_FAILED);
+			statusCallback.onError(BleErrors.ERROR_DESCRIPTOR_SET_FAILED);
 			return false;
 		}
-
-		_characteristicsNotificationCallback = callback;
 
 		result = gatt.writeDescriptor(descriptor);
 		if (!result) {
 			BleLog.LOGe(TAG, ".. failed to subscribe for notifications!");
-			callback.onError(BleErrors.ERROR_SUBSCRIBE_NOTIFICATION_FAILED);
+			statusCallback.onError(BleErrors.ERROR_SUBSCRIBE_NOTIFICATION_FAILED);
 			return false;
 		}
+
+		_subscribeCallback = statusCallback;
+		_notificationCallbacks.put(characteristic.getUuid(), callback);
 
 		return true;
 	}
 
-	public boolean unsubscribe(String address, String serviceUuid, String characteristicUuid, IDataCallback callback) {
+	protected boolean unsubscribe(String address, String serviceUuid, String characteristicUuid, IStatusCallback statusCallback) {
+
+		UUID uuidService = BleUtils.stringToUuid(serviceUuid);
+		UUID uuidCharacteristic = BleUtils.stringToUuid(characteristicUuid);
 
 		if (!isInitialized()) {
 			BleLog.LOGe(TAG, ".. not initialized");
-			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
+			statusCallback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return false;
 		}
 
 		Connection connection = _connections.get(address);
 		if (connection == null) {
 			BleLog.LOGe(TAG, ".. never connected");
-			callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
+			statusCallback.onError(BleErrors.ERROR_NEVER_CONNECTED);
 			return false;
 		}
 
 		if (connection.getConnectionState() != ConnectionState.CONNECTED) {
 			BleLog.LOGe(TAG, ".. not connected");
-			callback.onError(BleErrors.ERROR_NOT_CONNECTED);
+			statusCallback.onError(BleErrors.ERROR_NOT_CONNECTED);
 			return false;
 		}
 
 		BluetoothGatt gatt = connection.getGatt();
-		BluetoothGattService service = gatt.getService(BleUtils.stringToUuid(serviceUuid));
+		BluetoothGattService service = gatt.getService(uuidService);
 
 		if (service == null) {
 			BleLog.LOGe(TAG, ".. service not found!");
-			callback.onError(BleErrors.ERROR_SERVICE_NOT_FOUND);
+			statusCallback.onError(BleErrors.ERROR_SERVICE_NOT_FOUND);
 			return false;
 		}
 
-		UUID uuid = BleUtils.stringToUuid(characteristicUuid);
-		BluetoothGattCharacteristic characteristic = service.getCharacteristic(uuid);
+		BluetoothGattCharacteristic characteristic = service.getCharacteristic(uuidCharacteristic);
 
 		if (characteristic == null) {
 			BleLog.LOGe(TAG, ".. characteristic not found!");
-			callback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
+			statusCallback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
 			return false;
 		}
 
@@ -1258,25 +1280,25 @@ public class BleCore {
 
 		if (descriptor == null) {
 			BleLog.LOGe(TAG, ".. descriptor not found!");
-			callback.onError(BleErrors.ERROR_NOTIFICATION_DESCRIPTOR_NOT_FOUND);
+			statusCallback.onError(BleErrors.ERROR_NOTIFICATION_DESCRIPTOR_NOT_FOUND);
 			return false;
 		}
 
 		boolean result = descriptor.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
 		if (!result) {
 			BleLog.LOGe(TAG, ".. failed to set descriptor for notifications!");
-			callback.onError(BleErrors.ERROR_DESCRIPTOR_SET_FAILED);
+			statusCallback.onError(BleErrors.ERROR_DESCRIPTOR_SET_FAILED);
 			return false;
 		}
-
-		_characteristicsNotificationCallback = callback;
 
 		result = gatt.writeDescriptor(descriptor);
 		if (!result) {
-			BleLog.LOGe(TAG, ".. failed to subscribe for notifications!");
-			callback.onError(BleErrors.ERROR_UNSUBSCRIBE_NOTIFICATION_FAILED);
+			BleLog.LOGe(TAG, ".. failed to unsubscribe from notifications!");
+			statusCallback.onError(BleErrors.ERROR_UNSUBSCRIBE_NOTIFICATION_FAILED);
 			return false;
 		}
+
+		_unsubscribeCallback = statusCallback;
 
 		return true;
 	}
@@ -1285,10 +1307,12 @@ public class BleCore {
 	IDataCallback _discoveryCallback = null;
 	IDataCallback _characteristicsReadCallback = null;
 	IStatusCallback _characteristicsWriteCallback = null;
-	IDataCallback _characteristicsNotificationCallback = null;
+
+	IStatusCallback _subscribeCallback = null;
+	IStatusCallback _unsubscribeCallback = null;
+	HashMap<UUID, ISubscribeCallback> _notificationCallbacks = new HashMap<>();
 
 	private class BluetoothGattCallbackExt extends BluetoothGattCallback {
-
 
 		@Override
 		public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
@@ -1417,9 +1441,13 @@ public class BleCore {
 			setCharacteristic(json, characteristic);
 			setValue(json, characteristic.getValue());
 
-			if (_characteristicsNotificationCallback != null) {
+			UUID uuidService = characteristic.getService().getUuid();
+			UUID uuidCharacteristic = characteristic.getUuid();
+
+			ISubscribeCallback callback = _notificationCallbacks.get(uuidCharacteristic);
+			if (callback != null) {
 				BleLog.LOGd(TAG, "notification: %s", Arrays.toString(characteristic.getValue()));
-				_characteristicsNotificationCallback.onData(json);
+				callback.onData(uuidService, uuidCharacteristic, json);
 			}
 
 		}
@@ -1469,7 +1497,7 @@ public class BleCore {
 			} else {
 				BleLog.LOGe(TAG, "failed to read descriptor, status: %d", status);
 
-				if (_characteristicsNotificationCallback != null) {
+				if (_characteristicsWriteCallback != null) {
 					_characteristicsWriteCallback.onError(BleErrors.ERROR_DESCRIPTOR_READ_FAILED);
 				}
 
@@ -1481,6 +1509,9 @@ public class BleCore {
 
 			BluetoothGattCharacteristic characteristic = descriptor.getCharacteristic();
 
+			UUID uuidService = characteristic.getService().getUuid();
+			UUID uuidCharacteristic = characteristic.getUuid();
+
 			if (descriptor.getUuid().equals(BleCoreTypes.CLIENT_CONFIGURATION_DESCRIPTOR_UUID)) {
 
 				JSONObject json = new JSONObject();
@@ -1489,30 +1520,28 @@ public class BleCore {
 					// unsubscribe
 					boolean result = gatt.setCharacteristicNotification(characteristic, false);
 
-
-					if (_characteristicsNotificationCallback != null) {
+					if (_unsubscribeCallback != null) {
 						if (status != BluetoothGatt.GATT_SUCCESS || !result) {
 							BleLog.LOGe(TAG, "Failed to unsubscribe");
-							_characteristicsNotificationCallback.onError(BleErrors.ERROR_UNSUBSCRIBE_FAILED);
+							_unsubscribeCallback.onError(BleErrors.ERROR_UNSUBSCRIBE_FAILED);
 							return;
 						}
 
-						setStatus(json, BleCoreTypes.CHARACTERISTIC_UNSUBSCRIBED);
-						_characteristicsNotificationCallback.onData(json);
+						_unsubscribeCallback.onSuccess();
+						_notificationCallbacks.remove(characteristic.getUuid());
 					}
 				} else {
 					// subscribe
 					boolean result = gatt.setCharacteristicNotification(characteristic, true);
 
-					if (_characteristicsNotificationCallback != null) {
+					if (_subscribeCallback != null) {
 						if (status != BluetoothGatt.GATT_SUCCESS || !result) {
 							BleLog.LOGe(TAG, "Failed to subscribe");
-							_characteristicsNotificationCallback.onError(BleErrors.ERROR_SUBSCRIBE_FAILED);
+							_subscribeCallback.onError(BleErrors.ERROR_SUBSCRIBE_FAILED);
 							return;
 						}
 
-						setStatus(json, BleCoreTypes.CHARACTERISTIC_SUBSCRIBED);
-						_characteristicsNotificationCallback.onData(json);
+						_subscribeCallback.onSuccess();
 					}
 				}
 			}

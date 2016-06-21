@@ -50,7 +50,7 @@ import nl.dobots.bluenet.ble.cfg.BluenetConfig;
  *
  * @author Dominik Egger
  */
-public class BleMeshMessage {
+public class MeshMsg {
 
 	// size of message without payload is:
 	// 1B channel + 1B RESERVED + 2B length + 6B target + 2B type
@@ -75,7 +75,7 @@ public class BleMeshMessage {
 	 * @param length length of data, includes target, type and payload
 	 * @param payload payload of the mesh message, i.e. the data to be sent into the mesh
 	 */
-	public BleMeshMessage(int channel, byte[] target, int type, int length, byte[] payload) {
+	public MeshMsg(int channel, byte[] target, int type, int length, byte[] payload) {
 		Assert.assertTrue("target has to have length 6", target.length == 6);
 
 		this.channel = channel;
@@ -89,7 +89,7 @@ public class BleMeshMessage {
 	 * Parses the given byte array into a mesh message
 	 * @param bytes byte array containing the mesh message
 	 */
-	public BleMeshMessage(byte[] bytes) {
+	public MeshMsg(byte[] bytes) {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 

@@ -37,7 +37,7 @@ import nl.dobots.bluenet.utils.BleUtils;
  *
  * @author Dominik Egger
  */
-public class BleTrackedDevice {
+public class TrackedDeviceMsg {
 
 	// the MAC address of the tracked device
 	byte[] address;
@@ -49,7 +49,7 @@ public class BleTrackedDevice {
 	 * @param address MAC address of the tracked device (as a byte array)
 	 * @param rssi rssi value to be used as trigger threshold
 	 */
-	public BleTrackedDevice(byte[] address, int rssi) {
+	public TrackedDeviceMsg(byte[] address, int rssi) {
 		this.address = address;
 		this.rssi = rssi;
 	}
@@ -60,7 +60,7 @@ public class BleTrackedDevice {
 	 *                "00:43:A8:23:10:F0")
 	 * @param rssi rssi value to be used as trigger threshold
 	 */
-	public BleTrackedDevice(String address, int rssi) {
+	public TrackedDeviceMsg(String address, int rssi) {
 		this.rssi = rssi;
 		BleUtils.addressToBytes(address);
 	}
