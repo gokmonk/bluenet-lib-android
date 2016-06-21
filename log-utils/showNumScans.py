@@ -3,38 +3,14 @@
 #from pylab import *
 import matplotlib.pyplot as plt
 import sys
+import parseLog
 
-scans = []
-scanStops = []
-scanStarts = []
-phoneInteractive = []
-appForeGround = []
-
-scanning = False
-logfile = open(sys.argv[1], "r")
-for line in logfile:
-	columns = line.rstrip().split(' ')
-	if (columns[1] == "onScan"):
-		scans.append([int(columns[0]), columns[2], int(columns[3]), int(columns[4])])
-	elif (columns[1] == "startScan"):
-		if (scanning == True):
-			print "Error at " + columns[0] + " ?"
-		scanning = True
-		scanStarts.append(int(columns[0]))
-	elif (columns[1] == "stopScan"):
-		scanning = False
-		scanStops.append(int(columns[0]))
-	elif (columns[1] == "phoneInteractive"):
-		phoneInteractive.append([int(columns[0]), int(columns[2])])
-	elif (columns[1] == "appForeGround"):
-		appForeGround.append([int(columns[0]), 1])
-	elif (columns[1] == "appBackGround"):
-		appForeGround.append([int(columns[0]), 0])
-
-#	print line.rstrip()
-#	for column in line.rstrip().split(' '):
-#		print column
-logfile.close()
+data = parseLog.parse(sys.argv[1])
+scans = data["scans"]
+scanStops = data["scanStops"]
+scanStarts = data["scanStarts"]
+phoneInteractive = data["phoneInteractive"]
+appForeGround = data["appForeGround"]
 
 ############################################
 ## Visualize number of scans per interval ##
