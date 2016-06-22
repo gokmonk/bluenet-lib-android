@@ -31,37 +31,56 @@ public class BleLog {
 		_logLevel = level;
 	}
 
+	private static int getLineNumber() {
+		return Thread.currentThread().getStackTrace()[5].getLineNumber();
+	}
+
+	private static void log(int level, String tag, String message) {
+		if (_logLevel <= level) {
+			Log.println(level, tag, String.format("[%d] %s", getLineNumber(), message));
+		}
+	}
+
+	// Helper functions for logging
+	public static void LOGi(String tag, String message) {
+		log(Log.INFO, tag, message);
+	}
+
+	public static void LOGi(String tag, String fmt, Object ... args) {
+		log(Log.INFO, tag, String.format(fmt, args));
+	}
+
 	// Helper functions for logging
 	public static void LOGd(String tag, String message) {
-		if (_logLevel <= Log.DEBUG) {
-			Log.d(tag, message);
-		}
+		log(Log.DEBUG, tag, message);
 	}
 
 	public static void LOGd(String tag, String fmt, Object ... args) {
-		LOGd(tag, String.format(fmt, args));
+		log(Log.DEBUG, tag, String.format(fmt, args));
 	}
 
 	public static void LOGe(String tag, String message) {
-		if (_logLevel <= Log.ERROR) {
-			Log.e(tag, message);
-		}
+		log(Log.ERROR, tag, message);
 	}
 
 	public static void LOGe(String tag, String message, Throwable tr) {
-		if (_logLevel <= Log.ERROR) {
-			Log.e(tag, message, tr);
-		}
+		log(Log.ERROR, tag, message + '\n' + Log.getStackTraceString(tr));
 	}
 
 	public static void LOGe(String tag, String fmt, Object ... args) {
-		LOGe(tag, String.format(fmt, args));
+		log(Log.ERROR, tag, String.format(fmt, args));
 	}
 
 	public static void LOGv(String tag, String message) {
-		if (_logLevel <= Log.VERBOSE) {
-			Log.v(tag, message);
-		}
+		log(Log.VERBOSE, tag, message);
+	}
+
+	public static void LOGw(String tag, String message) {
+		log(Log.WARN, tag, message);
+	}
+
+	public static void LOGw(String tag, String fmt, Object ... args) {
+		log(Log.WARN, tag, String.format(fmt, args));
 	}
 
 }

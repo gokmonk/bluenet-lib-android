@@ -180,7 +180,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void getCrownstoneId(String address, final IIntegerCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getCrownstoneId(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -236,7 +236,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setCrownstoneId(String address, final int value, final IStatusCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			setCrownstoneId(value, callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -1036,7 +1036,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void getPasskey(String address, final IStringCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getPasskey(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -1092,7 +1092,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setPasskey(String address, final String value, final IStatusCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			setPasskey(value, callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -1149,7 +1149,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void getNearbyTimeout(String address, final IIntegerCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getNearbyTimeout(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -1205,7 +1205,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setNearbyTimeout(String address, final int value, final IStatusCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			setNearbyTimeout(value, callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -1259,7 +1259,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void getScanDuration(String address, final IIntegerCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getScanDuration(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -1315,7 +1315,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setScanDuration(String address, final int value, final IStatusCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			setScanDuration(value, callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -1369,7 +1369,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void getScanSendDelay(String address, final IIntegerCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getScanSendDelay(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -1425,7 +1425,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setScanSendDelay(String address, final int value, final IStatusCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			setScanSendDelay(value, callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -1479,7 +1479,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void getScanBreakDuration(String address, final IIntegerCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getScanBreakDuration(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -1535,7 +1535,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setScanBreakDuration(String address, final int value, final IStatusCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			setScanBreakDuration(value, callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -1589,7 +1589,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void getScanFilter(String address, final IIntegerCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getScanFilter(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -1645,7 +1645,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setScanFilter(String address, final int value, final IStatusCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			setScanFilter(value, callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -1699,7 +1699,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void getScanFilterFraction(String address, final IIntegerCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getScanFilterFraction(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -1755,7 +1755,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setScanFilterFraction(String address, final int value, final IStatusCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			setScanFilterFraction(value, callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -2459,7 +2459,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void getBootDelay(String address, final IIntegerCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.isConnected(null)) {
 			getBootDelay(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -2515,7 +2515,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setBootDelay(String address, final int value, final IStatusCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			setBootDelay(value, callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -2569,7 +2569,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void getMaxChipTemperature(String address, final IIntegerCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getMaxChipTemperature(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -2625,7 +2625,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setMaxChipTemperature(String address, final int value, final IStatusCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			setMaxChipTemperature(value, callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -2679,7 +2679,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void getAdcSampleRate(String address, final IIntegerCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getAdcSampleRate(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -2735,7 +2735,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setAdcSampleRate(String address, final int value, final IStatusCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			setAdcSampleRate(value, callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -2789,7 +2789,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void getPowerSampleBurstInterval(String address, final IIntegerCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getPowerSampleBurstInterval(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -2845,7 +2845,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setPowerSampleBurstInterval(String address, final int value, final IStatusCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			setPowerSampleBurstInterval(value, callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -2899,7 +2899,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void getPowerSampleContInterval(String address, final IIntegerCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getPowerSampleContInterval(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -2955,7 +2955,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setPowerSampleContInterval(String address, final int value, final IStatusCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			setPowerSampleContInterval(value, callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -3009,7 +3009,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void getPowerSampleContNumSamples(String address, final IIntegerCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getPowerSampleContNumSamples(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -3065,7 +3065,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setPowerSampleContNumSamples(String address, final int value, final IStatusCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			setPowerSampleContNumSamples(value, callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -3119,7 +3119,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void getPwmFrequency(String address, final IIntegerCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getPwmFrequency(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -3175,7 +3175,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setPwmFrequency(String address, final int value, final IStatusCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			setPwmFrequency(value, callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -3228,7 +3228,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getMeshEnabled(String address, final IBooleanCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getMeshEnabled(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -3277,7 +3277,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getEncryptionEnabled(String address, final IBooleanCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getEncryptionEnabled(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -3326,7 +3326,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getIBeaconEnabled(String address, final IBooleanCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getIBeaconEnabled(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -3375,7 +3375,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getScannerEnabled(String address, final IBooleanCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getScannerEnabled(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -3424,7 +3424,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getContPowerSamplerEnabled(String address, final IBooleanCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getContPowerSamplerEnabled(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -3473,7 +3473,7 @@ public class BleExtConfiguration {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void getTrackerEnabled(String address, final IBooleanCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getTrackerEnabled(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -3515,7 +3515,7 @@ public class BleExtConfiguration {
 	}
 
 	public void getXXX(String address, final ICallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			getXXX(callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
@@ -3554,7 +3554,7 @@ public class BleExtConfiguration {
 	}
 
 	public void setXXX(String address, final zzz value, final IStatusCallback callback) {
-		if (_bleExt.checkConnection(null)) {
+		if (_bleExt.checkConnection(address)) {
 			setXXX(value, callback);
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {

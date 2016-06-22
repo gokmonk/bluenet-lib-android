@@ -166,42 +166,54 @@ public class BleExtState {
 	}
 
 	public void getTemperature(final IIntegerCallback callback) {
-		if (_bleExt.isConnected(callback) && _bleExt.hasStateCharacteristics(callback)) {
-			BleLog.LOGd(TAG, "Get temperature ...");
-			_bleBaseState.getTemperature(_bleExt.getTargetAddress(), callback);
-		}
+		_bleExt.getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				if (_bleExt.isConnected(callback) && _bleExt.hasStateCharacteristics(callback)) {
+					BleLog.LOGd(TAG, "Get temperature ...");
+					_bleBaseState.getTemperature(_bleExt.getTargetAddress(), callback);
+				}
+			}
+		});
 	}
 
-	public void getTemperature(String address, final IIntegerCallback callback) {
-		if (_bleExt.checkConnection(address)) {
-			getTemperature(callback);
-		} else {
-			_bleExt.connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					getTemperature(new IIntegerCallback() {
+	public void getTemperature(final String address, final IIntegerCallback callback) {
+		_bleExt.getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGv(TAG, "Get temperature");
+//				if (_bleExt.checkConnection(address)) {
+//					getTemperature(callback);
+//				} else {
+					_bleExt.connectAndExecute(address, new IExecuteCallback() {
 						@Override
-						public void onSuccess(int result) {
-							callback.onSuccess(result);
-							execCallback.onSuccess();
+						public void execute(final IStatusCallback execCallback) {
+							getTemperature(new IIntegerCallback() {
+								@Override
+								public void onSuccess(int result) {
+									callback.onSuccess(result);
+									execCallback.onSuccess();
+								}
+
+								@Override
+								public void onError(int error) {
+									execCallback.onError(error);
+								}
+							});
 						}
+					}, new IStatusCallback() {
+						@Override
+						public void onSuccess() { /* don't care */ }
 
 						@Override
 						public void onError(int error) {
-							execCallback.onError(error);
+							callback.onError(error);
 						}
 					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
+//				}
+			}
+		});
 
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////

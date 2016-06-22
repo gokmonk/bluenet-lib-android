@@ -131,7 +131,7 @@ public class BleBase extends BleCore {
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGd(TAG, "json: " + json.toString());
+//						BleLog.LOGd(TAG, "json: " + json.toString());
 					}
 				});
 
@@ -147,7 +147,7 @@ public class BleBase extends BleCore {
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGd(TAG, "json: " + json.toString());
+//						BleLog.LOGd(TAG, "json: " + json.toString());
 					}
 				});
 

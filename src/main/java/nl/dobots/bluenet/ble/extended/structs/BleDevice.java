@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.UUID;
 
+import nl.dobots.bluenet.ble.base.structs.CrownstoneServiceData;
 import nl.dobots.bluenet.ble.cfg.BleTypes;
 
 /**
@@ -64,6 +65,8 @@ public class BleDevice {
 	private UUID _proximityUuid;
 	private int _calibratedRssi;
 
+	private CrownstoneServiceData _serviceData;
+
 	public BleDevice(String address, String name, int rssi) {
 		this._address = address;
 		this._name = name;
@@ -98,6 +101,9 @@ public class BleDevice {
 			this._minor = json.getInt(BleTypes.PROPERTY_MINOR);
 			this._proximityUuid = (UUID) json.get(BleTypes.PROPERTY_PROXIMITY_UUID);
 			this._calibratedRssi = json.getInt(BleTypes.PROPERTY_CALIBRATED_RSSI);
+		}
+		if (isCrownstone()) {
+			this._serviceData = new CrownstoneServiceData(json.getString(BleTypes.PROPERTY_SERVICE_DATA));
 		}
 
 		updateRssiValue((new Date()).getTime(), this._rssi);
@@ -204,6 +210,14 @@ public class BleDevice {
 
 	public void setCalibratedRssi(int calibratedRssi) {
 		_calibratedRssi = calibratedRssi;
+	}
+
+	public CrownstoneServiceData getServiceData() {
+		return _serviceData;
+	}
+
+	public void setServiceData(CrownstoneServiceData serviceData) {
+		_serviceData = serviceData;
 	}
 
 	public synchronized void updateRssiValue(long timestamp, int rssi) {
