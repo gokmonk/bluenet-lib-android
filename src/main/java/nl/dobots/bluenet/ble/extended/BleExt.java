@@ -290,7 +290,7 @@ public class BleExt {
 					device = new BleDevice(json);
 				} catch (JSONException e) {
 //					BleLog.LOGe(TAG, "Failed to parse json into device! Err: " + e.getMessage());
-//					BleLog.LOGi(TAG, "json: " + json.toString());
+//					BleLog.LOGd(TAG, "json: " + json.toString());
 					return;
 				}
 
@@ -656,13 +656,13 @@ public class BleExt {
 				 *   was received in between.
 				 *   If the delay is really necessary, we need to find a better solution
 				 */
-//				_handler.postDelayed(new Runnable() {
-//					@Override
-//					public void run() {
-//						discoverServices(callback);
-//					}
-//				}, 500);
-				discoverServices(callback);
+				_handler.postDelayed(new Runnable() {
+					@Override
+					public void run() {
+						discoverServices(callback);
+					}
+				}, 500);
+//				discoverServices(callback);
 			}
 
 			@Override
@@ -868,11 +868,18 @@ public class BleExt {
 
 				@Override
 				public void onError(final int error) {
-					if (!retry(address, function, callback)) {
+					if (error == BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND) {
 						if (resumeDelayedDisconnect) {
 							delayedDisconnect(null);
 						}
 						callback.onError(error);
+					} else {
+						if (!retry(address, function, callback)) {
+							if (resumeDelayedDisconnect) {
+								delayedDisconnect(null);
+							}
+							callback.onError(error);
+						}
 					}
 //						delayedDisconnect(new IStatusCallback() {
 //							@Override
@@ -1014,7 +1021,7 @@ public class BleExt {
 			@Override
 			public void run() {
 				if (isConnected(callback)) {
-					BleLog.LOGi(TAG, "Reading current PWM value ...");
+					BleLog.LOGd(TAG, "Reading current PWM value ...");
 					if (hasStateCharacteristics(null)) {
 						_bleExtState.getSwitchState(_targetAddress, callback);
 					} else if (hasCharacteristic(BluenetConfig.CHAR_PWM_UUID, callback)) {
@@ -1036,7 +1043,7 @@ public class BleExt {
 		getHandler().post(new Runnable() {
 			@Override
 			public void run() {
-				BleLog.LOGi(TAG, "Reading current PWM value ...");
+				BleLog.LOGd(TAG, "Reading current PWM value ...");
 				if (checkConnection(address)) {
 					readPwm(callback);
 				} else {
@@ -1104,7 +1111,7 @@ public class BleExt {
 		getHandler().post(new Runnable() {
 			@Override
 			public void run() {
-				BleLog.LOGi(TAG, "Set PWM to %d", value);
+				BleLog.LOGd(TAG, "Set PWM to %d", value);
 //				if (checkConnection(address)) {
 //					writePwm(value, callback);
 //				} else {
@@ -1176,6 +1183,7 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void readRelay(String address, final IBooleanCallback callback) {
+		BleLog.LOGd(TAG, "Reading current Relay value ...");
 		if (checkConnection(address)) {
 			readRelay(callback);
 		} else {
@@ -1220,11 +1228,11 @@ public class BleExt {
 			@Override
 			public void run() {
 				if (isConnected(callback)) {
-					BleLog.LOGi(TAG, "Set Relay to %b", relayOn);
+					BleLog.LOGd(TAG, "Set Relay to %b", relayOn);
 					if (hasControlCharacteristic(null)) {
-						BleLog.LOGi(TAG, "use control characteristic");
+						BleLog.LOGd(TAG, "use control characteristic");
 						int value = relayOn ? 100 : 0;
-						_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_SWITCH, 1, new byte[]{(byte) value}), callback);
+						_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_RELAY, 1, new byte[]{(byte) value}), callback);
 					} else if (hasCharacteristic(BluenetConfig.CHAR_RELAY_UUID, callback)) {
 						_bleBase.writeRelay(_targetAddress, relayOn, callback);
 					}
@@ -1247,7 +1255,7 @@ public class BleExt {
 		getHandler().post(new Runnable() {
 			@Override
 			public void run() {
-				BleLog.LOGi(TAG, "Set Relay to %b", relayOn);
+				BleLog.LOGd(TAG, "Set Relay to %b", relayOn);
 				if (checkConnection(address)) {
 					writeRelay(relayOn, callback);
 				} else {
@@ -1316,6 +1324,7 @@ public class BleExt {
 	 * @param callback callback which will be informed about success or failure
 	 */
 	public void togglePower(String address, final IStatusCallback callback) {
+		BleLog.LOGd(TAG, "Toggle power ...");
 		if (checkConnection(address)) {
 			togglePower(callback);
 		} else {
@@ -1566,6 +1575,7 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void readPowerConsumption(String address, final IIntegerCallback callback) {
+		BleLog.LOGd(TAG, "Reading power consumption value ...");
 		if (checkConnection(address)) {
 			readPowerConsumption(callback);
 		} else {
@@ -1688,6 +1698,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	private void writeReset(String address, final int value, final IStatusCallback callback) {
+		BleLog.LOGd(TAG, "Set Reset to %d", value);
 		if (checkConnection(address)) {
 			writeReset(value, callback);
 		} else {
@@ -1791,6 +1802,7 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void readTemperature(String address, final IIntegerCallback callback) {
+		BleLog.LOGd(TAG, "Reading Temperature value ...");
 		if (checkConnection(address)) {
 			readTemperature(callback);
 		} else {
@@ -1848,6 +1860,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writeMeshMessage(String address, final MeshMsg value, final IStatusCallback callback) {
+		BleLog.LOGd(TAG, "Set MeshMessage to %s", value.toString());
 		if (checkConnection(address)) {
 			writeMeshMessage(value, callback);
 		} else {
@@ -1906,6 +1919,7 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void readTrackedDevices(String address, final IByteArrayCallback callback) {
+		BleLog.LOGd(TAG, "Reading TrackedDevices value ...");
 		if (checkConnection(address)) {
 			readTrackedDevices(callback);
 		} else {
@@ -1960,6 +1974,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void addTrackedDevice(String address, final TrackedDeviceMsg value, final IStatusCallback callback) {
+		BleLog.LOGd(TAG, "Set TrackedDevice to %s", value.toString());
 		if (checkConnection(address)) {
 			addTrackedDevice(value, callback);
 		} else {
@@ -2015,6 +2030,7 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void listScannedDevices(String address, final IByteArrayCallback callback) {
+		BleLog.LOGd(TAG, "List scanned devices ...");
 		if (checkConnection(address)) {
 			listScannedDevices(callback);
 		} else {
@@ -2077,6 +2093,7 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writeScanDevices(String address, final boolean value, final IStatusCallback callback) {
+		BleLog.LOGd(TAG, "Scan Devices: %b", value);
 		if (checkConnection(address)) {
 			writeScanDevices(value, callback);
 		} else {
@@ -2160,6 +2177,7 @@ public class BleExt {
 	 * @param callback the callback which will return the list of scanned devices
 	 */
 	public void scanForDevices(final String address, final int scanDuration, final IByteArrayCallback callback) {
+		BleLog.LOGd(TAG, "Scan for devices ...");
 		if (checkConnection(address)) {
 			scanForDevices(scanDuration, callback);
 		} else {
@@ -2263,6 +2281,7 @@ public class BleExt {
 	}
 
 	public void readAlert(String address, final IAlertCallback callback) {
+		BleLog.LOGd(TAG, "Reading Alert value ...");
 		if (checkConnection(address)) {
 			readAlert(callback);
 		} else {
@@ -2302,6 +2321,7 @@ public class BleExt {
 	}
 
 	public void resetAlert(String address, final IStatusCallback callback) {
+		BleLog.LOGd(TAG, "Reset Alert");
 		if (checkConnection(address)) {
 			resetAlert(callback);
 		} else {

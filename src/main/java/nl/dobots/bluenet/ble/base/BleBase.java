@@ -78,6 +78,24 @@ public class BleBase extends BleCore {
 		}
 	};
 
+	@Override
+	public void connectDevice(String address, int timeout, IDataCallback callback) {
+		_subscribers.clear();
+		super.connectDevice(address, timeout, callback);
+	}
+
+	@Override
+	public boolean disconnectDevice(String address, IDataCallback callback) {
+		_subscribers.clear();
+		return super.disconnectDevice(address, callback);
+	}
+
+	@Override
+	public boolean closeDevice(String address, boolean clearCache, IStatusCallback callback) {
+		_subscribers.clear();
+		return super.closeDevice(address, clearCache, callback);
+	}
+
 	/**
 	 * Start an endless scan, without defining any UUIDs to filter for. the scan will continue
 	 * until stopEndlessScan is called. The function will convert a received device from JSON into
@@ -760,7 +778,7 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will be informed about success or failure of the enable call
 	 */
 	public void enableStateNotification(final String address, final int stateType, final IStatusCallback callback) {
-		StateMsg state = new StateMsg(stateType, BluenetConfig.NOTIFY_VALUE, 0, new byte[]{});
+		StateMsg state = new StateMsg(stateType, BluenetConfig.NOTIFY_VALUE, 1, new byte[]{1});
 		byte[] bytes = state.toArray();
 		BleLog.LOGd(TAG, "notify state: write %d at service %s and characteristic %s", stateType, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_CONTROL_UUID);
 		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_CONTROL_UUID, bytes,
@@ -935,8 +953,8 @@ public class BleBase extends BleCore {
 						@Override
 						public void onError(int error) {
 							// select failed, unsubscribe again
-							callback.onError(error);
 							unsubscribeState(address, subscriberId[0]);
+							callback.onError(error);
 						}
 					});
 				}
@@ -950,14 +968,14 @@ public class BleBase extends BleCore {
 			new IStateCallback() {
 				@Override
 				public void onSuccess(StateMsg state) {
-					callback.onSuccess(state);
 					unsubscribeState(address, subscriberId[0]);
+					callback.onSuccess(state);
 				}
 
 				@Override
 				public void onError(int error) {
-					callback.onError(error);
 					unsubscribeState(address, subscriberId[0]);
+					callback.onError(error);
 				}
 			}
 		);

@@ -271,6 +271,7 @@ public class BleExtState {
 			} else {
 				final SubscriberCallback cb = _subscriberList.get(type);
 				statusCallback.onSuccess(cb.addSubscriber(callback));
+				return cb;
 			}
 		}
 		return null;
