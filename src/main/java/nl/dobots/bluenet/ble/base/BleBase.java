@@ -22,6 +22,7 @@ import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDiscoveryCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IPowerSamplesCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.ISubscribeCallback;
@@ -30,6 +31,7 @@ import nl.dobots.bluenet.ble.base.structs.CommandMsg;
 import nl.dobots.bluenet.ble.base.structs.ConfigurationMsg;
 import nl.dobots.bluenet.ble.base.structs.CrownstoneServiceData;
 import nl.dobots.bluenet.ble.base.structs.MeshMsg;
+import nl.dobots.bluenet.ble.base.structs.PowerSamples;
 import nl.dobots.bluenet.ble.base.structs.StateMsg;
 import nl.dobots.bluenet.ble.base.structs.TrackedDeviceMsg;
 import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshData;
@@ -605,7 +607,7 @@ public class BleBase extends BleCore {
 	 * @param address the MAC address of the device
 	 * @param callback the callback which will get the curve on success, or an error otherwise
 	 */
-	public void readPowerSamples(String address, final IByteArrayCallback callback) {
+	public void readPowerSamples(String address, final IPowerSamplesCallback callback) {
 		BleLog.LOGd(TAG, "read current curve at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID);
 		read(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID, new IDataCallback() {
 			@Override
@@ -618,7 +620,9 @@ public class BleBase extends BleCore {
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
 				BleLog.LOGd(TAG, "current curve: %s", Arrays.toString(bytes));
-				callback.onSuccess(bytes);
+
+				PowerSamples powerSamples = new PowerSamples(bytes);
+				callback.onData(powerSamples);
 			}
 		});
 	}

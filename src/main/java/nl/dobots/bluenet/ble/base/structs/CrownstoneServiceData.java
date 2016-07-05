@@ -40,9 +40,11 @@ public class CrownstoneServiceData extends JSONObject {
 		setCrownstoneStateId(bb.getShort());
 		setSwitchState((bb.get() & 0xff));
 		setEventBitmask(bb.get());
-		bb.getShort(); // skip reserved
-//		setPowerUsage(bb.getInt());
-//		setAccumulatedEnergy(bb.getInt());
+		setTemperature(bb.get());
+		bb.get(); // skip reserved
+//		bb.getShort(); // skip reserved
+		setPowerUsage(bb.getInt());
+		setAccumulatedEnergy(bb.getInt());
 	}
 
 	public CrownstoneServiceData(String json) throws JSONException {
@@ -121,6 +123,24 @@ public class CrownstoneServiceData extends JSONObject {
 			put("eventBitmask", eventBitmask);
 		} catch (JSONException e) {
 			BleLog.LOGd(TAG, "failed to add event bitmask");
+			e.printStackTrace();
+		}
+	}
+
+	public byte getTemperature() {
+		try {
+			return (byte)getInt("temperature");
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "no temperature found");
+			return 0;
+		}
+	}
+
+	private void setTemperature(byte temperature) {
+		try {
+			put("temperature", temperature);
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "failed to add temperature");
 			e.printStackTrace();
 		}
 	}

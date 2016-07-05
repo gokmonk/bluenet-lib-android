@@ -16,9 +16,11 @@ import nl.dobots.bluenet.ble.base.BleBase;
 import nl.dobots.bluenet.ble.base.callbacks.IAlertCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IPowerSamplesCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
 import nl.dobots.bluenet.ble.base.structs.AlertState;
 import nl.dobots.bluenet.ble.base.structs.CommandMsg;
+import nl.dobots.bluenet.ble.base.structs.PowerSamples;
 import nl.dobots.bluenet.ble.base.structs.StateMsg;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
@@ -1602,9 +1604,9 @@ public class BleExt {
 	 * with address otherwise
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
-	public void readPowerSamples(final IByteArrayCallback callback) {
+	public void readPowerSamples(final IPowerSamplesCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_POWER_SAMPLES_UUID, callback)) {
-			BleLog.LOGd(TAG, "Reading CurrentCurve value ...");
+			BleLog.LOGd(TAG, "Reading PowerSamples value ...");
 			_bleBase.readPowerSamples(_targetAddress, callback);
 		}
 	}
@@ -1616,17 +1618,18 @@ public class BleExt {
 	 * @param address the MAC address of the device
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
-	public void readPowerSamples(String address, final IByteArrayCallback callback) {
+	public void readPowerSamples(String address, final IPowerSamplesCallback callback) {
+		BleLog.LOGd(TAG, "Reading PowerSamples value ...");
 		if (checkConnection(address)) {
 			readPowerSamples(callback);
 		} else {
 			connectAndExecute(address, new IExecuteCallback() {
 				@Override
 				public void execute(final IStatusCallback execCallback) {
-					readPowerSamples(new IByteArrayCallback() {
+					readPowerSamples(new IPowerSamplesCallback() {
 						@Override
-						public void onSuccess(byte[] result) {
-							callback.onSuccess(result);
+						public void onData(PowerSamples result) {
+							callback.onData(result);
 							execCallback.onSuccess();
 						}
 
