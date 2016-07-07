@@ -282,17 +282,9 @@ public class BleExt {
 
 		_connectionState = BleDeviceConnectionState.scanning;
 
-		return _bleBase.startEndlessScan(new IDataCallback() {
+		return _bleBase.startEndlessScan(new IBleDeviceCallback() {
 			@Override
-			public void onData(JSONObject json) {
-				BleDevice device;
-				try {
-					device = new BleDevice(json);
-				} catch (JSONException e) {
-//					BleLog.LOGe(TAG, "Failed to parse json into device! Err: " + e.getMessage());
-//					BleLog.LOGd(TAG, "json: " + json.toString());
-					return;
-				}
+			public void onDeviceScanned(BleDevice device) {
 
 				if (_blackList != null && _blackList.contains(device.getAddress())) {
 					return;

@@ -42,6 +42,8 @@ import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.core.BleCore;
 import nl.dobots.bluenet.ble.core.BleCoreTypes;
 import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
+import nl.dobots.bluenet.ble.extended.callbacks.IBleDeviceCallback;
+import nl.dobots.bluenet.ble.extended.structs.BleDevice;
 import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
@@ -104,7 +106,7 @@ public class BleBase extends BleCore {
 	 * @param callback the callback to be notified if devices are detected
 	 * @return true if the scan was started, false otherwise
 	 */
-	public boolean startEndlessScan(final IDataCallback callback) {
+	public boolean startEndlessScan(final IBleDeviceCallback callback) {
 		return this.startEndlessScan(new String[]{}, callback);
 	}
 
@@ -120,7 +122,7 @@ public class BleBase extends BleCore {
 	 * @param uuids a list of UUIDs to filter for
 	 * @return true if the scan was started, false otherwise
 	 */
-	public boolean startEndlessScan(String[] uuids,  final IDataCallback callback) {
+	public boolean startEndlessScan(String[] uuids,  final IBleDeviceCallback callback) {
 		// wrap the status callback to do some pre-processing of the scan result data
 		return super.startEndlessScan(uuids, new IDataCallback() {
 
@@ -171,7 +173,15 @@ public class BleBase extends BleCore {
 					}
 				});
 
-				callback.onData(json);
+				BleDevice device;
+				try {
+					device = new BleDevice(json);
+				} catch (JSONException e) {
+//					BleLog.LOGe(TAG, "Failed to parse json into device! Err: " + e.getMessage());
+//					BleLog.LOGd(TAG, "json: " + json.toString());
+					return;
+				}
+				callback.onDeviceScanned(device);
 			}
 		});
 	}

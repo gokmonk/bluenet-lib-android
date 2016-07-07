@@ -93,7 +93,9 @@ public class BleDevice {
 
 	public BleDevice(JSONObject json) throws JSONException {
 		this._address = json.getString(BleTypes.PROPERTY_ADDRESS);
-		this._name = json.getString(BleTypes.PROPERTY_NAME);
+		// name is not a required property of an advertisement, so if no name is present
+		// just use the default name
+		this._name = json.optString(BleTypes.PROPERTY_NAME, "No Name");
 		this._rssi = json.getInt(BleTypes.PROPERTY_RSSI);
 		this._type = determineDeviceType(json);
 		if (isIBeacon()) {
