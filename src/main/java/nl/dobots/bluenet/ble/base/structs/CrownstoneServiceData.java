@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import nl.dobots.bluenet.utils.BleLog;
+import nl.dobots.bluenet.utils.BleUtils;
 
 /**
  * Copyright (c) 2016 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -45,6 +46,9 @@ public class CrownstoneServiceData extends JSONObject {
 //		bb.getShort(); // skip reserved
 		setPowerUsage(bb.getInt());
 		setAccumulatedEnergy(bb.getInt());
+
+		setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
+		setPwm(getSwitchState() & ~(1 << 7));
 	}
 
 	public CrownstoneServiceData(String json) throws JSONException {
@@ -105,6 +109,42 @@ public class CrownstoneServiceData extends JSONObject {
 			put("switchState", switchState);
 		} catch (JSONException e) {
 			BleLog.LOGd(TAG, "failed to add switch state");
+			e.printStackTrace();
+		}
+	}
+
+	public boolean getRelayState() {
+		try {
+			return getBoolean("relayState");
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "no relay state found");
+			return false;
+		}
+	}
+
+	private void setRelayState(boolean relayState) {
+		try {
+			put("relayState", relayState);
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "failed to add relay state");
+			e.printStackTrace();
+		}
+	}
+
+	public int getPwm() {
+		try {
+			return getInt("pwm");
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "no pwm found");
+			return 0;
+		}
+	}
+
+	private void setPwm(int pwm) {
+		try {
+			put("pwm", pwm);
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "failed to add pwm");
 			e.printStackTrace();
 		}
 	}

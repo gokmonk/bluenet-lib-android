@@ -8,6 +8,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.nio.BufferOverflowException;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -504,7 +505,7 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writeRelay(String address, boolean relayOn, final IStatusCallback callback) {
-		int value = relayOn ? 100 : 0;
+		int value = relayOn ? BluenetConfig.RELAY_ON : BluenetConfig.RELAY_OFF;
 		BleLog.LOGd(TAG, "write %d at service %s and characteristic %s", value, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID);
 		write(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID, new byte[]{(byte) value},
 				new IStatusCallback() {
@@ -649,8 +650,12 @@ public class BleBase extends BleCore {
 				byte[] bytes = BleCore.getValue(json);
 				BleLog.LOGd(TAG, "current curve: %s", Arrays.toString(bytes));
 
-				PowerSamples powerSamples = new PowerSamples(bytes);
-				callback.onData(powerSamples);
+				try {
+					PowerSamples powerSamples = new PowerSamples(bytes);
+					callback.onData(powerSamples);
+				} catch (BufferUnderflowException e) {
+					callback.onError(BleErrors.ERROR_CHARACTERISTIC_READ_FAILED);
+				}
 			}
 		});
 	}
@@ -965,6 +970,12 @@ public class BleBase extends BleCore {
 							// select failed, unsubscribe again
 							unsubscribeState(address, subscriberId[0]);
 							callback.onError(error);
+//							_timeoutHandler.postDelayed(new Runnable() {
+//								@Override
+//								public void run() {
+//									unsubscribeState(address, subscriberId[0]);
+//								}
+//							}, 200);
 						}
 					});
 				}
@@ -980,12 +991,24 @@ public class BleBase extends BleCore {
 				public void onSuccess(StateMsg state) {
 					unsubscribeState(address, subscriberId[0]);
 					callback.onSuccess(state);
+//					_timeoutHandler.postDelayed(new Runnable() {
+//						@Override
+//						public void run() {
+//							unsubscribeState(address, subscriberId[0]);
+//						}
+//					}, 200);
 				}
 
 				@Override
 				public void onError(int error) {
 					unsubscribeState(address, subscriberId[0]);
 					callback.onError(error);
+//					_timeoutHandler.postDelayed(new Runnable() {
+//						@Override
+//						public void run() {
+//							unsubscribeState(address, subscriberId[0]);
+//						}
+//					}, 200);
 				}
 			}
 		);

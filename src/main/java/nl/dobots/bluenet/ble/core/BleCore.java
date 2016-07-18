@@ -791,6 +791,8 @@ public class BleCore {
 
 	public synchronized boolean stopEndlessScan(IStatusCallback callback) {
 
+		BleLog.LOGd(TAG, "stopEndlessScan ...");
+
 		if (!isInitialized()) {
 			if (callback != null) callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return false;
@@ -810,6 +812,8 @@ public class BleCore {
 		_scanning = false;
 
 		if (callback != null) callback.onSuccess();
+
+		BleLog.LOGd(TAG, "stopEndlessScan ... done");
 		return true;
 	}
 

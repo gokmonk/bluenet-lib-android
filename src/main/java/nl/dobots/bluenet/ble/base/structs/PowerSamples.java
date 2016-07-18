@@ -1,5 +1,6 @@
 package nl.dobots.bluenet.ble.base.structs;
 
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -33,7 +34,7 @@ public class PowerSamples {
 		private int length;
 		private short[] samples = new short[NUM_SAMPLES];
 
-		public Samples(ByteBuffer buffer) {
+		public Samples(ByteBuffer buffer) throws BufferUnderflowException {
 			length = buffer.getShort();
 			buffer.asShortBuffer().get(samples);
 			buffer.position(buffer.position() + NUM_SAMPLES*2);
@@ -56,7 +57,7 @@ public class PowerSamples {
 		byte[] timestampDiffs = new byte[NUM_SAMPLES-1];
 		int[] timestamps = new int[NUM_SAMPLES];
 
-		public Timestamps(ByteBuffer buffer) {
+		public Timestamps(ByteBuffer buffer) throws BufferUnderflowException {
 			length = buffer.getShort();
 			firstValue = buffer.getInt();
 			lastValue = buffer.getInt();
@@ -95,7 +96,7 @@ public class PowerSamples {
 	 * Parses the given byte array into a mesh message
 	 * @param bytes byte array containing the mesh message
 	 */
-	public PowerSamples(byte[] bytes) {
+	public PowerSamples(byte[] bytes) throws BufferUnderflowException {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
