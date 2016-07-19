@@ -37,18 +37,36 @@ public class CrownstoneServiceData extends JSONObject {
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
 		bb.getShort(); // skip first two bytes (service UUID)
-		setCrownstoneId(bb.getShort());
-		setCrownstoneStateId(bb.getShort());
-		setSwitchState((bb.get() & 0xff));
-		setEventBitmask(bb.get());
-		setTemperature(bb.get());
-		bb.get(); // skip reserved
-//		bb.getShort(); // skip reserved
-		setPowerUsage(bb.getInt());
-		setAccumulatedEnergy(bb.getInt());
 
-		setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
-		setPwm(getSwitchState() & ~(1 << 7));
+		bb.mark();
+		int val = bb.get();
+
+		if (val == 1) {
+			setCrownstoneId(bb.getShort());
+			setCrownstoneStateId(bb.getShort());
+			setSwitchState((bb.get() & 0xff));
+			setEventBitmask(bb.get());
+			setTemperature(bb.get());
+			setPowerUsage(bb.getInt());
+			setAccumulatedEnergy(bb.getInt());
+
+			setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
+			setPwm(getSwitchState() & ~(1 << 7));
+		} else {
+			bb.reset();
+			setCrownstoneId(bb.getShort());
+			setCrownstoneStateId(bb.getShort());
+			setSwitchState((bb.get() & 0xff));
+			setEventBitmask(bb.get());
+			setTemperature(bb.get());
+			bb.get(); // skip reserved
+//			bb.getShort(); // skip reserved
+			setPowerUsage(bb.getInt());
+			setAccumulatedEnergy(bb.getInt());
+
+			setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
+			setPwm(getSwitchState() & ~(1 << 7));
+		}
 	}
 
 	public CrownstoneServiceData(String json) throws JSONException {
