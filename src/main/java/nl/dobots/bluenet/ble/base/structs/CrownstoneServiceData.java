@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import nl.dobots.bluenet.utils.BleLog;
+import nl.dobots.bluenet.utils.BleUtils;
 
 /**
  * Copyright (c) 2016 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -36,13 +37,36 @@ public class CrownstoneServiceData extends JSONObject {
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
 		bb.getShort(); // skip first two bytes (service UUID)
-		setCrownstoneId(bb.getShort());
-		setCrownstoneStateId(bb.getShort());
-		setSwitchState((bb.get() & 0xff));
-		setEventBitmask(bb.get());
-		bb.getShort(); // skip reserved
-//		setPowerUsage(bb.getInt());
-//		setAccumulatedEnergy(bb.getInt());
+
+		bb.mark();
+		int val = bb.get();
+
+		if (val == 1) {
+			setCrownstoneId(bb.getShort());
+			setCrownstoneStateId(bb.getShort());
+			setSwitchState((bb.get() & 0xff));
+			setEventBitmask(bb.get());
+			setTemperature(bb.get());
+			setPowerUsage(bb.getInt());
+			setAccumulatedEnergy(bb.getInt());
+
+			setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
+			setPwm(getSwitchState() & ~(1 << 7));
+		} else {
+			bb.reset();
+			setCrownstoneId(bb.getShort());
+			setCrownstoneStateId(bb.getShort());
+			setSwitchState((bb.get() & 0xff));
+			setEventBitmask(bb.get());
+			setTemperature(bb.get());
+			bb.get(); // skip reserved
+//			bb.getShort(); // skip reserved
+			setPowerUsage(bb.getInt());
+			setAccumulatedEnergy(bb.getInt());
+
+			setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
+			setPwm(getSwitchState() & ~(1 << 7));
+		}
 	}
 
 	public CrownstoneServiceData(String json) throws JSONException {
@@ -107,6 +131,42 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 	}
 
+	public boolean getRelayState() {
+		try {
+			return getBoolean("relayState");
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "no relay state found");
+			return false;
+		}
+	}
+
+	private void setRelayState(boolean relayState) {
+		try {
+			put("relayState", relayState);
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "failed to add relay state");
+			e.printStackTrace();
+		}
+	}
+
+	public int getPwm() {
+		try {
+			return getInt("pwm");
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "no pwm found");
+			return 0;
+		}
+	}
+
+	private void setPwm(int pwm) {
+		try {
+			put("pwm", pwm);
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "failed to add pwm");
+			e.printStackTrace();
+		}
+	}
+
 	public byte getEventBitmask() {
 		try {
 			return (byte)getInt("eventBitmask");
@@ -121,6 +181,24 @@ public class CrownstoneServiceData extends JSONObject {
 			put("eventBitmask", eventBitmask);
 		} catch (JSONException e) {
 			BleLog.LOGd(TAG, "failed to add event bitmask");
+			e.printStackTrace();
+		}
+	}
+
+	public byte getTemperature() {
+		try {
+			return (byte)getInt("temperature");
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "no temperature found");
+			return 0;
+		}
+	}
+
+	private void setTemperature(byte temperature) {
+		try {
+			put("temperature", temperature);
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "failed to add temperature");
 			e.printStackTrace();
 		}
 	}

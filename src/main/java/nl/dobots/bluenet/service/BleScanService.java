@@ -349,7 +349,7 @@ public class BleScanService extends Service {
 			while (_paused) {}
 
 			BleLog.LOGd(TAG, "starting scan interval ...");
-			if (_ble.startIntervalScan(new IBleDeviceCallback() {
+			if (_ble.startScan(false, new IBleDeviceCallback() {
 
 				@Override
 				public void onDeviceScanned(BleDevice device) {

@@ -16,14 +16,17 @@ import nl.dobots.bluenet.ble.base.BleBase;
 import nl.dobots.bluenet.ble.base.callbacks.IAlertCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IPowerSamplesCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
 import nl.dobots.bluenet.ble.base.structs.AlertState;
 import nl.dobots.bluenet.ble.base.structs.CommandMsg;
+import nl.dobots.bluenet.ble.base.structs.PowerSamples;
 import nl.dobots.bluenet.ble.base.structs.StateMsg;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.core.BleCore;
 import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
+import nl.dobots.bluenet.ble.core.BleCoreTypes;
 import nl.dobots.bluenet.ble.extended.callbacks.IBleDeviceCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
@@ -36,6 +39,7 @@ import nl.dobots.bluenet.ble.extended.structs.BleDeviceMap;
 import nl.dobots.bluenet.ble.base.structs.MeshMsg;
 import nl.dobots.bluenet.ble.base.structs.TrackedDeviceMsg;
 import nl.dobots.bluenet.utils.BleLog;
+import nl.dobots.bluenet.utils.BleUtils;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -112,6 +116,8 @@ public class BleExt {
 	public BleBase getBleBase() {
 		return _bleBase;
 	}
+
+	public BleExtState getBleExtState() { return _bleExtState; }
 
 	/**
 	 * Set the scan device filter. by setting a filter, only the devices specified will
@@ -197,6 +203,7 @@ public class BleExt {
 	 * Close the library and release all callbacks
 	 */
 	public void destroy() {
+		_handler.removeCallbacksAndMessages(null);
 		_bleBase.destroy();
 	}
 
@@ -237,22 +244,26 @@ public class BleExt {
 	 * startEndlessScan for details
 	 *
 	 * Note: clears the device list on start
+	 *
 	 * @param callback callback used to report back scanned devices
 	 * @return true if the scan was started, false if an error occurred
 	 */
 	public boolean startScan(final IBleDeviceCallback callback) {
-		clearDeviceMap();
-		return startEndlessScan(callback);
+		return startScan(true, callback);
 	}
 
 	/**
-	 * Starts a scan without clearing the device list. used for interval scanning, i.e.,
-	 * scan for some time, then pause for some time, then scan again. see
+	 * Starts a scan used for interval scanning,  devices will be provided through the callback. see
 	 * startEndlessScan for details
+	 *
+	 * @param clearList if true, clears the list before starting the scan
 	 * @param callback callback used to report back scanned devices
 	 * @return true if the scan was started, false if an error occurred
 	 */
-	public boolean startIntervalScan(final IBleDeviceCallback callback) {
+	public boolean startScan(boolean clearList, final IBleDeviceCallback callback) {
+		if (clearList) {
+			clearDeviceMap();
+		}
 		return startEndlessScan(callback);
 	}
 
@@ -268,26 +279,18 @@ public class BleExt {
 	 * @return true if the scan was started, false if an error occurred
 	 */
 	private boolean startEndlessScan(final IBleDeviceCallback callback) {
-		checkConnectionState(BleDeviceConnectionState.initialized, null);
-//		if (_connectionState != BleDeviceConnectionState.initialized) {
-//			BleCore.LOGe(TAG, "State is not initialized: %s", _connectionState.toString());
-//			callback.onError(BleCoreTypes.ERROR_WRONG_STATE);
-//			return false;
-//		}
+//		checkConnectionState(BleDeviceConnectionState.initialized, null);
+		if (_connectionState != BleDeviceConnectionState.initialized) {
+			BleLog.LOGe(TAG, "State is not initialized: %s", _connectionState.toString());
+			callback.onError(BleErrors.ERROR_WRONG_STATE);
+			return false;
+		}
 
 		_connectionState = BleDeviceConnectionState.scanning;
 
-		return _bleBase.startEndlessScan(new IDataCallback() {
+		return _bleBase.startEndlessScan(new IBleDeviceCallback() {
 			@Override
-			public void onData(JSONObject json) {
-				BleDevice device;
-				try {
-					device = new BleDevice(json);
-				} catch (JSONException e) {
-					BleLog.LOGe(TAG, "Failed to parse json into device! Err: " + e.getMessage());
-					BleLog.LOGd(TAG, "json: " + json.toString());
-					return;
-				}
+			public void onDeviceScanned(BleDevice device) {
 
 				if (_blackList != null && _blackList.contains(device.getAddress())) {
 					return;
@@ -329,6 +332,9 @@ public class BleExt {
 
 			@Override
 			public void onError(int error) {
+				if (error == BleErrors.ERROR_ALREADY_SCANNING) {
+					_bleBase.stopEndlessScan(null);
+				}
 				_connectionState = BleDeviceConnectionState.initialized;
 				callback.onError(error);
 			}
@@ -382,7 +388,7 @@ public class BleExt {
 	 *                 if the device was successfully connected. onError will be called with an
 	 *                 ERROR to report failure.
 	 */
-	private void connect(String address, final IStatusCallback callback) {
+	private void connect(final String address, final IStatusCallback callback) {
 
 		if (checkConnectionState(BleDeviceConnectionState.initialized, null)) {
 
@@ -414,14 +420,21 @@ public class BleExt {
 				@Override
 				public void onError(int error) {
 					_connectionState = BleDeviceConnectionState.initialized;
-					callback.onError(error);
+
+					if (!retry(error)) {
+						callback.onError(error);
+					} else {
+						connect(address, callback);
+					}
 				}
 			};
 
-			if (_bleBase.isClosed(_targetAddress)) {
+//			if (_bleBase.isClosed(_targetAddress)) {
+//				_bleBase.connectDevice(_targetAddress, CONNECT_TIMEOUT, dataCallback);
+//			} else if (_bleBase.isDisconnected(_targetAddress)) {
+//				_bleBase.reconnectDevice(_targetAddress, 30, dataCallback);
+			if (_bleBase.isClosed(_targetAddress) || _bleBase.isDisconnected(_targetAddress)) {
 				_bleBase.connectDevice(_targetAddress, CONNECT_TIMEOUT, dataCallback);
-			} else if (_bleBase.isDisconnected(_targetAddress)) {
-				_bleBase.reconnectDevice(_targetAddress, 30, dataCallback);
 			}
 		} else if (checkConnectionState(BleDeviceConnectionState.connected, null)) {
 			if (_targetAddress.equals(address)) {
@@ -497,7 +510,7 @@ public class BleExt {
 	 */
 	private boolean checkConnectionState(BleDeviceConnectionState state, IBaseCallback callback) {
 		if (_connectionState != state) {
-			BleLog.LOGe(TAG, "wrong connection state: %s instead of %s", _connectionState.toString(), state.toString());
+//			BleLog.LOGe(TAG, "wrong connection state: %s instead of %s", _connectionState.toString(), state.toString());
 			if (callback != null) {
 				callback.onError(BleErrors.ERROR_WRONG_STATE);
 			}
@@ -569,7 +582,7 @@ public class BleExt {
 	 * @param characteristicUuid the UUID of the characteristic
 	 */
 	private void onCharacteristicDiscovered(String serviceUuid, String characteristicUuid) {
-		BleLog.LOGd(TAG, "discovered characteristic: %s", characteristicUuid);
+//		BleLog.LOGd(TAG, "discovered characteristic: %s", characteristicUuid);
 		// todo: might have to store both service and characteristic uuid, because the characteristic
 		//       UUID is not unique!
 		_detectedCharacteristics.add(characteristicUuid);
@@ -632,6 +645,10 @@ public class BleExt {
 		return hasCharacteristic(BluenetConfig.CHAR_CONTROL_UUID, null);
 	}
 
+	private void handleOnSuccess() {
+		_retries = 0;
+	}
+
 	/**
 	 * Connect to the given device, once connection is established, discover the available
 	 * services and characteristics. The connection will be kept open. Need to disconnect and
@@ -640,23 +657,24 @@ public class BleExt {
 	 * @param callback the callback which will be notified about discovered services and
 	 *                 characteristics
 	 */
-	public void connectAndDiscover(String address, final IDiscoveryCallback callback) {
+	public void connectAndDiscover(final String address, final IDiscoveryCallback callback) {
 		connect(address, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
+				handleOnSuccess();
 				/* [05.01.16] I am sometimes getting the behaviour that the connect first succeeds
 				 *   and then a couple ms later I receive a disconnect again. In such a case, delaying
 				 *   the discover leads to the library trying to discover services although a disconnect
 				 *   was received in between.
 				 *   If the delay is really necessary, we need to find a better solution
 				 */
-//				_handler.postDelayed(new Runnable() {
-//					@Override
-//					public void run() {
-//						discoverServices(callback);
-//					}
-//				}, 500);
-				discoverServices(callback);
+				_handler.postDelayed(new Runnable() {
+					@Override
+					public void run() {
+						discoverServices(callback);
+					}
+				}, 500);
+//				discoverServices(callback);
 			}
 
 			@Override
@@ -673,7 +691,7 @@ public class BleExt {
 	 * @param callback the callback which will be notified about success or failure
 	 * @return
 	 */
-	public boolean disconnectAndClose(boolean clearCache, final IStatusCallback callback) {
+	public synchronized boolean disconnectAndClose(boolean clearCache, final IStatusCallback callback) {
 		checkConnectionState(BleDeviceConnectionState.connected, null);
 //		if (!checkConnectionState(BleDeviceConnectionState.connected, callback)) return false;
 
@@ -734,6 +752,10 @@ public class BleExt {
 		return _bleBase.handlePermissionResult(requestCode, permissions, grantResults, callback);
 	}
 
+	public Handler getHandler() {
+		return _handler;
+	}
+
 //	abstract class CallbackRunnable implements Runnable {
 //		IStatusCallback _callback;
 //
@@ -758,7 +780,8 @@ public class BleExt {
 		}
 
 		@Override
-		public void run() {
+		public synchronized void run() {
+			BleLog.LOGd(TAG, "delayed disconnect timeout");
 			disconnectAndClose(false, new IStatusCallback() {
 				@Override
 				public void onSuccess() {
@@ -787,13 +810,14 @@ public class BleExt {
 	 * @param callback the callback which should be notified once the disconnect and close completed
 	 */
 	private void delayedDisconnect(IStatusCallback callback) {
+		BleLog.LOGd(TAG, "delay disconnect");
 		// remove the previous delayed disconnect
 		clearDelayedDisconnect();
 		// if a callback is provided (or no delayedDisconnect runnable available)
 		if (callback != null || _delayedDisconnect == null) {
 			// create and register a new delayed disconnect with the new callback
 			_delayedDisconnect = new DelayedDisconnectRunnable();
-			_delayedDisconnect.setCallback(callback);
+//			_delayedDisconnect.setCallback(callback);
 		} // otherwise post the previous runnable again with the new timeout
 		_handler.postDelayed(_delayedDisconnect, DELAYED_DISCONNECT_TIME);
 	}
@@ -802,11 +826,55 @@ public class BleExt {
 	 * Clear the delayed disconnect, either when the timer expires, or if the device
 	 * disconnects for another reason
 	 */
-	private void clearDelayedDisconnect() {
+	private boolean clearDelayedDisconnect() {
 		if (_delayedDisconnect != null) {
+			BleLog.LOGd(TAG, "delay disconnect remove callbacks");
 			_handler.removeCallbacks(_delayedDisconnect);
+			return true;
+		} else {
+			return false;
 		}
 	}
+
+	private static final int MAX_RETRIES = 3;
+	private int _retries = 0;
+
+	private boolean retry(int error) {
+
+		// check if error is retriable ...
+		switch (error) {
+		case 19:
+		case BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND: {
+			return false;
+		}
+		case 133:
+		default: {
+			if (_retries < MAX_RETRIES) {
+				_retries++;
+				BleLog.LOGw(TAG, "retry: %d", _retries);
+				return true;
+			} else {
+				_retries = 0;
+				return false;
+			}
+		}
+		}
+
+	}
+
+//	private boolean retry(final String address, final IExecuteCallback function, final IStatusCallback callback) {
+//
+//		if (_retries < MAX_RETRIES) {
+//			_retries++;
+//			BleLog.LOGw(TAG, "retry: %d", _retries);
+//			connectAndExecute(address, function, callback);
+//			return true;
+//		} else {
+//			_retries = 0;
+//			return false;
+//		}
+//
+//	}
 
 	/**
 	 * Connects to the given device, discovers the available services, then executes the provided
@@ -820,50 +888,90 @@ public class BleExt {
 	 * @param callback the callback which should be notified once the connectAndExecute function
 	 *                 completed (after closing the device, or if an error occurs)
 	 */
-	public void connectAndExecute(String address, final IExecuteCallback function, final IStatusCallback callback) {
-		connectAndDiscover(address, new IDiscoveryCallback() {
-			@Override
-			public void onDiscovery(String serviceUuid, String characteristicUuid) { /* don't care */ }
-
-			@Override
-			public void onSuccess() {
-
-				// call execute function
-				function.execute(new IStatusCallback() {
-					@Override
-					public void onSuccess() {
-						delayedDisconnect(callback);
+	public void connectAndExecute(final String address, final IExecuteCallback function, final IStatusCallback callback) {
+		final boolean resumeDelayedDisconnect = clearDelayedDisconnect();
+		if (checkConnection(address)) {
+			function.execute(new IStatusCallback() {
+				@Override
+				public void onSuccess() {
+					if (resumeDelayedDisconnect) {
+						delayedDisconnect(null);
 					}
+					callback.onSuccess();
+					handleOnSuccess();
+				}
 
-					@Override
-					public void onError(int error) {
-						delayedDisconnect(new IStatusCallback() {
-							@Override
-							public void onSuccess() { /* don't care */ }
-
-							@Override
-							public void onError(int error) {
-								callback.onError(error);
-							}
-						});
+				@Override
+				public void onError(final int error) {
+					if (resumeDelayedDisconnect) {
+						delayedDisconnect(null);
+					}
+					if (error == BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND) {
 						callback.onError(error);
+					} else {
+						if (!retry(error)) {
+							callback.onError(error);
+						} else {
+							connectAndExecute(address, function, callback);
+						}
 					}
-				});
-			}
+				}
+			});
+		} else {
+			connectAndDiscover(address, new IDiscoveryCallback() {
+				@Override
+				public void onDiscovery(String serviceUuid, String characteristicUuid) { /* don't care */ }
 
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-				// todo: do we need to disconnect and close here?
-//				disconnectAndClose(new IStatusCallback() {
-//					@Override
-//					public void onDeviceScanned() {}
-//
-//					@Override
-//					public void onError(int error) {}
-//				});
-			}
-		});
+				@Override
+				public void onSuccess() {
+
+					// call execute function
+					function.execute(new IStatusCallback() {
+						@Override
+						public void onSuccess() {
+							delayedDisconnect(null);
+							callback.onSuccess();
+							handleOnSuccess();
+						}
+
+						@Override
+						public void onError(final int error) {
+							delayedDisconnect(null);
+							if (!retry(error)) {
+								callback.onError(error);
+							} else {
+								connectAndExecute(address, function, callback);
+							}
+						}
+					});
+				}
+
+				@Override
+				public void onError(final int error) {
+					// todo: do we need to disconnect and close here?
+					disconnectAndClose(true, new IStatusCallback() {
+						@Override
+						public void onSuccess() {
+
+							if (!retry(error)) {
+								callback.onError(error);
+							} else {
+								connectAndExecute(address, function, callback);
+							}
+						}
+
+						@Override
+						public void onError(int e) {
+							if (!retry(error)) {
+								callback.onError(error);
+							} else {
+								connectAndExecute(address, function, callback);
+							}
+						}
+					});
+				}
+			});
+		}
 	}
 
 	/**
@@ -875,7 +983,8 @@ public class BleExt {
 	 */
 	public boolean isConnected(IBaseCallback callback) {
 //		if (checkConnectionState(BleDeviceConnectionState.connected, callback)) {
-			if (_bleBase.isDeviceConnected(_targetAddress)) {
+			if (checkConnectionState(BleDeviceConnectionState.connected, null) &&
+					_bleBase.isDeviceConnected(_targetAddress)) {
 				return true;
 			} else {
 				if (callback != null) {
@@ -893,10 +1002,11 @@ public class BleExt {
 	 * @return true if we are connected, false otherwise
 	 * @param address
 	 */
-	public boolean checkConnection(String address) {
+	public synchronized boolean checkConnection(String address) {
 		if (isConnected(null) && _targetAddress.equals(address)) {
 			if (_delayedDisconnect != null) {
-				delayedDisconnect(null);
+//				delayedDisconnect(null);
+				clearDelayedDisconnect();
 			}
 			return true;
 		}
@@ -915,14 +1025,19 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void readPwm(final IIntegerCallback callback) {
-		if (isConnected(callback)) {
-			BleLog.LOGd(TAG, "Reading current PWM value ...");
-			if (hasStateCharacteristics(null)) {
-				_bleExtState.getSwitchState(_targetAddress, callback);
-			} else if (hasCharacteristic(BluenetConfig.CHAR_PWM_UUID, callback)) {
-				_bleBase.readPWM(_targetAddress, callback);
-			}
-		}
+//		getHandler().post(new Runnable() {
+//			@Override
+//			public void run() {
+				if (isConnected(callback)) {
+					BleLog.LOGd(TAG, "Reading current PWM value ...");
+					if (hasStateCharacteristics(null)) {
+						_bleExtState.getSwitchState(_targetAddress, callback);
+					} else if (hasCharacteristic(BluenetConfig.CHAR_PWM_UUID, callback)) {
+						_bleBase.readPWM(_targetAddress, callback);
+					}
+				}
+//			}
+//		});
 	}
 
 	/**
@@ -932,36 +1047,42 @@ public class BleExt {
 	 * @param address the MAC address of the device from which the PWM value should be read
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
-	public void readPwm(String address, final IIntegerCallback callback) {
-		if (checkConnection(address)) {
-			readPwm(callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					readPwm(new IIntegerCallback() {
+	public void readPwm(final String address, final IIntegerCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "Reading current PWM value ...");
+//				if (checkConnection(address)) {
+//					readPwm(callback);
+//				} else {
+					connectAndExecute(address, new IExecuteCallback() {
 						@Override
-						public void onSuccess(int result) {
-							callback.onSuccess(result);
-							execCallback.onSuccess();
+						public void execute(final IStatusCallback execCallback) {
+							readPwm(new IIntegerCallback() {
+								@Override
+								public void onSuccess(int result) {
+									callback.onSuccess(result);
+									execCallback.onSuccess();
+								}
+
+								@Override
+								public void onError(int error) {
+									execCallback.onError(error);
+								}
+							});
 						}
+					}, new IStatusCallback() {
+						@Override
+						public void onSuccess() { /* don't care */ }
 
 						@Override
 						public void onError(int error) {
-							execCallback.onError(error);
+							callback.onError(error);
 						}
 					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
+//				}
+			}
+		});
 	}
 
 	/**
@@ -972,16 +1093,21 @@ public class BleExt {
 	 * @param value the PWM value to be written to the device
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void writePwm(int value, IStatusCallback callback) {
-		if (isConnected(callback)) {
-			BleLog.LOGd(TAG, "Set PWM to %d", value);
-			if (hasControlCharacteristic(null)) {
-				BleLog.LOGd(TAG, "use control characteristic");
-				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_PWM, 1, new byte[]{(byte) value}), callback);
-			} else if (hasCharacteristic(BluenetConfig.CHAR_PWM_UUID, callback)) {
-				_bleBase.writePWM(_targetAddress, value, callback);
-			}
-		}
+	public void writePwm(final int value, final IStatusCallback callback) {
+//		getHandler().post(new Runnable() {
+//			@Override
+//			public void run() {
+				if (isConnected(callback)) {
+					BleLog.LOGd(TAG, "Set PWM to %d", value);
+					if (hasControlCharacteristic(null)) {
+						BleLog.LOGd(TAG, "use control characteristic");
+						_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_PWM, 1, new byte[]{(byte) value}), callback);
+					} else if (hasCharacteristic(BluenetConfig.CHAR_PWM_UUID, callback)) {
+						_bleBase.writePWM(_targetAddress, value, callback);
+					}
+				}
+//			}
+//		});
 	}
 
 	/**
@@ -994,36 +1120,42 @@ public class BleExt {
 	 * @param value the PWM value to be written
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void writePwm(String address, final int value, final IStatusCallback callback) {
-		if (checkConnection(address)) {
-			writePwm(value, callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					writePwm(value, new IStatusCallback() {
+	public void writePwm(final String address, final int value, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "Set PWM to %d", value);
+//				if (checkConnection(address)) {
+//					writePwm(value, callback);
+//				} else {
+					connectAndExecute(address, new IExecuteCallback() {
 						@Override
-						public void onSuccess() {
-							callback.onSuccess();
-							execCallback.onSuccess();
+						public void execute(final IStatusCallback execCallback) {
+							writePwm(value, new IStatusCallback() {
+								@Override
+								public void onSuccess() {
+									callback.onSuccess();
+									execCallback.onSuccess();
+								}
+
+								@Override
+								public void onError(int error) {
+									execCallback.onError(error);
+								}
+							});
 						}
+					}, new IStatusCallback() {
+						@Override
+						public void onSuccess() { /* don't care */ }
 
 						@Override
 						public void onError(int error) {
-							execCallback.onError(error);
+							callback.onError(error);
 						}
 					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
+//				}
+			}
+		});
 	}
 
 	/**
@@ -1035,24 +1167,29 @@ public class BleExt {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void readRelay(final IBooleanCallback callback) {
-		if (isConnected(callback)) {
-			BleLog.LOGd(TAG, "Reading current Relay value ...");
-			if (hasStateCharacteristics(null)) {
-				_bleExtState.getSwitchState(_targetAddress, new IIntegerCallback() {
-					@Override
-					public void onSuccess(int result) {
-						callback.onSuccess(result > 0);
-					}
+//		getHandler().post(new Runnable() {
+//			@Override
+//			public void run() {
+				if (isConnected(callback)) {
+					BleLog.LOGd(TAG, "Reading current Relay value ...");
+					if (hasStateCharacteristics(null)) {
+						_bleExtState.getSwitchState(_targetAddress, new IIntegerCallback() {
+							@Override
+							public void onSuccess(int result) {
+								callback.onSuccess(result > 0);
+							}
 
-					@Override
-					public void onError(int error) {
-						callback.onError(error);
+							@Override
+							public void onError(int error) {
+								callback.onError(error);
+							}
+						});
+					} else if (hasCharacteristic(BluenetConfig.CHAR_RELAY_UUID, callback)) {
+						_bleBase.readRelay(_targetAddress, callback);
 					}
-				});
-			} else if (hasCharacteristic(BluenetConfig.CHAR_RELAY_UUID, callback)) {
-				_bleBase.readRelay(_targetAddress, callback);
-			}
-		}
+				}
+//			}
+//		});
 	}
 
 	/**
@@ -1063,36 +1200,42 @@ public class BleExt {
 	 * @param address the MAC address of the device from which the Relay value should be read
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
-	public void readRelay(String address, final IBooleanCallback callback) {
-		if (checkConnection(address)) {
-			readRelay(callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					readRelay(new IBooleanCallback() {
-						@Override
-						public void onSuccess(boolean result) {
-							callback.onSuccess(result);
-							execCallback.onSuccess();
-						}
+	public void readRelay(final String address, final IBooleanCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "Reading current Relay value ...");
+//		if (checkConnection(address)) {
+//			readRelay(callback);
+//		} else {
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IStatusCallback execCallback) {
+						readRelay(new IBooleanCallback() {
+							@Override
+							public void onSuccess(boolean result) {
+								callback.onSuccess(result);
+								execCallback.onSuccess();
+							}
 
-						@Override
-						public void onError(int error) {
-							execCallback.onError(error);
-						}
-					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
+							@Override
+							public void onError(int error) {
+								execCallback.onError(error);
+							}
+						});
+					}
+				}, new IStatusCallback() {
+					@Override
+					public void onSuccess() { /* don't care */ }
 
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				});
+//		}
+			}
+		});
 	}
 
 	/**
@@ -1103,17 +1246,22 @@ public class BleExt {
 	 * @param relayOn true if the relay should be switched on, false otherwise
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void writeRelay(boolean relayOn, IStatusCallback callback) {
-		if (isConnected(callback)) {
-			BleLog.LOGd(TAG, "Set Relay to %b", relayOn);
-			if (hasControlCharacteristic(null)) {
-				BleLog.LOGd(TAG, "use control characteristic");
-				int value = relayOn ? 100 : 0;
-				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_SWITCH, 1, new byte[]{(byte) value}), callback);
-			} else if (hasCharacteristic(BluenetConfig.CHAR_RELAY_UUID, callback)) {
-				_bleBase.writeRelay(_targetAddress, relayOn, callback);
-			}
-		}
+	public void writeRelay(final boolean relayOn, final IStatusCallback callback) {
+//		getHandler().post(new Runnable() {
+//			@Override
+//			public void run() {
+				if (isConnected(callback)) {
+					BleLog.LOGd(TAG, "Set Relay to %b", relayOn);
+					if (hasControlCharacteristic(null)) {
+						BleLog.LOGd(TAG, "use control characteristic");
+						int value = relayOn ? BluenetConfig.RELAY_ON : BluenetConfig.RELAY_OFF;
+						_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_RELAY, 1, new byte[]{(byte) value}), callback);
+					} else if (hasCharacteristic(BluenetConfig.CHAR_RELAY_UUID, callback)) {
+						_bleBase.writeRelay(_targetAddress, relayOn, callback);
+					}
+				}
+//			}
+//		});
 	}
 
 	/**
@@ -1126,41 +1274,47 @@ public class BleExt {
 	 * @param relayOn true if the relay should be switched on, false otherwise
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void writeRelay(String address, final boolean relayOn, final IStatusCallback callback) {
-		if (checkConnection(address)) {
-			writeRelay(relayOn, callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					writeRelay(relayOn, new IStatusCallback() {
+	public void writeRelay(final String address, final boolean relayOn, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "Set Relay to %b", relayOn);
+//				if (checkConnection(address)) {
+//					writeRelay(relayOn, callback);
+//				} else {
+					connectAndExecute(address, new IExecuteCallback() {
 						@Override
-						public void onSuccess() {
-							callback.onSuccess();
-							execCallback.onSuccess();
+						public void execute(final IStatusCallback execCallback) {
+							writeRelay(relayOn, new IStatusCallback() {
+								@Override
+								public void onSuccess() {
+									callback.onSuccess();
+									execCallback.onSuccess();
+								}
+
+								@Override
+								public void onError(int error) {
+									execCallback.onError(error);
+								}
+							});
 						}
+					}, new IStatusCallback() {
+						@Override
+						public void onSuccess() { /* don't care */ }
 
 						@Override
 						public void onError(int error) {
-							execCallback.onError(error);
+							callback.onError(error);
 						}
 					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
+//				}
+			}
+		});
 	}
 
 	/**
-	 * Toggle power between ON (pwm = 255) and OFF (pwm = 0). Reads first the current PW<
-	 * value from the device, then switches the PWM value accordingly.
+	 * Toggle power between ON (pwm = BluenetConfig.PWM_ON) and OFF (pwm = BluenetConfig.PWM_OFF).
+	 * Reads first the current PWM value from the device, then switches the PWM value accordingly.
 	 *
 	 * Note: needs to be already connected or an error is created! Use overloaded function
 	 * with address otherwise
@@ -1171,9 +1325,9 @@ public class BleExt {
 			@Override
 			public void onSuccess(int result) {
 				if (result > 0) {
-					writePwm(0, callback);
+					powerOff(callback);
 				} else {
-					writePwm(255, callback);
+					powerOn(callback);
 				}
 			}
 
@@ -1185,87 +1339,207 @@ public class BleExt {
 	}
 
 	/**
-	 * Toggle power between ON (pwm = 255) and OFF (pwm = 0). Reads first the current PW<
-	 * value from the device, then switches the PWM value accordingly.
+	 * Toggle power between ON (pwm = BluenetConfig.PWM_ON) and OFF (pwm = BluenetConfig.PWM_OFF).
+	 * Reads first the current PWM value from the device, then switches the PWM value accordingly.
 	 *
 	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
 	 * @param address the MAC address of the device
 	 * @param callback callback which will be informed about success or failure
 	 */
-	public void togglePower(String address, final IStatusCallback callback) {
-		if (checkConnection(address)) {
-			togglePower(callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					togglePower(new IStatusCallback() {
-						@Override
-						public void onSuccess() {
-							callback.onSuccess();
-							execCallback.onSuccess();
-						}
+	public void togglePower(final String address, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "Toggle power ...");
+//		if (checkConnection(address)) {
+//			togglePower(callback);
+//		} else {
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IStatusCallback execCallback) {
+						togglePower(new IStatusCallback() {
+							@Override
+							public void onSuccess() {
+								callback.onSuccess();
+								execCallback.onSuccess();
+							}
 
-						@Override
-						public void onError(int error) {
-							execCallback.onError(error);
-						}
-					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
+							@Override
+							public void onError(int error) {
+								execCallback.onError(error);
+							}
+						});
+					}
+				}, new IStatusCallback() {
+					@Override
+					public void onSuccess() { /* don't care */ }
 
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				});
+//		}
+			}
+		});
 	}
 
 	/**
-	 * Helper function to set power ON (sets pwm value to 255)
+	 * Helper function to set power ON (sets pwm value to BluenetConfig.PWM_ON)
 	 *
 	 * Note: needs to be already connected or an error is created! Use overloaded function
 	 * with address otherwise
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void powerOn(IStatusCallback callback) {
-		writePwm(255, callback);
+		writePwm(BluenetConfig.PWM_ON, callback);
 	}
 
 	/**
-	 * Helper function to set power ON (sets pwm value to 255)
+	 * Helper function to set power ON (sets pwm value to BluenetConfig.PWM_ON)
 	 *
 	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void powerOn(String address, final IStatusCallback callback) {
-		writePwm(address, 255, callback);
+		writePwm(address, BluenetConfig.PWM_ON, callback);
 	}
 
 	/**
-	 * Helper function to set power OFF (sets pwm value to 0)
+	 * Helper function to set power OFF (sets pwm value to BluenetConfig.PWM_OFF)
 	 *
 	 * Note: needs to be already connected or an error is created! Use overloaded function
 	 * with address otherwise
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void powerOff(IStatusCallback callback) {
-		writePwm(0, callback);
+		writePwm(BluenetConfig.PWM_OFF, callback);
 	}
 
 	/**
-	 * Helper function to set power OFF (sets pwm value to 0)
+	 * Helper function to set power OFF (sets pwm value to BluenetConfig.PWM_OFF)
 	 *
 	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void powerOff(String address, final IStatusCallback callback) {
-		writePwm(address, 0, callback);
+		writePwm(address, BluenetConfig.PWM_OFF, callback);
 	}
-//
+
+	/**
+	 * Toggle relay between ON (BluenetConfig.RELAY_ON) and OFF (BluenetConfig.RELAY_OFF).
+	 * Reads first the current relay value from the device, then switches the relay value accordingly.
+	 *
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 * @param callback callback which will be informed about success or failure
+	 */
+	public void toggleRelay(final IStatusCallback callback) {
+		readRelay(new IBooleanCallback() {
+			@Override
+			public void onSuccess(boolean result) {
+				if (result) {
+					relayOff(callback);
+				} else {
+					relayOn(callback);
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
+
+	/**
+	 * Toggle relay between ON (BluenetConfig.RELAY_ON) and OFF (BluenetConfig.RELAY_OFF).
+	 * Reads first the current relay value from the device, then switches the relay value accordingly.
+	 *
+	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
+	 * @param address the MAC address of the device
+	 * @param callback callback which will be informed about success or failure
+	 */
+	public void toggleRelay(final String address, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "Toggle relay ...");
+//		if (checkConnection(address)) {
+//			togglePower(callback);
+//		} else {
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IStatusCallback execCallback) {
+						toggleRelay(new IStatusCallback() {
+							@Override
+							public void onSuccess() {
+								callback.onSuccess();
+								execCallback.onSuccess();
+							}
+
+							@Override
+							public void onError(int error) {
+								execCallback.onError(error);
+							}
+						});
+					}
+				}, new IStatusCallback() {
+					@Override
+					public void onSuccess() { /* don't care */ }
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				});
+//		}
+			}
+		});
+	}
+
+	/**
+	 * Helper function to set relay ON (sets relay value to BluenetConfig.RELAY_ON)
+	 *
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void relayOn(IStatusCallback callback) {
+		writeRelay(true, callback);
+	}
+
+	/**
+	 * Helper function to set relay ON (sets pwm value to BluenetConfig.RELAY_ON)
+	 *
+	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void relayOn(String address, final IStatusCallback callback) {
+		writeRelay(address, true, callback);
+	}
+
+	/**
+	 * Helper function to set relay OFF (sets pwm value to BluenetConfig.RELAY_OFF)
+	 *
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void relayOff(IStatusCallback callback) {
+		writeRelay(false, callback);
+	}
+
+	/**
+	 * Helper function to set relay OFF (sets pwm value to BluenetConfig.RELAY_OFF)
+	 *
+	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void relayOff(String address, final IStatusCallback callback) {
+		writeRelay(address, false, callback);
+	}
+
 //	/**
 //	 * If permanently connected to a device, state notifications can be requested. this means that
 //	 * as soon as a state variable changes on the device, a notification will be sent and the
@@ -1400,36 +1674,42 @@ public class BleExt {
 	 * @param address the MAC address of the device
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
-	public void readPowerConsumption(String address, final IIntegerCallback callback) {
-		if (checkConnection(address)) {
-			readPowerConsumption(callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					readPowerConsumption(new IIntegerCallback() {
+	public void readPowerConsumption(final String address, final IIntegerCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "Reading power consumption value ...");
+//				if (checkConnection(address)) {
+//					readPowerConsumption(callback);
+//				} else {
+					connectAndExecute(address, new IExecuteCallback() {
 						@Override
-						public void onSuccess(int result) {
-							callback.onSuccess(result);
-							execCallback.onSuccess();
+						public void execute(final IStatusCallback execCallback) {
+							readPowerConsumption(new IIntegerCallback() {
+								@Override
+								public void onSuccess(int result) {
+									callback.onSuccess(result);
+									execCallback.onSuccess();
+								}
+
+								@Override
+								public void onError(int error) {
+									execCallback.onError(error);
+								}
+							});
 						}
+					}, new IStatusCallback() {
+						@Override
+						public void onSuccess() { /* don't care */ }
 
 						@Override
 						public void onError(int error) {
-							execCallback.onError(error);
+							callback.onError(error);
 						}
 					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
+//				}
+			}
+		});
 	}
 
 	/**
@@ -1439,9 +1719,9 @@ public class BleExt {
 	 * with address otherwise
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
-	public void readPowerSamples(final IByteArrayCallback callback) {
+	public void readPowerSamples(final IPowerSamplesCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_POWER_SAMPLES_UUID, callback)) {
-			BleLog.LOGd(TAG, "Reading CurrentCurve value ...");
+			BleLog.LOGd(TAG, "Reading PowerSamples value ...");
 			_bleBase.readPowerSamples(_targetAddress, callback);
 		}
 	}
@@ -1453,36 +1733,42 @@ public class BleExt {
 	 * @param address the MAC address of the device
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
-	public void readPowerSamples(String address, final IByteArrayCallback callback) {
-		if (checkConnection(address)) {
-			readPowerSamples(callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					readPowerSamples(new IByteArrayCallback() {
+	public void readPowerSamples(final String address, final IPowerSamplesCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "Reading PowerSamples value ...");
+//				if (checkConnection(address)) {
+//					readPowerSamples(callback);
+//				} else {
+					connectAndExecute(address, new IExecuteCallback() {
 						@Override
-						public void onSuccess(byte[] result) {
-							callback.onSuccess(result);
-							execCallback.onSuccess();
+						public void execute(final IStatusCallback execCallback) {
+							readPowerSamples(new IPowerSamplesCallback() {
+								@Override
+								public void onData(PowerSamples result) {
+									callback.onData(result);
+									execCallback.onSuccess();
+								}
+
+								@Override
+								public void onError(int error) {
+									execCallback.onError(error);
+								}
+							});
 						}
+					}, new IStatusCallback() {
+						@Override
+						public void onSuccess() { /* don't care */ }
 
 						@Override
 						public void onError(int error) {
-							execCallback.onError(error);
+							callback.onError(error);
 						}
 					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
+//				}
+			}
+		});
 	}
 
 	/////////////////////
@@ -1521,36 +1807,42 @@ public class BleExt {
 	 * @param value the value to be written
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	private void writeReset(String address, final int value, final IStatusCallback callback) {
-		if (checkConnection(address)) {
-			writeReset(value, callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					writeReset(value, new IStatusCallback() {
+	private void writeReset(final String address, final int value, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "Set Reset to %d", value);
+//				if (checkConnection(address)) {
+//					writeReset(value, callback);
+//				} else {
+					connectAndExecute(address, new IExecuteCallback() {
 						@Override
-						public void onSuccess() {
-							callback.onSuccess();
-							execCallback.onSuccess();
+						public void execute(final IStatusCallback execCallback) {
+							writeReset(value, new IStatusCallback() {
+								@Override
+								public void onSuccess() {
+									callback.onSuccess();
+									execCallback.onSuccess();
+								}
+
+								@Override
+								public void onError(int error) {
+									execCallback.onError(error);
+								}
+							});
 						}
+					}, new IStatusCallback() {
+						@Override
+						public void onSuccess() { /* don't care */ }
 
 						@Override
 						public void onError(int error) {
-							execCallback.onError(error);
+							callback.onError(error);
 						}
 					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
+//				}
+			}
+		});
 	}
 
 	/**
@@ -1624,36 +1916,42 @@ public class BleExt {
 	 * @param address the MAC address of the device
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
-	public void readTemperature(String address, final IIntegerCallback callback) {
-		if (checkConnection(address)) {
-			readTemperature(callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					readTemperature(new IIntegerCallback() {
+	public void readTemperature(final String address, final IIntegerCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "Reading Temperature value ...");
+//				if (checkConnection(address)) {
+//					readTemperature(callback);
+//				} else {
+					connectAndExecute(address, new IExecuteCallback() {
 						@Override
-						public void onSuccess(int result) {
-							callback.onSuccess(result);
-							execCallback.onSuccess();
+						public void execute(final IStatusCallback execCallback) {
+							readTemperature(new IIntegerCallback() {
+								@Override
+								public void onSuccess(int result) {
+									callback.onSuccess(result);
+									execCallback.onSuccess();
+								}
+
+								@Override
+								public void onError(int error) {
+									execCallback.onError(error);
+								}
+							});
 						}
+					}, new IStatusCallback() {
+						@Override
+						public void onSuccess() { /* don't care */ }
 
 						@Override
 						public void onError(int error) {
-							execCallback.onError(error);
+							callback.onError(error);
 						}
 					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
+//				}
+			}
+		});
 	}
 
 	/**
@@ -1681,36 +1979,42 @@ public class BleExt {
 	 * @param value the message to be sent to the mesh (through the device)
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void writeMeshMessage(String address, final MeshMsg value, final IStatusCallback callback) {
-		if (checkConnection(address)) {
-			writeMeshMessage(value, callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					writeMeshMessage(value, new IStatusCallback() {
+	public void writeMeshMessage(final String address, final MeshMsg value, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "Set MeshMessage to %s", value.toString());
+//				if (checkConnection(address)) {
+//					writeMeshMessage(value, callback);
+//				} else {
+					connectAndExecute(address, new IExecuteCallback() {
 						@Override
-						public void onSuccess() {
-							callback.onSuccess();
-							execCallback.onSuccess();
+						public void execute(final IStatusCallback execCallback) {
+							writeMeshMessage(value, new IStatusCallback() {
+								@Override
+								public void onSuccess() {
+									callback.onSuccess();
+									execCallback.onSuccess();
+								}
+
+								@Override
+								public void onError(int error) {
+									execCallback.onError(error);
+								}
+							});
 						}
+					}, new IStatusCallback() {
+						@Override
+						public void onSuccess() { /* don't care */ }
 
 						@Override
 						public void onError(int error) {
-							execCallback.onError(error);
+							callback.onError(error);
 						}
 					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
+//				}
+			}
+		});
 	}
 
 
@@ -1739,36 +2043,42 @@ public class BleExt {
 	 * @param address the MAC address of the device
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
-	public void readTrackedDevices(String address, final IByteArrayCallback callback) {
-		if (checkConnection(address)) {
-			readTrackedDevices(callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					readTrackedDevices(new IByteArrayCallback() {
+	public void readTrackedDevices(final String address, final IByteArrayCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "Reading TrackedDevices value ...");
+//				if (checkConnection(address)) {
+//					readTrackedDevices(callback);
+//				} else {
+					connectAndExecute(address, new IExecuteCallback() {
 						@Override
-						public void onSuccess(byte[] result) {
-							callback.onSuccess(result);
-							execCallback.onSuccess();
+						public void execute(final IStatusCallback execCallback) {
+							readTrackedDevices(new IByteArrayCallback() {
+								@Override
+								public void onSuccess(byte[] result) {
+									callback.onSuccess(result);
+									execCallback.onSuccess();
+								}
+
+								@Override
+								public void onError(int error) {
+									execCallback.onError(error);
+								}
+							});
 						}
+					}, new IStatusCallback() {
+						@Override
+						public void onSuccess() { /* don't care */ }
 
 						@Override
 						public void onError(int error) {
-							execCallback.onError(error);
+							callback.onError(error);
 						}
 					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
+//				}
+			}
+		});
 	}
 
 	/**
@@ -1793,36 +2103,42 @@ public class BleExt {
 	 * @param value the new device to be tracked
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void addTrackedDevice(String address, final TrackedDeviceMsg value, final IStatusCallback callback) {
-		if (checkConnection(address)) {
-			addTrackedDevice(value, callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					addTrackedDevice(value, new IStatusCallback() {
+	public void addTrackedDevice(final String address, final TrackedDeviceMsg value, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "Set TrackedDevice to %s", value.toString());
+//				if (checkConnection(address)) {
+//					addTrackedDevice(value, callback);
+//				} else {
+					connectAndExecute(address, new IExecuteCallback() {
 						@Override
-						public void onSuccess() {
-							callback.onSuccess();
-							execCallback.onSuccess();
+						public void execute(final IStatusCallback execCallback) {
+							addTrackedDevice(value, new IStatusCallback() {
+								@Override
+								public void onSuccess() {
+									callback.onSuccess();
+									execCallback.onSuccess();
+								}
+
+								@Override
+								public void onError(int error) {
+									execCallback.onError(error);
+								}
+							});
 						}
+					}, new IStatusCallback() {
+						@Override
+						public void onSuccess() { /* don't care */ }
 
 						@Override
 						public void onError(int error) {
-							execCallback.onError(error);
+							callback.onError(error);
 						}
 					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
+//				}
+			}
+		});
 	}
 
 	/**
@@ -1848,36 +2164,42 @@ public class BleExt {
 	 * @param address the MAC address of the device
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
-	public void listScannedDevices(String address, final IByteArrayCallback callback) {
-		if (checkConnection(address)) {
-			listScannedDevices(callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					listScannedDevices(new IByteArrayCallback() {
+	public void listScannedDevices(final String address, final IByteArrayCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "List scanned devices ...");
+//				if (checkConnection(address)) {
+//					listScannedDevices(callback);
+//				} else {
+					connectAndExecute(address, new IExecuteCallback() {
 						@Override
-						public void onSuccess(byte[] result) {
-							callback.onSuccess(result);
-							execCallback.onSuccess();
+						public void execute(final IStatusCallback execCallback) {
+							listScannedDevices(new IByteArrayCallback() {
+								@Override
+								public void onSuccess(byte[] result) {
+									callback.onSuccess(result);
+									execCallback.onSuccess();
+								}
+
+								@Override
+								public void onError(int error) {
+									execCallback.onError(error);
+								}
+							});
 						}
+					}, new IStatusCallback() {
+						@Override
+						public void onSuccess() { /* don't care */ }
 
 						@Override
 						public void onError(int error) {
-							execCallback.onError(error);
+							callback.onError(error);
 						}
 					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
+//				}
+			}
+		});
 	}
 
 	/**
@@ -1910,36 +2232,42 @@ public class BleExt {
 	 * @param value true to start scanning for devices, false to stop the scan
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void writeScanDevices(String address, final boolean value, final IStatusCallback callback) {
-		if (checkConnection(address)) {
-			writeScanDevices(value, callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					writeScanDevices(value, new IStatusCallback() {
+	public void writeScanDevices(final String address, final boolean value, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "Scan Devices: %b", value);
+//				if (checkConnection(address)) {
+//					writeScanDevices(value, callback);
+//				} else {
+					connectAndExecute(address, new IExecuteCallback() {
 						@Override
-						public void onSuccess() {
-							callback.onSuccess();
-							execCallback.onSuccess();
+						public void execute(final IStatusCallback execCallback) {
+							writeScanDevices(value, new IStatusCallback() {
+								@Override
+								public void onSuccess() {
+									callback.onSuccess();
+									execCallback.onSuccess();
+								}
+
+								@Override
+								public void onError(int error) {
+									execCallback.onError(error);
+								}
+							});
 						}
+					}, new IStatusCallback() {
+						@Override
+						public void onSuccess() { /* don't care */ }
 
 						@Override
 						public void onError(int error) {
-							execCallback.onError(error);
+							callback.onError(error);
 						}
 					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
+//				}
+			}
+		});
 	}
 
 	/**
@@ -1994,6 +2322,7 @@ public class BleExt {
 	 * @param callback the callback which will return the list of scanned devices
 	 */
 	public void scanForDevices(final String address, final int scanDuration, final IByteArrayCallback callback) {
+		BleLog.LOGd(TAG, "Scan for devices ...");
 		if (checkConnection(address)) {
 			scanForDevices(scanDuration, callback);
 		} else {
@@ -2096,36 +2425,42 @@ public class BleExt {
 		}
 	}
 
-	public void readAlert(String address, final IAlertCallback callback) {
-		if (checkConnection(address)) {
-			readAlert(callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					readAlert(new IAlertCallback() {
+	public void readAlert(final String address, final IAlertCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "Reading Alert value ...");
+//				if (checkConnection(address)) {
+//					readAlert(callback);
+//				} else {
+					connectAndExecute(address, new IExecuteCallback() {
 						@Override
-						public void onSuccess(AlertState result) {
-							callback.onSuccess(result);
-							execCallback.onSuccess();
+						public void execute(final IStatusCallback execCallback) {
+							readAlert(new IAlertCallback() {
+								@Override
+								public void onSuccess(AlertState result) {
+									callback.onSuccess(result);
+									execCallback.onSuccess();
+								}
+
+								@Override
+								public void onError(int error) {
+									execCallback.onError(error);
+								}
+							});
 						}
+					}, new IStatusCallback() {
+						@Override
+						public void onSuccess() { /* don't care */ }
 
 						@Override
 						public void onError(int error) {
-							execCallback.onError(error);
+							callback.onError(error);
 						}
 					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
+//				}
+			}
+		});
 	}
 
 	public void resetAlert(IStatusCallback callback) {
@@ -2135,37 +2470,43 @@ public class BleExt {
 		}
 	}
 
-	public void resetAlert(String address, final IStatusCallback callback) {
-		if (checkConnection(null)) {
-			resetAlert(callback);
-		} else {
-			connectAndExecute(address, new IExecuteCallback() {
-				@Override
-				public void execute(final IStatusCallback execCallback) {
-					resetAlert(new IStatusCallback() {
+	public void resetAlert(final String address, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "Reset Alert");
+//				if (checkConnection(address)) {
+//					resetAlert(callback);
+//				} else {
+					connectAndExecute(address, new IExecuteCallback() {
+						@Override
+						public void execute(final IStatusCallback execCallback) {
+							resetAlert(new IStatusCallback() {
+								@Override
+								public void onSuccess() {
+									callback.onSuccess();
+									execCallback.onSuccess();
+								}
+
+								@Override
+								public void onError(int error) {
+									execCallback.onError(error);
+								}
+							});
+						}
+					}, new IStatusCallback() {
 						@Override
 						public void onSuccess() {
-							callback.onSuccess();
-							execCallback.onSuccess();
 						}
 
 						@Override
 						public void onError(int error) {
-							execCallback.onError(error);
+							callback.onError(error);
 						}
 					});
-				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() {
-				}
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
-		}
+//				}
+			}
+		});
 	}
 
 	public void readMeshData(final IMeshDataCallback callback) {

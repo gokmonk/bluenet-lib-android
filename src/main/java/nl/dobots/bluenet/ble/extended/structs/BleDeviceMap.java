@@ -52,6 +52,7 @@ public class BleDeviceMap extends HashMap<String, BleDevice> {
 		if (contains(device)) {
 			BleDevice old = getDevice(device.getAddress());
 			old.updateRssiValue(System.currentTimeMillis(), device.getRssi());
+			old.setServiceData(device.getServiceData());
 			return old;
 		} else {
 			put(device.getAddress(), device);

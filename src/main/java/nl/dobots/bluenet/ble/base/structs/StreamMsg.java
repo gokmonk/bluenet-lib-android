@@ -94,8 +94,8 @@ public class StreamMsg {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
-		type = bb.get();
-		opCode = bb.get();
+		type = BleUtils.toUint8(bb.get());
+		opCode = BleUtils.toUint8(bb.get());
 		length = bb.getShort();
 		payload = new byte[length];
 		bb.get(payload);

@@ -108,9 +108,11 @@ public class BluenetConfig {
 	public static final char CMD_ENABLE_CONT_POWER_MEASURE =            11;   // 0x0B
 	public static final char CMD_ENABLE_SCANNER =                       12;   // 0x0C
 	public static final char CMD_SCAN_DEVICES =                         13;   // 0x0D
-	public static final char CMD_SAMPLE_POWER =                         14;   // 0x0E
-	public static final char CMD_USER_FEEDBACK =                        15;   // 0x0F
-	public static final char CMD_SCHEDULE_ENTRY =                       16;   // 0x10
+	public static final char CMD_USER_FEEDBACK =                        14;   // 0x0E
+	public static final char CMD_SCHEDULE_ENTRY =                       15;   // 0x0F
+	public static final char CMD_RELAY =                                16;   // 0x10
+	public static final char CMD_VALIDATE_SETUP =                       17;   // 0x11
+	public static final char CMD_REQUEST_SERVICE_DATA =                 18;   // 0x12
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -230,6 +232,13 @@ public class BluenetConfig {
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// constant used to convert the advertisement interval from ms to the unit expected by the
 	// characteristic (increments of 0.625 ms)
-	public static final double ADVERTISEMENT_INCREMENT = 0.625;
+	public static final double ADVERTISEMENT_INCREMENT =                0.625;
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+	public static final int PWM_ON =                                    100;
+	public static final int PWM_OFF =                                   0;
+	public static final int RELAY_ON =                                  255;
+	public static final int RELAY_OFF =                                 0;
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 }

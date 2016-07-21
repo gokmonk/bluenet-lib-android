@@ -8,6 +8,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.nio.BufferOverflowException;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -22,6 +23,7 @@ import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDiscoveryCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IPowerSamplesCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.ISubscribeCallback;
@@ -30,6 +32,7 @@ import nl.dobots.bluenet.ble.base.structs.CommandMsg;
 import nl.dobots.bluenet.ble.base.structs.ConfigurationMsg;
 import nl.dobots.bluenet.ble.base.structs.CrownstoneServiceData;
 import nl.dobots.bluenet.ble.base.structs.MeshMsg;
+import nl.dobots.bluenet.ble.base.structs.PowerSamples;
 import nl.dobots.bluenet.ble.base.structs.StateMsg;
 import nl.dobots.bluenet.ble.base.structs.TrackedDeviceMsg;
 import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshData;
@@ -40,6 +43,8 @@ import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.core.BleCore;
 import nl.dobots.bluenet.ble.core.BleCoreTypes;
 import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
+import nl.dobots.bluenet.ble.extended.callbacks.IBleDeviceCallback;
+import nl.dobots.bluenet.ble.extended.structs.BleDevice;
 import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
@@ -76,6 +81,24 @@ public class BleBase extends BleCore {
 		}
 	};
 
+	@Override
+	public void connectDevice(String address, int timeout, IDataCallback callback) {
+		_subscribers.clear();
+		super.connectDevice(address, timeout, callback);
+	}
+
+	@Override
+	public boolean disconnectDevice(String address, IDataCallback callback) {
+		_subscribers.clear();
+		return super.disconnectDevice(address, callback);
+	}
+
+	@Override
+	public boolean closeDevice(String address, boolean clearCache, IStatusCallback callback) {
+		_subscribers.clear();
+		return super.closeDevice(address, clearCache, callback);
+	}
+
 	/**
 	 * Start an endless scan, without defining any UUIDs to filter for. the scan will continue
 	 * until stopEndlessScan is called. The function will convert a received device from JSON into
@@ -84,7 +107,7 @@ public class BleBase extends BleCore {
 	 * @param callback the callback to be notified if devices are detected
 	 * @return true if the scan was started, false otherwise
 	 */
-	public boolean startEndlessScan(final IDataCallback callback) {
+	public boolean startEndlessScan(final IBleDeviceCallback callback) {
 		return this.startEndlessScan(new String[]{}, callback);
 	}
 
@@ -100,7 +123,7 @@ public class BleBase extends BleCore {
 	 * @param uuids a list of UUIDs to filter for
 	 * @return true if the scan was started, false otherwise
 	 */
-	public boolean startEndlessScan(String[] uuids,  final IDataCallback callback) {
+	public boolean startEndlessScan(String[] uuids,  final IBleDeviceCallback callback) {
 		// wrap the status callback to do some pre-processing of the scan result data
 		return super.startEndlessScan(uuids, new IDataCallback() {
 
@@ -131,7 +154,7 @@ public class BleBase extends BleCore {
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGd(TAG, "json: " + json.toString());
+//						BleLog.LOGd(TAG, "json: " + json.toString());
 					}
 				});
 
@@ -147,11 +170,19 @@ public class BleBase extends BleCore {
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGd(TAG, "json: " + json.toString());
+//						BleLog.LOGd(TAG, "json: " + json.toString());
 					}
 				});
 
-				callback.onData(json);
+				BleDevice device;
+				try {
+					device = new BleDevice(json);
+				} catch (JSONException e) {
+//					BleLog.LOGe(TAG, "Failed to parse json into device! Err: " + e.getMessage());
+//					BleLog.LOGd(TAG, "json: " + json.toString());
+					return;
+				}
+				callback.onDeviceScanned(device);
 			}
 		});
 	}
@@ -474,7 +505,7 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writeRelay(String address, boolean relayOn, final IStatusCallback callback) {
-		int value = relayOn ? 100 : 0;
+		int value = relayOn ? BluenetConfig.RELAY_ON : BluenetConfig.RELAY_OFF;
 		BleLog.LOGd(TAG, "write %d at service %s and characteristic %s", value, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID);
 		write(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID, new byte[]{(byte) value},
 				new IStatusCallback() {
@@ -605,7 +636,7 @@ public class BleBase extends BleCore {
 	 * @param address the MAC address of the device
 	 * @param callback the callback which will get the curve on success, or an error otherwise
 	 */
-	public void readPowerSamples(String address, final IByteArrayCallback callback) {
+	public void readPowerSamples(String address, final IPowerSamplesCallback callback) {
 		BleLog.LOGd(TAG, "read current curve at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID);
 		read(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID, new IDataCallback() {
 			@Override
@@ -618,7 +649,13 @@ public class BleBase extends BleCore {
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
 				BleLog.LOGd(TAG, "current curve: %s", Arrays.toString(bytes));
-				callback.onSuccess(bytes);
+
+				try {
+					PowerSamples powerSamples = new PowerSamples(bytes);
+					callback.onData(powerSamples);
+				} catch (BufferUnderflowException e) {
+					callback.onError(BleErrors.ERROR_CHARACTERISTIC_READ_FAILED);
+				}
 			}
 		});
 	}
@@ -756,7 +793,7 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will be informed about success or failure of the enable call
 	 */
 	public void enableStateNotification(final String address, final int stateType, final IStatusCallback callback) {
-		StateMsg state = new StateMsg(stateType, BluenetConfig.NOTIFY_VALUE, 0, new byte[]{});
+		StateMsg state = new StateMsg(stateType, BluenetConfig.NOTIFY_VALUE, 1, new byte[]{1});
 		byte[] bytes = state.toArray();
 		BleLog.LOGd(TAG, "notify state: write %d at service %s and characteristic %s", stateType, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_CONTROL_UUID);
 		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_CONTROL_UUID, bytes,
@@ -931,8 +968,14 @@ public class BleBase extends BleCore {
 						@Override
 						public void onError(int error) {
 							// select failed, unsubscribe again
-							callback.onError(error);
 							unsubscribeState(address, subscriberId[0]);
+							callback.onError(error);
+//							_timeoutHandler.postDelayed(new Runnable() {
+//								@Override
+//								public void run() {
+//									unsubscribeState(address, subscriberId[0]);
+//								}
+//							}, 200);
 						}
 					});
 				}
@@ -946,14 +989,26 @@ public class BleBase extends BleCore {
 			new IStateCallback() {
 				@Override
 				public void onSuccess(StateMsg state) {
-					callback.onSuccess(state);
 					unsubscribeState(address, subscriberId[0]);
+					callback.onSuccess(state);
+//					_timeoutHandler.postDelayed(new Runnable() {
+//						@Override
+//						public void run() {
+//							unsubscribeState(address, subscriberId[0]);
+//						}
+//					}, 200);
 				}
 
 				@Override
 				public void onError(int error) {
-					callback.onError(error);
 					unsubscribeState(address, subscriberId[0]);
+					callback.onError(error);
+//					_timeoutHandler.postDelayed(new Runnable() {
+//						@Override
+//						public void run() {
+//							unsubscribeState(address, subscriberId[0]);
+//						}
+//					}, 200);
 				}
 			}
 		);

@@ -43,13 +43,15 @@ public class BleBaseState {
 	}
 
 	private void parseSwitchState(StateMsg state, IIntegerCallback callback) {
-		if (state.getLength() != 1) {
-			BleLog.LOGe(TAG, "Wrong length parameter: %s", state.getLength());
-			callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
-		} else {
-			int switchState = state.getUint8Value();
-			BleLog.LOGd(TAG, "switch state: %d", switchState);
-			callback.onSuccess(switchState);
+		if (state.getType() == BluenetConfig.STATE_SWITCH_STATE) {
+			if (state.getLength() != 1) {
+				BleLog.LOGe(TAG, "Wrong length parameter: %s", state.getLength());
+				callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+			} else {
+				int switchState = state.getUint8Value();
+				BleLog.LOGd(TAG, "switch state: %d", switchState);
+				callback.onSuccess(switchState);
+			}
 		}
 	}
 
@@ -84,13 +86,15 @@ public class BleBaseState {
 	}
 
 	private void parseAccumulatedEnergy(StateMsg state, IIntegerCallback callback) {
-		if (state.getLength() != 4) {
-			BleLog.LOGe(TAG, "Wrong length parameter: %s", state.getLength());
-			callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
-		} else {
-			int accumulatedEnergy = state.getIntValue();
-			BleLog.LOGd(TAG, "accumulated energy: %d", accumulatedEnergy);
-			callback.onSuccess(accumulatedEnergy);
+		if (state.getType() == BluenetConfig.STATE_ACCUMULATED_ENERGY) {
+			if (state.getLength() != 4) {
+				BleLog.LOGe(TAG, "Wrong length parameter: %s", state.getLength());
+				callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+			} else {
+				int accumulatedEnergy = state.getIntValue();
+				BleLog.LOGd(TAG, "accumulated energy: %d", accumulatedEnergy);
+				callback.onSuccess(accumulatedEnergy);
+			}
 		}
 	}
 
@@ -125,13 +129,15 @@ public class BleBaseState {
 	}
 
 	private void parsePowerUsage(StateMsg state, IIntegerCallback callback) {
-		if (state.getLength() != 4) {
-			BleLog.LOGe(TAG, "Wrong length parameter: %s", state.getLength());
-			callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
-		} else {
-			int powerUsage = state.getIntValue();
-			BleLog.LOGd(TAG, "power usage: %d", powerUsage);
-			callback.onSuccess(powerUsage);
+		if (state.getType() == BluenetConfig.STATE_POWER_USAGE) {
+			if (state.getLength() != 4) {
+				BleLog.LOGe(TAG, "Wrong length parameter: %s", state.getLength());
+				callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+			} else {
+				int powerUsage = state.getIntValue();
+				BleLog.LOGd(TAG, "power usage: %d", powerUsage);
+				callback.onSuccess(powerUsage);
+			}
 		}
 	}
 
@@ -166,13 +172,15 @@ public class BleBaseState {
 	}
 
 	private void parseTemperature(StateMsg state, IIntegerCallback callback) {
-		if (state.getLength() != 4) {
-			BleLog.LOGe(TAG, "Wrong length parameter: %s", state.getLength());
-			callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
-		} else {
-			int temperature = state.getIntValue();
-			BleLog.LOGd(TAG, "power usage: %d", temperature);
-			callback.onSuccess(temperature);
+		if (state.getType() == BluenetConfig.STATE_TEMPERATURE) {
+			if (state.getLength() != 4) {
+				BleLog.LOGe(TAG, "Wrong length parameter: %s", state.getLength());
+				callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+			} else {
+				int temperature = state.getIntValue();
+				BleLog.LOGd(TAG, "power usage: %d", temperature);
+				callback.onSuccess(temperature);
+			}
 		}
 	}
 
