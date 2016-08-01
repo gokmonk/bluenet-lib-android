@@ -49,7 +49,7 @@ import nl.dobots.bluenet.service.callbacks.ScanDeviceListener;
 public class BleLogger extends BroadcastReceiver implements ScanDeviceListener, IntervalScanListener, EventListener  {
 	private static final String TAG = BleLogger.class.getCanonicalName();
 	private static final int FLUSH_INTERVAL = 1000;
-	private static final int COMPASS_AVERAGE_WINDOW = 10;
+	private static final int COMPASS_AVERAGE_WINDOW = 3;
 
 	private Context _context;
 
