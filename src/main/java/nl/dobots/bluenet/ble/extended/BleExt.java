@@ -11,6 +11,7 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 
 import nl.dobots.bluenet.ble.base.BleBase;
 import nl.dobots.bluenet.ble.base.callbacks.IAlertCallback;
@@ -68,6 +69,8 @@ public class BleExt {
 	// default time used for delayed disconnects
 	public static final int DELAYED_DISCONNECT_TIME = 5000; // 5 seconds
 
+	private static final int MAX_RETRIES = 3;
+
 	private BleBase _bleBase;
 
 	// list of devices. scanned devices that pass through the filter will be stored in the list
@@ -95,6 +98,8 @@ public class BleExt {
 	private IBleDeviceCallback _cloudScanCB;
 
 	private BleExtState _bleExtState;
+
+	private HashMap<String, Integer> _subscriberIds = new HashMap<>();
 
 	public BleExt() {
 		_bleBase = new BleBase();
@@ -455,6 +460,7 @@ public class BleExt {
 		BleLog.LOGd(TAG, "successfully connected");
 		// todo: timeout?
 		_connectionState = BleDeviceConnectionState.connected;
+		_subscriberIds.clear();
 	}
 
 	/**
@@ -497,6 +503,7 @@ public class BleExt {
 		// todo: timeout?
 		_connectionState = BleDeviceConnectionState.initialized;
 		clearDelayedDisconnect();
+		_subscriberIds.clear();
 //		_detectedCharacteristics.clear();
 	}
 
@@ -836,7 +843,6 @@ public class BleExt {
 		}
 	}
 
-	private static final int MAX_RETRIES = 3;
 	private int _retries = 0;
 
 	private boolean retry(int error) {
@@ -1769,6 +1775,38 @@ public class BleExt {
 //				}
 			}
 		});
+	}
+
+	public void subscribePowerSamples(final IPowerSamplesCallback callback) {
+		if (!_subscriberIds.containsKey(BluenetConfig.CHAR_POWER_SAMPLES_UUID)) {
+			if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_POWER_SAMPLES_UUID, callback)) {
+				BleLog.LOGd(TAG, "Subscribing to PowerSamples ...");
+				_bleBase.subscribePowerSamples(_targetAddress, new IIntegerCallback() {
+					@Override
+					public void onSuccess(int result) {
+						_subscriberIds.put(BluenetConfig.CHAR_POWER_SAMPLES_UUID, result);
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				}, callback);
+			}
+		} else {
+			BleLog.LOGd(TAG, "already subscribed");
+		}
+	}
+
+	public void unsubscribePowerSamples(IStatusCallback callback) {
+		if (isConnected(null) && _subscriberIds.containsKey(BluenetConfig.CHAR_POWER_SAMPLES_UUID)) {
+			BleLog.LOGd(TAG, "Unsubscribing from PowerSamples ...");
+			_bleBase.unsubscribePowerSamples(_targetAddress,
+					_subscriberIds.get(BluenetConfig.CHAR_POWER_SAMPLES_UUID),
+					callback);
+		} else {
+			BleLog.LOGd(TAG, "not subscribed or connected");
+		}
 	}
 
 	/////////////////////

@@ -75,6 +75,10 @@ public class BleLog {
 		log(Log.VERBOSE, tag, message);
 	}
 
+	public static void LOGv(String tag, String fmt, Object ... args) {
+		log(Log.VERBOSE, tag, String.format(fmt, args));
+	}
+
 	public static void LOGw(String tag, String message) {
 		log(Log.WARN, tag, message);
 	}

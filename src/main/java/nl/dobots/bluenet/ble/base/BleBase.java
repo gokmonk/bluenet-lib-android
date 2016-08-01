@@ -1,6 +1,7 @@
 package nl.dobots.bluenet.ble.base;
 
 import android.os.Handler;
+import android.os.SystemClock;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -387,6 +388,114 @@ public class BleBase extends BleCore {
 
 	}
 
+	class MultiPartNotificationCallback implements IDataCallback {
+
+		IDataCallback callback;
+
+		MultiPartNotificationCallback(IDataCallback callback) {
+			this.callback = callback;
+		}
+
+		ByteBuffer buffer = ByteBuffer.allocate(BluenetConfig.BLE_MAX_MULTIPART_NOTIFICATION_LENGTH);
+		int messageNr = 0;
+
+		long timeStart;
+
+		@Override
+		public void onData(JSONObject json) {
+			final byte[] notificationBytes = BleCore.getValue(json);
+			int nr = BleUtils.toUint8(notificationBytes[0]);
+
+			if (nr == 0) {
+				timeStart = SystemClock.elapsedRealtime();
+				if (messageNr != 0) {
+					BleLog.LOGw(TAG, "notification reset!");
+					buffer.clear();
+				} else {
+					// this is the first
+				}
+			} else if (messageNr > nr) {
+				BleLog.LOGe(TAG, "fatal error");
+				callback.onError(0);
+				return;
+			}
+			messageNr = nr;
+
+			buffer.put(notificationBytes, 1, notificationBytes.length - 1);
+
+			if (messageNr == 0xFF) {
+				BleLog.LOGd(TAG, "received last part");
+				BleLog.LOGv(TAG, "duration: %d", SystemClock.elapsedRealtime() - timeStart);
+				JSONObject combinedJson = new JSONObject();
+				byte[] result = new byte[buffer.position()];
+				buffer.rewind();
+				buffer.get(result);
+
+				BleCore.setValue(combinedJson, result);
+				callback.onData(combinedJson);
+
+				messageNr = 0;
+				buffer.clear();
+			} else {
+				BleLog.LOGd(TAG, "received part %d", messageNr + 1);
+			}
+		}
+
+		@Override
+		public void onError(int error) {
+
+		}
+	}
+
+	/**
+	 * Subscribe to a characteristic. This can be called several times for different callbacks. a
+	 * list of subscribers is kept with a subscriberId, so that different functions can subscribe
+	 * to the same characteristic.
+	 * the statusCallback will return in the onSuccess call the subscriber id, this id will be needed
+	 * to unsubscribe afterwards.
+	 *
+	 * @param address the address of the device
+	 * @param serviceUuid the uuid of the service containing the characteristic
+	 * @param characteristicUuid the uuid of the characteristic which should be subscribed to
+	 * @param statusCallback the callback which will be informed about success or failure.
+	 *                       in case of success, the onSuccess function will return the subscriber
+	 *                       id which is needed for unsubscribing afterwards
+	 * @param callback the callback which will be triggered every time a gatt notification arrives
+	 */
+	public void subscribeMultipart(String address, String serviceUuid, String characteristicUuid,
+						  final IIntegerCallback statusCallback, final IDataCallback callback) {
+
+		UUID uuid = BleUtils.stringToUuid(characteristicUuid);
+		final ArrayList<IDataCallback> subscribers = getSubscribers(uuid);
+
+		final MultiPartNotificationCallback notificationCB = new MultiPartNotificationCallback(callback);
+
+		if (subscribers.isEmpty()) {
+			subscribers.add(notificationCB);
+			if (!super.subscribe(address, serviceUuid, characteristicUuid, new IStatusCallback() {
+				@Override
+				public void onError(int error) {
+					statusCallback.onError(error);
+				}
+
+				@Override
+				public void onSuccess() {
+					statusCallback.onSuccess(subscribers.indexOf(notificationCB));
+				}
+			}, notificationCallback)) {
+				subscribers.remove(notificationCB);
+			}
+		} else {
+			subscribers.add(notificationCB);
+
+//			JSONObject json = new JSONObject();
+//			setStatus(json, BleCoreTypes.CHARACTERISTIC_SUBSCRIBED);
+//			callback.onData(json);
+			statusCallback.onSuccess(subscribers.indexOf(callback));
+		}
+
+	}
+
 	/**
 	 * Unsubscribe from the characteristic. Requires the subscriberId which was returned
 	 * in the statusCallback's onSuccess function during the subscribe call.
@@ -418,6 +527,137 @@ public class BleBase extends BleCore {
 			statusCallback.onError(BleErrors.WRONG_CALLBACK);
 //			callback.onError(BleErrors.WRONG_CALLBACK);
 		}
+	}
+
+	// todo: better name than single shot?
+	/**
+	 * Subscribe to a characteristic, get the notifications, then unsubscribe again (silently).
+	 * internal use only
+	 * @param address the address of the device
+	 * @param serviceUuid the uuid of the service containing the characteristic
+	 * @param characteristicUuid the uuid of the characteristic which should be subscribed to
+	 * @param callback the callback which will be triggered every time a gatt notification arrives
+	 */
+	private void subscribeMultipartSingleShot(final String address, final String serviceUuid,
+											  final String characteristicUuid,
+											  final IDataCallback callback) {
+
+		final int[] subscribeId = {0};
+
+		subscribeMultipart(address, serviceUuid, characteristicUuid,
+				new IIntegerCallback() {
+					@Override
+					public void onSuccess(int result) {
+						subscribeId[0] = result;
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				},
+				new IDataCallback() {
+					@Override
+					public void onData(JSONObject json) {
+						callback.onData(json);
+
+						// do the unsubscribe silently, i.e. not inform the callback about
+						// success or error
+						unsubscribe(address, serviceUuid, characteristicUuid, subscribeId[0],
+								new IStatusCallback() {
+									@Override
+									public void onSuccess() {
+										BleLog.LOGd(TAG, "unsubscribed successfully");
+									}
+
+									@Override
+									public void onError(int error) {
+										BleLog.LOGw(TAG, "unsubscribe failed %d", error);
+									}
+								});
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+
+						// do the unsubscribe silently, i.e. not inform the callback about
+						// success or error
+						unsubscribe(address, serviceUuid, characteristicUuid, subscribeId[0],
+								new IStatusCallback() {
+									@Override
+									public void onSuccess() {
+										BleLog.LOGd(TAG, "unsubscribed successfully");
+									}
+
+									@Override
+									public void onError(int error) {
+										BleLog.LOGw(TAG, "unsubscribe failed %d", error);
+									}
+								});
+					}
+				});
+	}
+
+	// todo: better name than single shot?
+	private void subscribeSingleShot(final String address, final String serviceUuid, final String characteristicUuid,
+									 final IDataCallback callback) {
+
+		final int[] subscribeId = {0};
+
+		subscribe(address, serviceUuid, characteristicUuid,
+				new IIntegerCallback() {
+					@Override
+					public void onSuccess(int result) {
+						subscribeId[0] = result;
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				},
+				new IDataCallback() {
+					@Override
+					public void onData(JSONObject json) {
+						callback.onData(json);
+
+						// do the unsubscribe silently, i.e. not inform the callback about
+						// success or error
+						unsubscribe(address, serviceUuid, characteristicUuid, subscribeId[0],
+								new IStatusCallback() {
+									@Override
+									public void onSuccess() {
+										BleLog.LOGd(TAG, "unsubscribed successfully");
+									}
+
+									@Override
+									public void onError(int error) {
+										BleLog.LOGw(TAG, "unsubscribe failed %d", error);
+									}
+								});
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+
+						// do the unsubscribe silently, i.e. not inform the callback about
+						// success or error
+						unsubscribe(address, serviceUuid, characteristicUuid, subscribeId[0],
+								new IStatusCallback() {
+									@Override
+									public void onSuccess() {
+										BleLog.LOGd(TAG, "unsubscribed successfully");
+									}
+
+									@Override
+									public void onError(int error) {
+										BleLog.LOGw(TAG, "unsubscribe failed %d", error);
+									}
+								});
+					}
+				});
 	}
 
 	// Crownstone specific characteristic operations
@@ -636,28 +876,56 @@ public class BleBase extends BleCore {
 	 * @param address the MAC address of the device
 	 * @param callback the callback which will get the curve on success, or an error otherwise
 	 */
-	public void readPowerSamples(String address, final IPowerSamplesCallback callback) {
-		BleLog.LOGd(TAG, "read current curve at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID);
-		read(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID, new IDataCallback() {
-			@Override
-			public void onError(int error) {
-				BleLog.LOGe(TAG, "Failed to read current curve characteristic");
-				callback.onError(error);
-			}
+	public void readPowerSamples(final String address, final IPowerSamplesCallback callback) {
+		BleLog.LOGd(TAG, "read power samples at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID);
 
-			@Override
-			public void onData(JSONObject json) {
-				byte[] bytes = BleCore.getValue(json);
-				BleLog.LOGd(TAG, "current curve: %s", Arrays.toString(bytes));
+		subscribeMultipartSingleShot(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID,
+				new IDataCallback() {
+					@Override
+					public void onData(JSONObject json) {
+						final byte[] notificationBytes = BleCore.getValue(json);
+						try {
+							PowerSamples powerSamples = new PowerSamples(notificationBytes);
+							callback.onData(powerSamples);
+						} catch (BufferUnderflowException e) {
+							callback.onError(BleErrors.ERROR_CHARACTERISTIC_READ_FAILED);
+						}
+					}
 
-				try {
-					PowerSamples powerSamples = new PowerSamples(bytes);
-					callback.onData(powerSamples);
-				} catch (BufferUnderflowException e) {
-					callback.onError(BleErrors.ERROR_CHARACTERISTIC_READ_FAILED);
-				}
-			}
-		});
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				});
+	}
+
+	public void subscribePowerSamples(final String address, final IIntegerCallback statusCallback, final IPowerSamplesCallback callback) {
+		BleLog.LOGd(TAG, "subscribe to power samples at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID);
+
+		subscribeMultipart(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID,
+				statusCallback,
+				new IDataCallback() {
+					@Override
+					public void onData(JSONObject json) {
+						final byte[] notificationBytes = BleCore.getValue(json);
+						try {
+							PowerSamples powerSamples = new PowerSamples(notificationBytes);
+							callback.onData(powerSamples);
+						} catch (BufferUnderflowException e) {
+							callback.onError(BleErrors.ERROR_CHARACTERISTIC_READ_FAILED);
+						}
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				});
+	}
+
+	public void unsubscribePowerSamples(final String address, int subscriberId, final IStatusCallback statusCallback) {
+		unsubscribe(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID,
+				subscriberId, statusCallback);
 	}
 
 	/**
@@ -830,7 +1098,7 @@ public class BleBase extends BleCore {
 	 */
 	public void subscribeState(String address, final IIntegerCallback statusCallback, final IStateCallback callback) {
 
-		subscribe(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID,
+		subscribeMultipart(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID,
 				statusCallback,
 				new IDataCallback() {
 

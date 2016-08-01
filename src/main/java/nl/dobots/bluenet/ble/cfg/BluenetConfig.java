@@ -13,6 +13,7 @@ package nl.dobots.bluenet.ble.cfg;
 public class BluenetConfig {
 
 	public static final int BLE_DEVICE_ADDRESS_LENGTH = 6;
+	public static final int BLE_MAX_MULTIPART_NOTIFICATION_LENGTH = 512;
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Crownstone Service
