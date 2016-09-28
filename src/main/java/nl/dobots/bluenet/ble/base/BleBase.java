@@ -1,6 +1,7 @@
 package nl.dobots.bluenet.ble.base;
 
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.SystemClock;
 import android.util.Log;
 
@@ -56,7 +57,9 @@ public class BleBase extends BleCore {
 	// handler used for delayed execution, e.g. a to get the configuration we need to write first
 	// to the select configuration characteristic, then wait for a moment for the device to process
 	// the request before reading from the get configuration characteristic
-	private Handler _timeoutHandler = new Handler();
+//	private Handler _timeoutHandler = new Handler();
+	private Handler _timeoutHandler;
+
 
 	/** Hashmap of all subscribers, based on characeristic UUID */
 	private HashMap<UUID, ArrayList<IDataCallback>> _subscribers = new HashMap<>();
@@ -81,6 +84,13 @@ public class BleBase extends BleCore {
 			}
 		}
 	};
+
+	public BleBase() {
+		// create handler with its own thread
+		HandlerThread handlerThread = new HandlerThread("BleBaseHandler");
+		handlerThread.start();
+		_timeoutHandler = new Handler(handlerThread.getLooper());
+	}
 
 	@Override
 	public void connectDevice(String address, int timeout, IDataCallback callback) {
