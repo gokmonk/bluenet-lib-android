@@ -33,6 +33,8 @@ import nl.dobots.bluenet.ble.base.structs.AlertState;
 import nl.dobots.bluenet.ble.base.structs.CommandMsg;
 import nl.dobots.bluenet.ble.base.structs.ConfigurationMsg;
 import nl.dobots.bluenet.ble.base.structs.CrownstoneServiceData;
+import nl.dobots.bluenet.ble.base.structs.EncryptionKeys;
+import nl.dobots.bluenet.ble.base.structs.EncryptionSessionData;
 import nl.dobots.bluenet.ble.base.structs.MeshMsg;
 import nl.dobots.bluenet.ble.base.structs.PowerSamples;
 import nl.dobots.bluenet.ble.base.structs.StateMsg;
@@ -60,6 +62,11 @@ public class BleBase extends BleCore {
 //	private Handler _timeoutHandler = new Handler();
 	private Handler _timeoutHandler;
 
+
+	private BleBaseEncryption _encryption = new BleBaseEncryption();
+	private boolean _encryptionEnabled = false;
+	private EncryptionKeys _encryptionKeys = null;
+	private EncryptionSessionData _encryptionSessionData = null;
 
 	/** Hashmap of all subscribers, based on characeristic UUID */
 	private HashMap<UUID, ArrayList<IDataCallback>> _subscribers = new HashMap<>();
@@ -92,6 +99,23 @@ public class BleBase extends BleCore {
 		_timeoutHandler = new Handler(handlerThread.getLooper());
 	}
 
+	public boolean enableEncryption(boolean enable) {
+		_encryptionEnabled = enable;
+		return true;
+	}
+
+	public boolean isEncryptionEnabled() {
+		return _encryptionEnabled;
+	}
+
+	public void setEncryptionKeys(EncryptionKeys encryptionKeys) {
+		_encryptionKeys = encryptionKeys;
+	}
+
+	public void setEncryptionSessionData(EncryptionSessionData sessionData) {
+		_encryptionSessionData = sessionData;
+	}
+
 	@Override
 	public void connectDevice(String address, int timeout, IDataCallback callback) {
 		_subscribers.clear();
@@ -108,6 +132,50 @@ public class BleBase extends BleCore {
 	public boolean closeDevice(String address, boolean clearCache, IStatusCallback callback) {
 		_subscribers.clear();
 		return super.closeDevice(address, clearCache, callback);
+	}
+
+	@Override
+	public boolean write(String address, String serviceUuid, String characteristicUuid, byte[] value, IStatusCallback callback) {
+		return write(address, serviceUuid, characteristicUuid, value, BleBaseEncryption.ACCESS_LEVEL_HIGHEST_AVAILABLE, callback);
+	}
+
+	public boolean write(String address, String serviceUuid, String characteristicUuid, byte[] value, char accessLevel, IStatusCallback callback) {
+		if (_encryptionEnabled && accessLevel != BleBaseEncryption.ACCESS_LEVEL_ENCRYPTION_DISABLED) {
+			// Just use highest available key
+			EncryptionKeys.KeyAccessLevelPair keyAccessLevelPair = _encryptionKeys.getHighestKey();
+			byte[] encryptedBytes = _encryption.encryptCtr(value, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, keyAccessLevelPair.key, keyAccessLevelPair.accessLevel);
+			return super.write(address, serviceUuid, characteristicUuid, encryptedBytes, callback);
+		}
+		return super.write(address, serviceUuid, characteristicUuid, value, callback);
+	}
+
+	@Override
+	public boolean read(String address, String serviceUuid, String characteristicUuid, IDataCallback callback) {
+		return read(address, serviceUuid, characteristicUuid, true, callback);
+	}
+
+	public boolean read(String address, String serviceUuid, String characteristicUuid, boolean useEncryption, final IDataCallback callback) {
+		if (_encryptionEnabled && useEncryption) {
+			IDataCallback encryptedCallback = new IDataCallback() {
+				@Override
+				public void onData(JSONObject json) {
+					byte[] encryptedBytes = getValue(json);
+					byte[] decryptedBytes = _encryption.decryptCtr(encryptedBytes, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, _encryptionKeys);
+					if (decryptedBytes == null) {
+						callback.onError(BleErrors.ENCRYPTION_ERROR);
+						return;
+					}
+					setValue(json, decryptedBytes);
+					callback.onData(json);
+				}
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			};
+			return super.read(address, serviceUuid, characteristicUuid, encryptedCallback);
+		}
+		return super.read(address, serviceUuid, characteristicUuid, callback);
 	}
 
 	/**
@@ -1120,7 +1188,16 @@ public class BleBase extends BleCore {
 					@Override
 					public void onData(JSONObject json) {
 						final byte[] bytes = BleCore.getValue(json);
-						StateMsg state = new StateMsg(bytes);
+						byte[] decryptedBytes;
+						if (_encryptionEnabled) {
+							decryptedBytes = _encryption.decryptCtr(bytes, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, _encryptionKeys);
+						}
+						else {
+							decryptedBytes = bytes;
+						}
+
+						Log.d(TAG, BleUtils.bytesToString(decryptedBytes));
+						StateMsg state = new StateMsg(decryptedBytes);
 						BleLog.LOGd(TAG, "received state notification: %s", state.toString());
 						callback.onSuccess(state);
 					}
@@ -1510,6 +1587,7 @@ public class BleBase extends BleCore {
 //		}
 	}
 
+	@Deprecated
 	public void readAlert(String address, final IAlertCallback callback) {
 		BleLog.LOGd(TAG, "read Alert at service %s and characteristic %s", BluenetConfig.ALERT_SERVICE_UUID, BluenetConfig.CHAR_NEW_ALERT_UUID);
 		read(address, BluenetConfig.ALERT_SERVICE_UUID, BluenetConfig.CHAR_NEW_ALERT_UUID, new IDataCallback() {
@@ -1535,6 +1613,7 @@ public class BleBase extends BleCore {
 	}
 
 	// only used to reset alerts (set value to 0)
+	@Deprecated
 	public void writeAlert(String address, int value, final IStatusCallback callback) {
 		BleLog.LOGd(TAG, "Alert: write %d at service %s and characteristic %s", value, BluenetConfig.ALERT_SERVICE_UUID, BluenetConfig.CHAR_NEW_ALERT_UUID);
 		write(address, BluenetConfig.ALERT_SERVICE_UUID, BluenetConfig.CHAR_NEW_ALERT_UUID, BleUtils.shortToByteArray(value),
@@ -1706,6 +1785,50 @@ public class BleBase extends BleCore {
 						callback.onError(error);
 					}
 				});
+	}
+
+	public void readSessionNonce(final String address, final boolean setupMode, final IDataCallback callback) {
+		Log.d(TAG, "readSessionNonce");
+		IDataCallback sessionCallback = new IDataCallback() {
+			@Override
+			public void onData(JSONObject json) {
+				byte[] data = getValue(json);
+				EncryptionSessionData sessionData = null;
+				if (setupMode) {
+					sessionData = _encryption.getSessionData(data, false);
+				}
+				else {
+					if (_encryptionKeys == null) {
+						callback.onError(BleErrors.ENCRYPTION_ERROR);
+						return;
+					}
+					byte[] decryptedData = _encryption.decryptEcb(data, _encryptionKeys.getGuestKey());
+					sessionData = _encryption.getSessionData(decryptedData);
+				}
+
+				if (sessionData == null) {
+					callback.onError(BleErrors.ENCRYPTION_ERROR);
+					return;
+				}
+				Log.d(TAG, "sessionNonce:" + BleUtils.bytesToString(sessionData.sessionNonce));
+				Log.d(TAG, "validationKey:" + BleUtils.bytesToString(sessionData.validationKey));
+				addBytes(json, "sessionNonce", sessionData.sessionNonce);
+				addBytes(json, "validationKey", sessionData.validationKey);
+				callback.onData(json);
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		};
+		if (setupMode) {
+			read(address, BluenetConfig.SETUP_SERVICE_UUID, BluenetConfig.CHAR_SETUP_SESSION_NONCE_UUID, false, sessionCallback);
+		}
+		else {
+			read(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_SESSION_NONCE_UUID, false, sessionCallback);
+		}
+
 	}
 
 }

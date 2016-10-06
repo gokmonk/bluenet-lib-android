@@ -1,5 +1,7 @@
 package nl.dobots.bluenet.ble.base.structs;
 
+import android.util.Log;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -93,10 +95,11 @@ public class StreamMsg {
 	public StreamMsg(byte[] bytes) {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
-
+		Log.d("streammsg", BleUtils.bytesToString(bytes));
 		type = BleUtils.toUint8(bb.get());
 		opCode = BleUtils.toUint8(bb.get());
 		length = bb.getShort();
+		Log.d("streammsg", "type=" + type + " opCode=" + opCode + " length=" + length);
 		payload = new byte[length];
 		bb.get(payload);
 	}

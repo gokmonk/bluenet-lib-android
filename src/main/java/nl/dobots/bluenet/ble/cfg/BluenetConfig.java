@@ -26,6 +26,8 @@ public class BluenetConfig {
 	public static final String CHAR_CONFIG_READ_UUID =                  "24f00005-7d10-4805-bfc1-7663a01c3bff";
 	public static final String CHAR_STATE_CONTROL_UUID =                "24f00006-7d10-4805-bfc1-7663a01c3bff";
 	public static final String CHAR_STATE_READ_UUID =                   "24f00007-7d10-4805-bfc1-7663a01c3bff";
+	public static final String CHAR_SESSION_NONCE_UUID =                "24f00008-7d10-4805-bfc1-7663a01c3bff";
+	public static final String CHAR_RECOVERY_UUID =                     "24f00009-7d10-4805-bfc1-7663a01c3bff";
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Setup Service
@@ -33,6 +35,10 @@ public class BluenetConfig {
 	// Setup Service - Characteristics
 	public static final String CHAR_SETUP_CONTROL_UUID =                "24f10001-7d10-4805-bfc1-7663a01c3bff";
 	public static final String CHAR_MAC_ADDRESS_UUID =                  "24f10002-7d10-4805-bfc1-7663a01c3bff";
+	public static final String CHAR_SESSION_KEY_UUID =                  "24f10003-7d10-4805-bfc1-7663a01c3bff";
+	public static final String CHAR_SETUP_CONFIG_CONTROL_UUID =         "24f10004-7d10-4805-bfc1-7663a01c3bff";
+	public static final String CHAR_SETUP_CONFIG_READ_UUID =            "24f10005-7d10-4805-bfc1-7663a01c3bff";
+	public static final String CHAR_SETUP_SESSION_NONCE_UUID =          "24f10008-7d10-4805-bfc1-7663a01c3bff";
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////

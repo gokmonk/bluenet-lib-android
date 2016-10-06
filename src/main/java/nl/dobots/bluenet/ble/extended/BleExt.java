@@ -21,6 +21,8 @@ import nl.dobots.bluenet.ble.base.callbacks.IPowerSamplesCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
 import nl.dobots.bluenet.ble.base.structs.AlertState;
 import nl.dobots.bluenet.ble.base.structs.CommandMsg;
+import nl.dobots.bluenet.ble.base.structs.EncryptionKeys;
+import nl.dobots.bluenet.ble.base.structs.EncryptionSessionData;
 import nl.dobots.bluenet.ble.base.structs.PowerSamples;
 import nl.dobots.bluenet.ble.base.structs.StateMsg;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
@@ -570,6 +572,24 @@ public class BleExt {
 			@Override
 			public void onSuccess() {
 				BleLog.LOGd(TAG, "... discovery done");
+
+				if (_bleBase.isEncryptionEnabled()) {
+					_bleBase.readSessionNonce(_targetAddress, false, new IDataCallback() {
+						@Override
+						public void onData(JSONObject json) {
+							EncryptionSessionData sessionData = new EncryptionSessionData();
+							sessionData.sessionNonce = BleBase.getBytes(json, "sessionNonce");
+							sessionData.validationKey = BleBase.getBytes(json, "validationKey");
+							_bleBase.setEncryptionSessionData(sessionData);
+							callback.onSuccess();
+						}
+
+						@Override
+						public void onError(int error) {
+							callback.onError(error);
+						}
+					});
+				}
 				callback.onSuccess();
 			}
 
@@ -1017,6 +1037,10 @@ public class BleExt {
 			return true;
 		}
 		return false;
+	}
+
+	public boolean isSetupMode() {
+		return hasCharacteristic(BluenetConfig.CHAR_SETUP_SESSION_NONCE_UUID, null);
 	}
 
 	///////////////////

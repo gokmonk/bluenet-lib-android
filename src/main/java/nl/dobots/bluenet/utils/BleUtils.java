@@ -138,6 +138,21 @@ public class BleUtils {
 		return result;
 	}
 
+	public static String bytesToString(byte[] bytes) {
+		if (bytes == null) {
+			return "";
+		}
+		if (bytes.length == 0) {
+			return "[]";
+		}
+		String str = "[" + toUint8(bytes[0]);
+		for (int i=1; i<bytes.length; i++) {
+			str += ", " + toUint8(bytes[i]);
+		}
+		str += "]";
+		return str;
+	}
+
 	public static boolean isValidAddress(String address) {
 		return BluetoothAdapter.checkBluetoothAddress(address);
 	}

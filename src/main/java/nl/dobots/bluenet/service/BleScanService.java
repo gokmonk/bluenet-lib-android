@@ -230,6 +230,7 @@ public class BleScanService extends Service {
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
 
+		Log.d(TAG, "onStartcommand");
 		boolean autoStart = false;
 		BleDeviceFilter scanFilter = BleDeviceFilter.all;
 
@@ -456,6 +457,7 @@ public class BleScanService extends Service {
 	public void startIntervalScan(BleDeviceFilter filter) {
 		_ble.setScanFilter(filter);
 		setScanningState(true);
+		Log.i(TAG, "startIntervalScan");
 
 		if (!_initialized) {
 			Log.i(TAG, "Start scan");

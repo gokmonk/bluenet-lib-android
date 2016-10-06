@@ -49,6 +49,9 @@ public class BleErrors {
 	public static final int WRONG_CALLBACK = 236;
 	public static final int NO_SUBSCRIBER_ID = 237;
 
+	// BleBase
+	public static final int ENCRYPTION_ERROR = 400;
+
 	// BleExt
 
 	public static final int ERROR_WRONG_STATE = 500;
