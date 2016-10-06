@@ -27,7 +27,7 @@ public class PowerSamples {
 
 	private static final String TAG = PowerSamples.class.getCanonicalName();
 
-	private static final int NUM_SAMPLES = 80;
+	private static final int NUM_SAMPLES = 75;
 
 	public class Samples {
 
