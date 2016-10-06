@@ -1,5 +1,7 @@
 package nl.dobots.bluenet.ble.base;
 
+import java.nio.charset.Charset;
+
 import nl.dobots.bluenet.ble.base.callbacks.IConfigurationCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
@@ -57,7 +59,7 @@ public class BleBaseConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setDeviceName(String address, String value, final IStatusCallback callback) {
-		byte[] bytes = value.getBytes();
+		byte[] bytes = value.getBytes(Charset.forName("UTF-8"));
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_NAME, bytes.length, bytes);
 		_bleBase.writeConfiguration(address, configuration, callback);
 	}
@@ -434,7 +436,7 @@ public class BleBaseConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setPasskey(String address, String value, final IStatusCallback callback) {
-		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_PASSKEY, 6, value.getBytes());
+		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_PASSKEY, 6, value.getBytes(Charset.forName("UTF-8")));
 		_bleBase.writeConfiguration(address, configuration, callback);
 	}
 
@@ -700,7 +702,7 @@ public class BleBaseConfiguration {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setWifi(String address, String value, final IStatusCallback callback) {
-		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_WIFI_SETTINGS, value.length(), value.getBytes());
+		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_WIFI_SETTINGS, value.length(), value.getBytes(Charset.forName("UTF-8")));
 		_bleBase.writeConfiguration(address, configuration, callback);
 	}
 
@@ -717,7 +719,7 @@ public class BleBaseConfiguration {
 					BleLog.LOGe(TAG, "empty name received!");
 					onError(BleErrors.ERROR_EMPTY_VALUE);
 				} else {
-					String deviceName = new String(configuration.getPayload());
+					String deviceName = new String(configuration.getPayload(), Charset.forName("UTF-8"));
 					BleLog.LOGd(TAG, "device name: %s", deviceName);
 					callback.onSuccess(deviceName);
 				}
@@ -739,7 +741,7 @@ public class BleBaseConfiguration {
 	@Deprecated
 	public void setDeviceType(String address, String value, final IStatusCallback callback) {
 		BleLog.LOGe(TAG, "deprecated");
-//		byte[] bytes = value.getBytes();
+//		byte[] bytes = value.getBytes(Charset.forName("UTF-8"));
 //		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_DEVICE_TYPE, bytes.length, bytes);
 //		_bleBase.writeConfiguration(address, configuration, callback);
 	}
@@ -781,7 +783,7 @@ public class BleBaseConfiguration {
 	@Deprecated
 	public void setRoom(String address, String value, final IStatusCallback callback) {
 		BleLog.LOGe(TAG, "deprecated");
-//		byte[] bytes = value.getBytes();
+//		byte[] bytes = value.getBytes(Charset.forName("UTF-8"));
 //		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_ROOM, bytes.length, bytes);
 //		_bleBase.writeConfiguration(address, configuration, callback);
 	}
