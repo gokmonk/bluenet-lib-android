@@ -31,6 +31,7 @@ import android.os.ParcelUuid;
 import android.os.SystemClock;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.os.SystemClock;
 
 import org.json.JSONArray;
 import org.json.JSONException;
