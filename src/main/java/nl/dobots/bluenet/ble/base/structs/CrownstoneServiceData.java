@@ -1,11 +1,16 @@
 package nl.dobots.bluenet.ble.base.structs;
 
+import android.util.Log;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+import nl.dobots.bluenet.ble.base.BleBaseEncryption;
+import nl.dobots.bluenet.ble.core.BleCore;
 import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
@@ -30,43 +35,8 @@ public class CrownstoneServiceData extends JSONObject {
 
 	private static final String TAG = CrownstoneServiceData.class.getCanonicalName();
 
-	public CrownstoneServiceData(byte[] bytes) {
+	public CrownstoneServiceData() {
 		super();
-
-		ByteBuffer bb = ByteBuffer.wrap(bytes);
-		bb.order(ByteOrder.LITTLE_ENDIAN);
-
-		bb.getShort(); // skip first two bytes (service UUID)
-
-		bb.mark();
-		int val = bb.get();
-
-		if (val == 1) {
-			setCrownstoneId(bb.getShort());
-			setCrownstoneStateId(bb.getShort());
-			setSwitchState((bb.get() & 0xff));
-			setEventBitmask(bb.get());
-			setTemperature(bb.get());
-			setPowerUsage(bb.getInt());
-			setAccumulatedEnergy(bb.getInt());
-
-			setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
-			setPwm(getSwitchState() & ~(1 << 7));
-		} else {
-			bb.reset();
-			setCrownstoneId(bb.getShort());
-			setCrownstoneStateId(bb.getShort());
-			setSwitchState((bb.get() & 0xff));
-			setEventBitmask(bb.get());
-			setTemperature(bb.get());
-			bb.get(); // skip reserved
-//			bb.getShort(); // skip reserved
-			setPowerUsage(bb.getInt());
-			setAccumulatedEnergy(bb.getInt());
-
-			setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
-			setPwm(getSwitchState() & ~(1 << 7));
-		}
 	}
 
 	public CrownstoneServiceData(String json) throws JSONException {
@@ -75,6 +45,126 @@ public class CrownstoneServiceData extends JSONObject {
 
 	public CrownstoneServiceData(JSONObject obj) throws JSONException {
 		this(obj.toString());
+	}
+
+
+	public boolean parseBytes(byte[] bytes, boolean encrypted, byte[] key) {
+		// Includes the service UUID (first 2 bytes)
+		Log.d(TAG, "serviceData: " + BleUtils.bytesToString(bytes));
+		ByteBuffer bb = ByteBuffer.wrap(bytes);
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+		try {
+			bb.getShort(); // skip first two bytes (service UUID)
+			bb.mark();
+			int firmwareVersion = BleUtils.toUint8(bb.get());
+
+			// First parse without decrypting
+			if (!parseDecryptedData(bytes, 3, firmwareVersion)) {
+				return false;
+			}
+			// Check if data is setup mode data, if so, we don't have to decrypt
+			if (isSetupPacket()) {
+				return true;
+			}
+
+			if (encrypted) {
+				firmwareVersion = BleUtils.toUint8(bytes[0]);
+				//byte[] decryptedBytes = BleBaseEncryption.decryptEcb(bytes, bb.position(), key);
+				byte[] decryptedBytes = BleBaseEncryption.decryptEcb(bytes, 3, key);
+				if (decryptedBytes == null) {
+					return false;
+				}
+				// Parse again, but now with decrypted data
+				if (!parseDecryptedData(decryptedBytes, 0, firmwareVersion)) {
+					return false;
+				}
+			}
+			return true;
+		} catch (BufferUnderflowException e) {
+			Log.e(TAG, "failed to parse");
+			e.printStackTrace();
+			return false;
+		}
+	}
+
+	private boolean parseDecryptedData(byte[] bytes, int offset, int firmwareVersion) {
+		ByteBuffer bb = ByteBuffer.wrap(bytes, offset, bytes.length-offset);
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+
+		byte[] test = new byte[16];
+		bb.mark();
+		bb.get(test);
+		Log.d(TAG, "parseDecryptedData: " + BleUtils.bytesToString(test));
+		bb.reset();
+
+		switch(firmwareVersion) {
+			case 1: {
+				int crownstoneId = BleUtils.toUint16(bb.getShort());
+				setSwitchState(BleUtils.toUint8(bb.get()));
+				byte eventBitmask = bb.get();
+				setEventBitmask(eventBitmask);
+				setTemperature(bb.get());
+				setPowerUsage(bb.getInt());
+				setAccumulatedEnergy(bb.getInt());
+				byte[] randomBytes = new byte[3];
+				bb.get(randomBytes);
+				setRandomBytes(randomBytes);
+
+				setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
+				setPwm(getSwitchState() & ~(1 << 7));
+
+				if (isExternalData(eventBitmask)) {
+					setCrownstoneId(-1);
+					setCrownstoneStateId(crownstoneId);
+				} else {
+					setCrownstoneId(crownstoneId);
+					setCrownstoneStateId(-1);
+				}
+				return true;
+			}
+			default: {
+				// TODO: this is deprecated (for advertisements from before firmwareVersion)
+				bb.reset();
+				setFirmwareVersion(0);
+				setCrownstoneId(BleUtils.toUint16(bb.getShort()));
+				setCrownstoneStateId(bb.getShort());
+				setSwitchState((bb.get() & 0xff));
+				setEventBitmask(bb.get());
+				setTemperature(bb.get());
+				bb.get(); // skip reserved
+				setPowerUsage(bb.getInt());
+				setAccumulatedEnergy(bb.getInt());
+
+				setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
+				setPwm(getSwitchState() & ~(1 << 7));
+				return true;
+			}
+		}
+//		return false;
+	}
+
+	private boolean isSetupPacket() {
+		Log.d(TAG, "setup=" + isSetupMode() + " id=" + getCrownstoneId() + " switch=" + getSwitchState() + " power=" + getPowerUsage() + " energy=" + getAccumulatedEnergy());
+		return (isSetupMode() && getCrownstoneId() == 0 && getSwitchState() == 0 && getPowerUsage() == 0 && getAccumulatedEnergy() == 0);
+	}
+
+
+	public int getFirmwareVersion() {
+		try {
+			return getInt("firmwareVersion");
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "no firmware version found");
+			return 0;
+		}
+	}
+
+	private void setFirmwareVersion(int firmwareVersion) {
+		try {
+			put("firmwareVersion", firmwareVersion);
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "failed to add firmware version");
+			e.printStackTrace();
+		}
 	}
 
 	public int getCrownstoneId() {
@@ -176,6 +266,21 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 	}
 
+	public boolean isNewData() { return isNewData(getEventBitmask()); }
+	public static boolean isNewData(byte eventBitmask) {
+		return ((eventBitmask & (1L << 0)) != 0);
+	}
+
+	public boolean isExternalData() { return isExternalData(getEventBitmask()); }
+	public static boolean isExternalData(byte eventBitmask) {
+		return ((eventBitmask & (1L << 1)) != 0);
+	}
+
+	public boolean isSetupMode() { return isSetupMode(getEventBitmask()); }
+	public static boolean isSetupMode(byte eventBitmask) {
+		return ((eventBitmask & (1L << 7)) != 0);
+	}
+
 	private void setEventBitmask(byte eventBitmask) {
 		try {
 			put("eventBitmask", eventBitmask);
@@ -235,6 +340,24 @@ public class CrownstoneServiceData extends JSONObject {
 			put("accumulatedEnergy", accumulatedEnergy);
 		} catch (JSONException e) {
 			BleLog.LOGd(TAG, "failed to add accumulated energy");
+			e.printStackTrace();
+		}
+	}
+
+	public String getRandomBytes() {
+		try {
+			return getString("randomBytes");
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "no random bytes found");
+			return null;
+		}
+	}
+
+	private void setRandomBytes(byte[] randomBytes) {
+		try {
+			put("randomBytes", BleUtils.bytesToEncodedString(randomBytes));
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "failed to add random bytes");
 			e.printStackTrace();
 		}
 	}

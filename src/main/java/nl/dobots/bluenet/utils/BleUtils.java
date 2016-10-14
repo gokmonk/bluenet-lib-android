@@ -103,6 +103,10 @@ public class BleUtils {
 		return b & 0xFF;
 	}
 
+	public static int toUint16(int num) {
+		return num & 0xFFFF;
+	}
+
 	public static byte[] addressToBytes(String address) {
 		if (address == null || address.length() != STR_ADDRESS_LENGTH) {
 			return null;

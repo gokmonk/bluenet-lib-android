@@ -84,6 +84,45 @@ public class EncryptionKeys {
 		}
 	}
 
+	public static byte[] getAdminKey(EncryptionKeys keys) {
+		if (keys == null) {
+			return new byte[0];
+		}
+		byte [] key = keys.getAdminKey();
+		if (key == null) {
+			return new byte[0];
+		}
+		else {
+			return key;
+		}
+	}
+
+	public static byte[] getMemberKey(EncryptionKeys keys) {
+		if (keys == null) {
+			return new byte[0];
+		}
+		byte [] key = keys.getMemberKey();
+		if (key == null) {
+			return new byte[0];
+		}
+		else {
+			return key;
+		}
+	}
+
+	public static byte[] getGuestKey(EncryptionKeys keys) {
+		if (keys == null) {
+			return new byte[0];
+		}
+		byte [] key = keys.getGuestKey();
+		if (key == null) {
+			return new byte[0];
+		}
+		else {
+			return key;
+		}
+	}
+
 	public KeyAccessLevelPair getHighestKey() {
 		if (getAdminKey() != null) {
 			return new KeyAccessLevelPair(getAdminKey(), BleBaseEncryption.ACCESS_LEVEL_ADMIN);

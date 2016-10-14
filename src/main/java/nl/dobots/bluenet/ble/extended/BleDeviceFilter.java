@@ -14,6 +14,7 @@ public enum BleDeviceFilter {
 	crownstone,
 	guidestone,
 	iBeacon,
+	@Deprecated
 	fridge
 
 }

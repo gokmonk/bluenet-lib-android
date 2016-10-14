@@ -1,5 +1,7 @@
 package nl.dobots.bluenet.ble.extended.structs;
 
+import android.util.Log;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -7,10 +9,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 import nl.dobots.bluenet.ble.base.structs.CrownstoneServiceData;
 import nl.dobots.bluenet.ble.cfg.BleTypes;
+import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -60,6 +64,7 @@ public class BleDevice {
 
 	private Double _distance;
 
+	private boolean _isIBeacon;
 	private int _major;
 	private int _minor;
 	private UUID _proximityUuid;
@@ -67,21 +72,30 @@ public class BleDevice {
 
 	private CrownstoneServiceData _serviceData;
 
+	private boolean _isValidatedCrownstone = false;
+	private int _lastCrownstoneId = -1;
+	private String _lastRandom;
+	private int _numSimilarCrownstoneIds = 0;
+
+
+
 	public BleDevice(String address, String name, int rssi) {
-		this._address = address;
-		this._name = name;
-		this._rssi = rssi;
-		this._type = DeviceType.unknown;
+		_address = address;
+		_name = name;
+		_rssi = rssi;
+		_type = DeviceType.unknown;
+		_isIBeacon = false;
 
 		updateRssiValue((new Date()).getTime(), rssi);
 //		_rssiHistory.add(new RssiMeasurement(rssi, (new Date()).getTime()));
 	}
 
-	private BleDevice(String address, String name, int rssi, DeviceType type, int major, int minor, UUID proximityUuid, int calibratedRssi) {
+	private BleDevice(String address, String name, int rssi, DeviceType type, boolean isIBeacon, int major, int minor, UUID proximityUuid, int calibratedRssi) {
 		_address = address;
 		_name = name;
 		_rssi = rssi;
 		_type = type;
+		_isIBeacon = isIBeacon;
 		_major = major;
 		_minor = minor;
 		_proximityUuid = proximityUuid;
@@ -92,33 +106,54 @@ public class BleDevice {
 	}
 
 	public BleDevice(JSONObject json) throws JSONException {
-		this._address = json.getString(BleTypes.PROPERTY_ADDRESS);
+		_address = json.getString(BleTypes.PROPERTY_ADDRESS);
 		// name is not a required property of an advertisement, so if no name is present
 		// just use the default name
-		this._name = json.optString(BleTypes.PROPERTY_NAME, "No Name");
-		this._rssi = json.getInt(BleTypes.PROPERTY_RSSI);
-		this._type = determineDeviceType(json);
-		if (isIBeacon()) {
-			this._major = json.getInt(BleTypes.PROPERTY_MAJOR);
-			this._minor = json.getInt(BleTypes.PROPERTY_MINOR);
-			this._proximityUuid = (UUID) json.get(BleTypes.PROPERTY_PROXIMITY_UUID);
-			this._calibratedRssi = json.getInt(BleTypes.PROPERTY_CALIBRATED_RSSI);
+		_name = json.optString(BleTypes.PROPERTY_NAME, "No Name");
+		_rssi = json.getInt(BleTypes.PROPERTY_RSSI);
+		_type = determineDeviceType(json);
+
+		if (json.has(BleTypes.PROPERTY_IS_IBEACON) && json.getBoolean(BleTypes.PROPERTY_IS_IBEACON)) {
+			_isIBeacon = true;
+			_major = json.getInt(BleTypes.PROPERTY_MAJOR);
+			_minor = json.getInt(BleTypes.PROPERTY_MINOR);
+			_proximityUuid = (UUID) json.get(BleTypes.PROPERTY_PROXIMITY_UUID);
+			_calibratedRssi = json.getInt(BleTypes.PROPERTY_CALIBRATED_RSSI);
 		}
 		if (isCrownstone()) {
-			this._serviceData = new CrownstoneServiceData(json.getString(BleTypes.PROPERTY_SERVICE_DATA));
+			_serviceData = new CrownstoneServiceData(json.getString(BleTypes.PROPERTY_SERVICE_DATA));
 		}
 
-		updateRssiValue((new Date()).getTime(), this._rssi);
+		updateRssiValue((new Date()).getTime(), _rssi);
 //		_rssiHistory.add(new RssiMeasurement(this._rssi, (new Date()).getTime()));
 	}
 
 	public BleDevice clone() {
-		return new BleDevice(this._address, this._name, this._rssi, this._type,
-				this._major, this._minor, this._proximityUuid, this._calibratedRssi);
+		return new BleDevice(_address, _name, _rssi, _type,
+				_isIBeacon, _major, _minor, _proximityUuid, _calibratedRssi);
+	}
+
+	public String toString() {
+		String str = "";
+		str += _address;
+		str += " (" + _name + ")";
+		str += " rssi: [" + _rssi + " avg=" + _averageRssi + "]";
+		str += " type: " + _type.name();
+		if (_isIBeacon) {
+			str += " iBeacon: [uuid=" + _proximityUuid + " major=" + _major + " minor=" + _minor + " rssi@1m=" + _calibratedRssi + "]";
+		}
+		else {
+			str += " iBeacon: no";
+		}
+		if (isCrownstone() && _serviceData != null) {
+			str += " serviceData: " + _serviceData.toString();
+		}
+		return str;
 	}
 
 	public boolean isIBeacon() {
-		return _type == DeviceType.ibeacon || _type == DeviceType.guidestone;
+//		return _type == DeviceType.ibeacon || _type == DeviceType.guidestone;
+		return _isIBeacon;
 	}
 
 	public boolean isGuidestone() {
@@ -327,6 +362,50 @@ public class BleDevice {
 			refresh();
 		}
 		return _averageRssi;
+	}
+
+	public void validateCrownstone() {
+		// TODO: if in dfu mode: validate differently
+		Log.d(TAG, "validateCrownstone");
+
+		if (!isCrownstone() || _serviceData == null) {
+			Log.d(TAG, "no service data or no crownstone");
+			return;
+		}
+		if (_serviceData.isSetupMode()) {
+			Log.d(TAG, "validated crownstone in setup mode!");
+			_lastCrownstoneId = -1;
+			_lastRandom = null;
+			_isValidatedCrownstone = true;
+			return;
+		}
+
+		Log.d(TAG, "_lastCrownstoneId=" + _lastCrownstoneId + " _lastRandom=" + _lastRandom);
+		if (_lastCrownstoneId != -1 && _lastRandom != null) {
+			// Skip check if crownstone id is external crownstone, or when advertisement didn't change.
+			if (_serviceData.isExternalData() || _lastRandom.equals(_serviceData.getRandomBytes())) {
+				Log.d(TAG, "isExternalData or similar rand");
+				return;
+			}
+			Log.d(TAG, "_lastCrownstoneId=" + _lastCrownstoneId + " current=" + _serviceData.getCrownstoneId());
+			if (_lastCrownstoneId == _serviceData.getCrownstoneId()) {
+				if (!_isValidatedCrownstone) {
+//					_numSimilarCrownstoneIds += 1;
+					if (++_numSimilarCrownstoneIds >= BluenetConfig.NUM_ADVERTISEMENT_VALIDATIONS) {
+						Log.d(TAG, "validated crownstone!");
+						_isValidatedCrownstone = true;
+					}
+					Log.d(TAG, "_numSimilarCrownstoneIds=" + _numSimilarCrownstoneIds);
+				}
+			}
+			else {
+				_numSimilarCrownstoneIds = 0;
+				_isValidatedCrownstone = false;
+			}
+		}
+		_lastCrownstoneId = _serviceData.getCrownstoneId();
+		_lastRandom = _serviceData.getRandomBytes();
+		Log.d(TAG, "updated: _lastCrownstoneId=" + _lastCrownstoneId + " _lastRandom=" + _lastRandom);
 	}
 
 	/**

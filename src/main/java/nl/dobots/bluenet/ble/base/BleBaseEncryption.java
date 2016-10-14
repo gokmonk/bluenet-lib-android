@@ -77,7 +77,7 @@ public class BleBaseEncryption {
 //		return false;
 //	}
 
-	public byte[] encryptCtr(byte[] payloadData, byte[] sessionNonce, byte[] validationKey, byte[] key, char accessLevel) {
+	public static byte[] encryptCtr(byte[] payloadData, byte[] sessionNonce, byte[] validationKey, byte[] key, char accessLevel) {
 		if (payloadData == null || payloadData.length < 1) {
 			Log.w(TAG, "wrong data length");
 			return null;
@@ -154,7 +154,7 @@ public class BleBaseEncryption {
 		return encryptedData;
 	}
 
-	public byte[] decryptCtr(byte[] encryptedData, byte[] sessionNonce, byte[] validationKey, EncryptionKeys keys) {
+	public static byte[] decryptCtr(byte[] encryptedData, byte[] sessionNonce, byte[] validationKey, EncryptionKeys keys) {
 		if (encryptedData == null || encryptedData.length < PACKET_NONCE_LENGTH + ACCESS_LEVEL_LENGTH + AES_BLOCK_SIZE) {
 			Log.w(TAG, "wrong data length");
 			return null;
@@ -217,12 +217,19 @@ public class BleBaseEncryption {
 		return payloadData;
 	}
 
-	public byte[] decryptEcb(byte[] payloadData, byte[] key) {
-		if (payloadData == null || payloadData.length < AES_BLOCK_SIZE) {
-			Log.w(TAG, "payload data of zero length");
+	public static byte[] decryptEcb(byte[] payloadData, byte[] key) {
+		return decryptEcb(payloadData, 0 , key);
+	}
+
+	public static byte[] decryptEcb(byte[] payloadData, int inputOffset, byte[] key) {
+		if (inputOffset < 0) {
 			return null;
 		}
-		if (payloadData.length % 16 != 0) {
+		if (payloadData == null || (payloadData.length-inputOffset) < AES_BLOCK_SIZE) {
+			Log.w(TAG, "payload data too short");
+			return null;
+		}
+		if ((payloadData.length-inputOffset) % 16 != 0) {
 			Log.w(TAG, "wrong payload data length");
 			return null;
 		}
@@ -231,11 +238,11 @@ public class BleBaseEncryption {
 			return null;
 		}
 
-		byte[] decryptedData = new byte[payloadData.length];
+		byte[] decryptedData = new byte[payloadData.length-inputOffset];
 		try {
 			Cipher cipher = Cipher.getInstance("AES/ECB/NoPadding");
 			cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"));
-			cipher.doFinal(payloadData, 0, payloadData.length, decryptedData, 0);
+			cipher.doFinal(payloadData, inputOffset, payloadData.length-inputOffset, decryptedData, 0);
 		} catch (GeneralSecurityException e) {
 			e.printStackTrace();
 			return null;
@@ -243,11 +250,11 @@ public class BleBaseEncryption {
 		return decryptedData;
 	}
 
-	public EncryptionSessionData getSessionData(byte[] decryptedData) {
+	public static EncryptionSessionData getSessionData(byte[] decryptedData) {
 		return getSessionData(decryptedData, true);
 	}
 
-	public EncryptionSessionData getSessionData(byte[] decryptedData, boolean encrypted) {
+	public static EncryptionSessionData getSessionData(byte[] decryptedData, boolean encrypted) {
 		if (decryptedData == null) {
 			return null;
 		}
@@ -269,7 +276,7 @@ public class BleBaseEncryption {
 		}
 	}
 
-	private EncryptionSessionData _getSessionData(byte[] data, int offset) {
+	private static EncryptionSessionData _getSessionData(byte[] data, int offset) {
 		byte[] sessionNonce = new byte[SESSION_NONCE_LENGTH];
 		byte[] validationKey = new byte[VALIDATION_KEY_LENGTH];
 

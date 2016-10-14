@@ -143,7 +143,7 @@ public class BleBase extends BleCore {
 		if (_encryptionEnabled && accessLevel != BleBaseEncryption.ACCESS_LEVEL_ENCRYPTION_DISABLED) {
 			// Just use highest available key
 			EncryptionKeys.KeyAccessLevelPair keyAccessLevelPair = _encryptionKeys.getHighestKey();
-			byte[] encryptedBytes = _encryption.encryptCtr(value, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, keyAccessLevelPair.key, keyAccessLevelPair.accessLevel);
+			byte[] encryptedBytes = BleBaseEncryption.encryptCtr(value, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, keyAccessLevelPair.key, keyAccessLevelPair.accessLevel);
 			return super.write(address, serviceUuid, characteristicUuid, encryptedBytes, callback);
 		}
 		return super.write(address, serviceUuid, characteristicUuid, value, callback);
@@ -160,7 +160,7 @@ public class BleBase extends BleCore {
 				@Override
 				public void onData(JSONObject json) {
 					byte[] encryptedBytes = getValue(json);
-					byte[] decryptedBytes = _encryption.decryptCtr(encryptedBytes, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, _encryptionKeys);
+					byte[] decryptedBytes = BleBaseEncryption.decryptCtr(encryptedBytes, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, _encryptionKeys);
 					if (decryptedBytes == null) {
 						callback.onError(BleErrors.ENCRYPTION_ERROR);
 						return;
@@ -199,12 +199,12 @@ public class BleBase extends BleCore {
 	 * the given UUIDs will be returned.
 	 *
 	 * @param callback the callback to be notified if devices are detected
-	 * @param uuids a list of UUIDs to filter for
+	 * @param serviceUuids a list of UUIDs to filter for
 	 * @return true if the scan was started, false otherwise
 	 */
-	public boolean startEndlessScan(String[] uuids,  final IBleDeviceCallback callback) {
+	public boolean startEndlessScan(String[] serviceUuids,  final IBleDeviceCallback callback) {
 		// wrap the status callback to do some pre-processing of the scan result data
-		return super.startEndlessScan(uuids, new IDataCallback() {
+		return super.startEndlessScan(serviceUuids, new IDataCallback() {
 
 			@Override
 			public void onError(int error) {
@@ -323,8 +323,11 @@ public class BleBase extends BleCore {
 
 		if (serviceUUID == BluenetConfig.CROWNSTONE_SERVICE_DATA_UUID) {
 			BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE, true);
-			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData(bb.array());
-			BleCore.addProperty(json, BleTypes.PROPERTY_SERVICE_DATA, crownstoneServiceData);
+//			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData(bb.array(), _encryptionEnabled, _encryptionKeys.getGuestKey());
+			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData();
+			if (crownstoneServiceData.parseBytes(bb.array(), _encryptionEnabled, EncryptionKeys.getGuestKey(_encryptionKeys))) {
+				BleCore.addProperty(json, BleTypes.PROPERTY_SERVICE_DATA, crownstoneServiceData);
+			}
 		} else if (serviceUUID == BluenetConfig.GUIDESTONE_SERVICE_DATA_UUID) {
 			BleCore.addProperty(json, BleTypes.PROPERTY_IS_GUIDESTONE, true);
 		}

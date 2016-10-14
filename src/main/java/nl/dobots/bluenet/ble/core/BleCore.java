@@ -32,12 +32,14 @@ import android.os.SystemClock;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.os.SystemClock;
+import android.util.Log;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.lang.reflect.Method;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -872,7 +874,7 @@ public class BleCore {
 					bb.position(bb.position() + length - 1); // length also includes the type field, so only advance by length-1
 				}
 			}
-		} catch (Exception e) {
+		} catch (BufferUnderflowException e) {
 //			BleLog.LOGe(TAG, "failed to parse advertisement, search: %d", search);
 //			e.printStackTrace();
 			callback.onError(BleErrors.ERROR_ADVERTISEMENT_PARSING);

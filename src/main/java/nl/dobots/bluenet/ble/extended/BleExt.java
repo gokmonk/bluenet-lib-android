@@ -5,6 +5,7 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
+import android.util.Log;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -85,6 +86,8 @@ public class BleExt {
 	// only report guidestone devices
 	private BleDeviceFilter _scanFilter = BleDeviceFilter.all;
 
+	private ArrayList<BleIbeaconFilter> _iBeaconFilter = new ArrayList<>();
+
 	// current connection state
 	private BleDeviceConnectionState _connectionState = BleDeviceConnectionState.uninitialized;
 
@@ -142,6 +145,26 @@ public class BleExt {
 	 */
 	public BleDeviceFilter getScanFilter() {
 		return _scanFilter;
+	}
+
+	public void addIbeaconFilter(BleIbeaconFilter filter) {
+		_iBeaconFilter.add(filter);
+	}
+
+	public void remIbeaconFilter(BleIbeaconFilter filter) {
+		for (int i=_iBeaconFilter.size(); i>0; i--) {
+			if (_iBeaconFilter.get(i).equals(filter)) {
+				_iBeaconFilter.remove(i);
+			}
+		}
+	}
+
+	public void clearIbeaconFilter() {
+		_iBeaconFilter.clear();
+	}
+
+	public ArrayList<BleIbeaconFilter> getIbeaconFilter() {
+		return _iBeaconFilter;
 	}
 
 	/**
@@ -299,6 +322,8 @@ public class BleExt {
 			@Override
 			public void onDeviceScanned(BleDevice device) {
 
+				Log.d(TAG, "scanned:" + device.toString());
+
 				if (_blackList != null && _blackList.contains(device.getAddress())) {
 					return;
 				}
@@ -324,6 +349,24 @@ public class BleExt {
 					case all:
 						// return any device that was detected
 						break;
+				}
+
+				if (!_iBeaconFilter.isEmpty()) {
+					if (!device.isIBeacon()) {
+						Log.d(TAG, "device is no ibeacon:" + device.getAddress() + " (" + device.getName() + ")");
+						return;
+					}
+					boolean match = false;
+					for (BleIbeaconFilter iBeaconFilter : _iBeaconFilter) {
+						if (iBeaconFilter.matches(device.getProximityUuid(), device.getMajor(), device.getMinor())) {
+							match = true;
+							break;
+						}
+					}
+					if (!match) {
+						Log.d(TAG, "not matching any ibeacon filter:" + device.getAddress() + " (" + device.getName() + ")");
+						return;
+					}
 				}
 
 				// update the device list, this triggers recalculation of the average RSSI (and
