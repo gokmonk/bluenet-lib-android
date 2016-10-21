@@ -48,6 +48,9 @@ public class BleErrors {
 	public static final int ERROR_BLE_PERMISSION_MISSING = 235;
 	public static final int WRONG_CALLBACK = 236;
 	public static final int NO_SUBSCRIBER_ID = 237;
+	public static final int ERROR_RECOVER_MODE_DISABLED = 238;
+	public static final int ERROR_NOT_IN_RECOVERY_MODE = 239;
+
 
 	// BleBase
 	public static final int ENCRYPTION_ERROR = 400;

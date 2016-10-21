@@ -10,6 +10,8 @@ import android.util.Log;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -915,21 +917,24 @@ public class BleExt {
 
 		// check if error is retriable ...
 		switch (error) {
-		case 19:
-		case BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND: {
-			return false;
-		}
-		case 133:
-		default: {
-			if (_retries < MAX_RETRIES) {
-				_retries++;
-				BleLog.LOGw(TAG, "retry: %d", _retries);
-				return true;
-			} else {
-				_retries = 0;
+			case BleErrors.ERROR_CHARACTERISTIC_READ_FAILED:
+			case BleErrors.ERROR_CHARACTERISTIC_WRITE_FAILED:
+			case BleErrors.ERROR_CONNECT_FAILED:
+			case 133: {
+				if (_retries < MAX_RETRIES) {
+					_retries++;
+					BleLog.LOGw(TAG, "retry: %d (error=%d)", _retries, error);
+					return true;
+				} else {
+					_retries = 0;
+					return false;
+				}
+			}
+			case 19:
+			case BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND:
+			default: {
 				return false;
 			}
-		}
 		}
 
 	}
@@ -962,6 +967,9 @@ public class BleExt {
 	 */
 	public void connectAndExecute(final String address, final IExecuteCallback function, final IStatusCallback callback) {
 		final boolean resumeDelayedDisconnect = clearDelayedDisconnect();
+
+		// TODO: if function.execute was successful ignore the connect errors. Need a class variable for that.
+
 		if (checkConnection(address)) {
 			function.execute(new IStatusCallback() {
 				@Override
@@ -1088,6 +1096,8 @@ public class BleExt {
 	public boolean isSetupMode() {
 		return hasCharacteristic(BluenetConfig.CHAR_SETUP_SESSION_NONCE_UUID, null);
 	}
+
+
 
 	///////////////////
 	// Power service //
@@ -1999,6 +2009,134 @@ public class BleExt {
 		writeReset(address, BluenetConfig.RESET_DFU, callback);
 	}
 
+	private void writeRecovery(final IStatusCallback callback) {
+		if (!isConnected(callback)) {
+			return;
+		}
+		BleLog.LOGd(TAG, "Write recovery");
+		if (!hasCharacteristic(BluenetConfig.CHAR_RECOVERY_UUID, null)) {
+			callback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
+			return;
+		}
+		BleLog.LOGd(TAG, "has characteristic");
+
+		byte[] code = BleUtils.intToByteArray(BluenetConfig.RECOVERY_CODE);
+
+		_bleBase.write(_targetAddress, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_RECOVERY_UUID, code, BleBaseEncryption.ACCESS_LEVEL_ENCRYPTION_DISABLED, new IStatusCallback() {
+			@Override
+			public void onSuccess() {
+				Log.d(TAG, "written to recovery characteristic");
+				_bleBase.read(_targetAddress, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_RECOVERY_UUID, false, new IDataCallback() {
+					@Override
+					public void onData(JSONObject json) {
+						// Verify that the crownstone accepted the recover command
+						byte[] data = BleCore.getValue(json);
+						Log.d(TAG, "read recover data: " + BleUtils.bytesToString(data));
+//						if (data == null || data.length != 1) {
+						if (data == null || data.length < 1) {
+							callback.onError(BleErrors.ERROR_RETURN_VALUE_PARSING);
+							return;
+						}
+						switch (BleUtils.toUint8(data[0])) {
+							case 1: {
+								callback.onSuccess();
+								break;
+							}
+							case 2: {
+								callback.onError(BleErrors.ERROR_RECOVER_MODE_DISABLED);
+								break;
+							}
+							default: {
+								callback.onError(BleErrors.ERROR_NOT_IN_RECOVERY_MODE);
+							}
+						}
+					}
+
+					@Override
+					public void onError(int error) {
+						switch (error) {
+
+						}
+						callback.onError(BleErrors.ERROR_CHARACTERISTIC_READ_FAILED);
+					}
+				});
+
+
+//						callback.onSuccess();
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(BleErrors.ERROR_CHARACTERISTIC_WRITE_FAILED);
+			}
+		});
+	}
+
+	public void recover(final String address, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				BleLog.LOGd(TAG, "recover / factory reset device");
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IStatusCallback execCallback) {
+						writeRecovery(new IStatusCallback() {
+							@Override
+							public void onSuccess() {
+//								_handler.postDelayed(new Runnable() {
+//									@Override
+//									public void run() {
+//										BleLog.LOGd(TAG, "low TX phase");
+//										writeRecovery(new IStatusCallback() {
+//											@Override
+//											public void onSuccess() {
+//												callback.onSuccess();
+//												execCallback.onSuccess();
+//											}
+//
+//											@Override
+//											public void onError(int error) {
+//												callback.onError(error);
+//											}
+//										});
+//									}
+//								}, 200);
+								callback.onSuccess();
+								execCallback.onSuccess();
+							}
+
+							@Override
+							public void onError(int error) {
+								switch (error) {
+									case BleErrors.ERROR_RETURN_VALUE_PARSING:
+									case BleErrors.ERROR_RECOVER_MODE_DISABLED:
+									case BleErrors.ERROR_NOT_IN_RECOVERY_MODE: {
+										Log.d(TAG, "recover mode disabled or not in recovery mode");
+										callback.onError(error);
+										execCallback.onSuccess();
+										break;
+									}
+									default: {
+										execCallback.onError(error);
+									}
+								}
+							}
+						});
+					}
+				}, new IStatusCallback() {
+					@Override
+					public void onSuccess() { /* don't care */ }
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				});
+//				}
+			}
+		});
+	}
+
 	/**
 	 * Function to read the current temperature value from the device.
 	 *
@@ -2526,6 +2664,7 @@ public class BleExt {
 		}
 	}
 
+	@Deprecated
 	public void readAlert(final IAlertCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_NEW_ALERT_UUID, callback)) {
 			BleLog.LOGd(TAG, "Reading Alert value ...");
@@ -2533,6 +2672,7 @@ public class BleExt {
 		}
 	}
 
+	@Deprecated
 	public void readAlert(final String address, final IAlertCallback callback) {
 		getHandler().post(new Runnable() {
 			@Override
@@ -2571,6 +2711,7 @@ public class BleExt {
 		});
 	}
 
+	@Deprecated
 	public void resetAlert(IStatusCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_NEW_ALERT_UUID, callback)) {
 			BleLog.LOGd(TAG, "Reset Alert");
@@ -2578,6 +2719,7 @@ public class BleExt {
 		}
 	}
 
+	@Deprecated
 	public void resetAlert(final String address, final IStatusCallback callback) {
 		getHandler().post(new Runnable() {
 			@Override
