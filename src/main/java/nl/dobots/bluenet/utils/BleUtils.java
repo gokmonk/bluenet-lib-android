@@ -7,6 +7,8 @@ import java.util.UUID;
 import android.bluetooth.BluetoothAdapter;
 import android.util.Base64;
 
+import nl.dobots.bluenet.ble.cfg.BluenetConfig;
+
 public class BleUtils {
 
 	public static final String BASE_UUID_START = "0000";
@@ -73,7 +75,7 @@ public class BleUtils {
 	}
 
 	public static int byteArrayToInt(byte[] bytes) {
-		return byteArrayToShort(bytes, 0);
+		return byteArrayToInt(bytes, 0);
 	}
 
 	public static int byteArrayToInt(byte[] bytes, int offset) {
@@ -99,12 +101,23 @@ public class BleUtils {
 		return bb.array();
 	}
 
+	public static byte[] intToByteArray(int val) {
+		ByteBuffer bb = ByteBuffer.allocate(4);
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+		bb.putInt(val);
+		return bb.array();
+	}
+
 	public static int toUint8(byte b) {
 		return b & 0xFF;
 	}
 
 	public static int toUint16(int num) {
 		return num & 0xFFFF;
+	}
+
+	public static long toUint32(int num) {
+		return num & 0xFFFFFFFFL;
 	}
 
 	public static byte[] addressToBytes(String address) {

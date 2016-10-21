@@ -12,6 +12,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import nl.dobots.bluenet.ble.base.structs.EncryptionKeys;
 import nl.dobots.bluenet.ble.base.structs.EncryptionSessionData;
+import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.utils.BleUtils;
 
 /**
@@ -49,8 +50,6 @@ public class BleBaseEncryption {
 	private static final int SESSION_NONCE_LENGTH = 5;
 	private static final int PACKET_NONCE_LENGTH = 3;
 	private static final int ACCESS_LEVEL_LENGTH = 1;
-
-	private static final int CAFEBABE = 0xCAFEBABE;
 
 //	private Cipher _cipher = null;
 //	private boolean _cipherInitialized = false;
@@ -254,22 +253,23 @@ public class BleBaseEncryption {
 		return getSessionData(decryptedData, true);
 	}
 
-	public static EncryptionSessionData getSessionData(byte[] decryptedData, boolean encrypted) {
+	public static EncryptionSessionData getSessionData(byte[] decryptedData, boolean wasEncrypted) {
 		if (decryptedData == null) {
 			return null;
 		}
-		if (encrypted) {
-			if (decryptedData.length < SESSION_NONCE_LENGTH) {
+		// When the data was encrypted, the first 4 bytes should be CAFEBABE, to check if encryption succeeded.
+		if (wasEncrypted) {
+			if (decryptedData.length < VALIDATION_KEY_LENGTH + SESSION_NONCE_LENGTH) {
+				return null;
+			}
+			// Bytes 0-3 (validation key) should be CAFEBABE
+			if (BleUtils.byteArrayToInt(decryptedData) != BluenetConfig.CAFEBABE) {
 				return null;
 			}
 			return _getSessionData(decryptedData, VALIDATION_KEY_LENGTH);
 		}
 		else {
-			if (decryptedData.length < VALIDATION_KEY_LENGTH + SESSION_NONCE_LENGTH) {
-				return null;
-			}
-			// Bytes 0-3 (validation key) should be 0xcafebabe
-			if (BleUtils.byteArrayToInt(decryptedData) != CAFEBABE) {
+			if (decryptedData.length < SESSION_NONCE_LENGTH) {
 				return null;
 			}
 			return _getSessionData(decryptedData, 0);

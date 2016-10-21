@@ -1798,15 +1798,15 @@ public class BleBase extends BleCore {
 				byte[] data = getValue(json);
 				EncryptionSessionData sessionData = null;
 				if (setupMode) {
-					sessionData = _encryption.getSessionData(data, false);
+					sessionData = BleBaseEncryption.getSessionData(data, false);
 				}
 				else {
 					if (_encryptionKeys == null) {
 						callback.onError(BleErrors.ENCRYPTION_ERROR);
 						return;
 					}
-					byte[] decryptedData = _encryption.decryptEcb(data, _encryptionKeys.getGuestKey());
-					sessionData = _encryption.getSessionData(decryptedData);
+					byte[] decryptedData = BleBaseEncryption.decryptEcb(data, _encryptionKeys.getGuestKey());
+					sessionData = BleBaseEncryption.getSessionData(decryptedData);
 				}
 
 				if (sessionData == null) {
