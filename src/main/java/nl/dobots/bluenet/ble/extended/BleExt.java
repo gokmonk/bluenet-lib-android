@@ -634,7 +634,9 @@ public class BleExt {
 						}
 					});
 				}
-				callback.onSuccess();
+				else {
+					callback.onSuccess();
+				}
 			}
 
 			@Override
