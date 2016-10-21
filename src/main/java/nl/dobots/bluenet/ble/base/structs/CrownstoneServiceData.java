@@ -54,7 +54,8 @@ public class CrownstoneServiceData extends JSONObject {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 		try {
-			bb.getShort(); // skip first two bytes (service UUID)
+			setServiceUuid(BleUtils.toUint16(bb.getShort()));
+
 			bb.mark();
 			int firmwareVersion = BleUtils.toUint8(bb.get());
 
@@ -163,6 +164,24 @@ public class CrownstoneServiceData extends JSONObject {
 			put("firmwareVersion", firmwareVersion);
 		} catch (JSONException e) {
 			BleLog.LOGd(TAG, "failed to add firmware version");
+			e.printStackTrace();
+		}
+	}
+
+	public int getServiceUuid() {
+		try {
+			return getInt("serviceUuid");
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "no service uuid found");
+			return 0;
+		}
+	}
+
+	private void setServiceUuid(int serviceUuid) {
+		try {
+			put("serviceUuid", serviceUuid);
+		} catch (JSONException e) {
+			BleLog.LOGd(TAG, "failed to add service uuid");
 			e.printStackTrace();
 		}
 	}

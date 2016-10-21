@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 
 import nl.dobots.bluenet.ble.base.BleBase;
+import nl.dobots.bluenet.ble.base.BleBaseEncryption;
 import nl.dobots.bluenet.ble.base.callbacks.IAlertCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;

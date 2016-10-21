@@ -43,6 +43,8 @@ public class BleDevice {
 	private static final double coeff2 = 6.9476;
 	private static final double coeff3 = 0.54992;
 
+	public static final int NUM_ADVERTISEMENT_VALIDATIONS = 3;
+
 	// todo: should we support a device being more than one type?
 	enum DeviceType {
 		unknown,
@@ -50,6 +52,13 @@ public class BleDevice {
 		guidestone,
 		ibeacon,
 		fridge
+	}
+
+	enum CrownstoneMode {
+		unknown,
+		setup,
+		normal,
+		dfu,
 	}
 
 	private static long expirationTime = 5000;
@@ -72,6 +81,7 @@ public class BleDevice {
 
 	private CrownstoneServiceData _serviceData;
 
+	private CrownstoneMode _crownstoneMode = CrownstoneMode.unknown;
 	private boolean _isValidatedCrownstone = false;
 	private int _lastCrownstoneId = -1;
 	private String _lastRandom;
@@ -85,12 +95,14 @@ public class BleDevice {
 		_rssi = rssi;
 		_type = DeviceType.unknown;
 		_isIBeacon = false;
+		_crownstoneMode = CrownstoneMode.unknown;
+		_isValidatedCrownstone = false;
 
 		updateRssiValue((new Date()).getTime(), rssi);
 //		_rssiHistory.add(new RssiMeasurement(rssi, (new Date()).getTime()));
 	}
 
-	private BleDevice(String address, String name, int rssi, DeviceType type, boolean isIBeacon, int major, int minor, UUID proximityUuid, int calibratedRssi) {
+	private BleDevice(String address, String name, int rssi, DeviceType type, boolean isIBeacon, int major, int minor, UUID proximityUuid, int calibratedRssi, boolean validated, CrownstoneMode mode) {
 		_address = address;
 		_name = name;
 		_rssi = rssi;
@@ -100,6 +112,8 @@ public class BleDevice {
 		_minor = minor;
 		_proximityUuid = proximityUuid;
 		_calibratedRssi = calibratedRssi;
+		_crownstoneMode = mode; // TODO: should this be copied?
+		_isValidatedCrownstone = validated; // TODO: should this be copied?
 
 		updateRssiValue((new Date()).getTime(), rssi);
 //		_rssiHistory.add(new RssiMeasurement(rssi, (new Date()).getTime()));
@@ -130,7 +144,7 @@ public class BleDevice {
 
 	public BleDevice clone() {
 		return new BleDevice(_address, _name, _rssi, _type,
-				_isIBeacon, _major, _minor, _proximityUuid, _calibratedRssi);
+				_isIBeacon, _major, _minor, _proximityUuid, _calibratedRssi, _isValidatedCrownstone, _crownstoneMode);
 	}
 
 	public String toString() {
@@ -164,9 +178,18 @@ public class BleDevice {
 		return _type == DeviceType.crownstone;
 	}
 
+	@Deprecated
 	public boolean isFridge() {
 		return _type == DeviceType.fridge;
 	}
+
+	public boolean isValidatedCrownstone() {
+		return _isValidatedCrownstone;
+	}
+
+	public boolean isSetupMode() { return _crownstoneMode == CrownstoneMode.setup; }
+
+	public boolean isDfuMode() { return _crownstoneMode == CrownstoneMode.dfu; }
 
 	private DeviceType determineDeviceType(JSONObject json) throws JSONException {
 		if (json.has(BleTypes.PROPERTY_IS_CROWNSTONE)) {
@@ -377,8 +400,10 @@ public class BleDevice {
 			_lastCrownstoneId = -1;
 			_lastRandom = null;
 			_isValidatedCrownstone = true;
+			_crownstoneMode = CrownstoneMode.setup;
 			return;
 		}
+		_crownstoneMode = CrownstoneMode.normal;
 
 		Log.d(TAG, "_lastCrownstoneId=" + _lastCrownstoneId + " _lastRandom=" + _lastRandom);
 		if (_lastCrownstoneId != -1 && _lastRandom != null) {
@@ -391,7 +416,7 @@ public class BleDevice {
 			if (_lastCrownstoneId == _serviceData.getCrownstoneId()) {
 				if (!_isValidatedCrownstone) {
 //					_numSimilarCrownstoneIds += 1;
-					if (++_numSimilarCrownstoneIds >= BluenetConfig.NUM_ADVERTISEMENT_VALIDATIONS) {
+					if (++_numSimilarCrownstoneIds >= NUM_ADVERTISEMENT_VALIDATIONS) {
 						Log.d(TAG, "validated crownstone!");
 						_isValidatedCrownstone = true;
 					}

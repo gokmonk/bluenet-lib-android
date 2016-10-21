@@ -253,6 +253,4 @@ public class BluenetConfig {
 	public static final int RELAY_ON =                                  255;
 	public static final int RELAY_OFF =                                 0;
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	public static final int NUM_ADVERTISEMENT_VALIDATIONS =             3;
 }
