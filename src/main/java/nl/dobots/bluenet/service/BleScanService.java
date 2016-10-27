@@ -15,6 +15,7 @@ import java.util.ArrayList;
 
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.extended.BleDeviceFilter;
+import nl.dobots.bluenet.ble.extended.callbacks.IBleBeaconCallback;
 import nl.dobots.bluenet.ble.extended.callbacks.IBleDeviceCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.extended.BleExt;
@@ -22,6 +23,7 @@ import nl.dobots.bluenet.ble.extended.structs.BleDevice;
 import nl.dobots.bluenet.ble.extended.structs.BleDeviceMap;
 import nl.dobots.bluenet.service.callbacks.EventListener;
 import nl.dobots.bluenet.service.callbacks.IntervalScanListener;
+import nl.dobots.bluenet.service.callbacks.ScanBeaconListener;
 import nl.dobots.bluenet.service.callbacks.ScanDeviceListener;
 import nl.dobots.bluenet.service.callbacks.IScanListCallback;
 import nl.dobots.bluenet.utils.BleLog;
@@ -151,6 +153,7 @@ public class BleScanService extends Service {
 
 	// Keep up a list of listeners to notify
 	private ArrayList<ScanDeviceListener> _scanDeviceListeners = new ArrayList<>();
+	private ArrayList<ScanBeaconListener> _scanBeaconListeners = new ArrayList<>();
 	private ArrayList<IntervalScanListener> _intervalScanListeners = new ArrayList<>();
 	private ArrayList<EventListener> _eventListeners = new ArrayList<>();
 
@@ -370,6 +373,18 @@ public class BleScanService extends Service {
 						}
 					}
 				}
+			}, new IBleBeaconCallback() {
+				@Override
+				public void onBeaconScanned(BleDevice device) {
+					for (ScanBeaconListener listener : _scanBeaconListeners) {
+						listener.onBeaconScanned(device);
+					}
+				}
+
+				@Override
+				public void onError(int error) {
+
+				}
 			}))
 			{
 				Log.d(TAG, "... scan interval started");
@@ -563,6 +578,27 @@ public class BleScanService extends Service {
 	public void unregisterScanDeviceListener(ScanDeviceListener listener) {
 		if (_scanDeviceListeners.contains(listener)) {
 			_scanDeviceListeners.remove(listener);
+		}
+	}
+
+	/**
+	 * Register as a ScanBeaconListener. Whenever a device is detected, an onDeviceScanned event
+	 * is triggered with the detected device as a parameter
+	 * @param listener the listener to register
+	 */
+	public void registerScanBeaconListener(ScanBeaconListener listener) {
+		if (!_scanBeaconListeners.contains(listener)) {
+			_scanBeaconListeners.add(listener);
+		}
+	}
+
+	/**
+	 * Unregister from the service
+	 * @param listener the listener to unregister
+	 */
+	public void unregisterScanBeaconListener(ScanBeaconListener listener) {
+		if (_scanBeaconListeners.contains(listener)) {
+			_scanBeaconListeners.remove(listener);
 		}
 	}
 

@@ -5,6 +5,7 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
+import android.support.annotation.Nullable;
 import android.util.Log;
 
 import org.json.JSONException;
@@ -34,6 +35,7 @@ import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.core.BleCore;
 import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
 import nl.dobots.bluenet.ble.core.BleCoreTypes;
+import nl.dobots.bluenet.ble.extended.callbacks.IBleBeaconCallback;
 import nl.dobots.bluenet.ble.extended.callbacks.IBleDeviceCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
@@ -297,7 +299,23 @@ public class BleExt {
 		if (clearList) {
 			clearDeviceMap();
 		}
-		return startEndlessScan(callback);
+		return startEndlessScan(callback, null);
+	}
+
+	/**
+	 * Starts a scan used for interval scanning,  devices will be provided through the callback. see
+	 * startEndlessScan for details
+	 *
+	 * @param clearList if true, clears the list before starting the scan
+	 * @param callback callback used to report back scanned devices
+	 * @param beaconCallback callback used to report back scanned devices that match the iBeacon filter
+	 * @return true if the scan was started, false if an error occurred
+	 */
+	public boolean startScan(boolean clearList, final IBleDeviceCallback callback, final IBleBeaconCallback beaconCallback) {
+		if (clearList) {
+			clearDeviceMap();
+		}
+		return startEndlessScan(callback, beaconCallback);
 	}
 
 	/**
@@ -311,7 +329,7 @@ public class BleExt {
 	 * @param callback callback used to report back scanned devices
 	 * @return true if the scan was started, false if an error occurred
 	 */
-	private boolean startEndlessScan(final IBleDeviceCallback callback) {
+	private boolean startEndlessScan(final IBleDeviceCallback callback, @Nullable final IBleBeaconCallback beaconCallback) {
 //		checkConnectionState(BleDeviceConnectionState.initialized, null);
 		if (_connectionState != BleDeviceConnectionState.initialized) {
 			BleLog.LOGe(TAG, "State is not initialized: %s", _connectionState.toString());
@@ -334,6 +352,26 @@ public class BleExt {
 					return;
 				}
 
+				boolean iBeaconMatch = false;
+				if (!_iBeaconFilter.isEmpty() && beaconCallback != null) {
+					if (device.isIBeacon()) {
+						for (BleIbeaconFilter iBeaconFilter : _iBeaconFilter) {
+							if (iBeaconFilter.matches(device.getProximityUuid(), device.getMajor(), device.getMinor())) {
+								iBeaconMatch = true;
+								break;
+							}
+						}
+					}
+					if (iBeaconMatch) {
+						Log.d(TAG, "matching ibeacon filter: " + device.getAddress() + " (" + device.getName() + ")");
+						device = updateDevice(device);
+						beaconCallback.onBeaconScanned(device);
+					}
+					else {
+						Log.d(TAG, "not matching any ibeacon filter:" + device.getAddress() + " (" + device.getName() + ")");
+					}
+				}
+
 				switch (_scanFilter) {
 					case crownstone:
 						// if filter set to crownstone, but device is not a crownstone, abort
@@ -354,29 +392,18 @@ public class BleExt {
 						break;
 				}
 
-				if (!_iBeaconFilter.isEmpty()) {
-					if (!device.isIBeacon()) {
-						Log.d(TAG, "device is no ibeacon:" + device.getAddress() + " (" + device.getName() + ")");
-						return;
-					}
-					boolean match = false;
-					for (BleIbeaconFilter iBeaconFilter : _iBeaconFilter) {
-						if (iBeaconFilter.matches(device.getProximityUuid(), device.getMajor(), device.getMinor())) {
-							match = true;
-							break;
-						}
-					}
-					if (!match) {
-						Log.d(TAG, "not matching any ibeacon filter:" + device.getAddress() + " (" + device.getName() + ")");
-						return;
-					}
-				}
 
-				// update the device list, this triggers recalculation of the average RSSI (and
-				// distance estimation if it is a beacon)
-				device = updateDevice(device);
+
+				// Update the device list, this triggers recalculation of the average RSSI (and
+				// distance estimation if it is a beacon).
+				// If there was an iBeacon match, it was already updated before.
+				if (!iBeaconMatch) {
+					device = updateDevice(device);
+				}
 				// report the updated device
-				callback.onDeviceScanned(device);
+				if (callback != null) {
+					callback.onDeviceScanned(device);
+				}
 
 				if (_cloudScanCB != null) {
 					_cloudScanCB.onDeviceScanned(device);
