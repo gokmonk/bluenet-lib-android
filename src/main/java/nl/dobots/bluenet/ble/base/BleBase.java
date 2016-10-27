@@ -241,7 +241,8 @@ public class BleBase extends BleCore {
 					@Override
 					public void onSuccess(byte[] result) {
 						int serviceUUID = BleUtils.byteArrayToShort(result, 0);
-						if (serviceUUID == BluenetConfig.CROWNSTONE_SERVICE_DATA_UUID ||
+						if (serviceUUID == BluenetConfig.CROWNSTONE_PLUG_SERVICE_DATA_UUID ||
+								serviceUUID == BluenetConfig.CROWNSTONE_BUILTIN_SERVICE_DATA_UUID ||
 								serviceUUID == BluenetConfig.GUIDESTONE_SERVICE_DATA_UUID) {
 							parseServiceData(json, result);
 						}
@@ -321,8 +322,8 @@ public class BleBase extends BleCore {
 
 		int serviceUUID = bb.getShort();
 
-		if (serviceUUID == BluenetConfig.CROWNSTONE_SERVICE_DATA_UUID) {
-			BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE, true);
+		if (serviceUUID == BluenetConfig.CROWNSTONE_PLUG_SERVICE_DATA_UUID || serviceUUID == BluenetConfig.CROWNSTONE_BUILTIN_SERVICE_DATA_UUID) {
+			BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE, true); // TODO: need to differ between plug and builtin?
 //			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData(bb.array(), _encryptionEnabled, _encryptionKeys.getGuestKey());
 			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData();
 			if (crownstoneServiceData.parseBytes(bb.array(), _encryptionEnabled, EncryptionKeys.getGuestKey(_encryptionKeys))) {
@@ -330,6 +331,11 @@ public class BleBase extends BleCore {
 			}
 		} else if (serviceUUID == BluenetConfig.GUIDESTONE_SERVICE_DATA_UUID) {
 			BleCore.addProperty(json, BleTypes.PROPERTY_IS_GUIDESTONE, true);
+			// TODO: should probably be GuidestoneServiceData in the future.
+			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData();
+			if (crownstoneServiceData.parseBytes(bb.array(), _encryptionEnabled, EncryptionKeys.getGuestKey(_encryptionKeys))) {
+				BleCore.addProperty(json, BleTypes.PROPERTY_SERVICE_DATA, crownstoneServiceData);
+			}
 		}
 	}
 

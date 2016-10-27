@@ -51,6 +51,7 @@ public class BleDevice {
 		crownstone,
 		guidestone,
 		ibeacon,
+		@Deprecated
 		fridge
 	}
 
@@ -163,6 +164,10 @@ public class BleDevice {
 			str += " serviceData: " + _serviceData.toString();
 		}
 		return str;
+	}
+
+	public DeviceType getDeviceType() {
+		return _type;
 	}
 
 	public boolean isIBeacon() {

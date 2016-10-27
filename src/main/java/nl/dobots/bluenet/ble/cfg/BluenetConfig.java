@@ -212,8 +212,9 @@ public class BluenetConfig {
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// DoBots
 	public static final short DOBOTS_COMPANY_ID =                       (short)0x038E;
-	public static final short CROWNSTONE_SERVICE_DATA_UUID =            (short)0xC001;
-	public static final short GUIDESTONE_SERVICE_DATA_UUID =            (short)0xC002;
+	public static final short CROWNSTONE_PLUG_SERVICE_DATA_UUID =       (short)0xC001;
+	public static final short CROWNSTONE_BUILTIN_SERVICE_DATA_UUID =    (short)0xC002;
+	public static final short GUIDESTONE_SERVICE_DATA_UUID =            (short)0xC003;
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
