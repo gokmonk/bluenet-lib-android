@@ -10,7 +10,9 @@ import nl.dobots.bluenet.ble.core.BleCoreTypes;
  */
 public class BleTypes extends BleCoreTypes {
 
-	public static final String PROPERTY_IS_CROWNSTONE = "isCrownstone";
+	public static final String PROPERTY_IS_CROWNSTONE_PLUG = "isCrownstonePlug";
+	public static final String PROPERTY_IS_CROWNSTONE_BUILTIN = "isCrownstoneBuiltin";
+
 	public static final String PROPERTY_CALIBRATED_RSSI = "calibratedRssi";
 	public static final String PROPERTY_MINOR = "minor";
 	public static final String PROPERTY_MAJOR = "major";

@@ -373,16 +373,20 @@ public class BleExt {
 				}
 
 				switch (_scanFilter) {
-					case crownstone:
-						// if filter set to crownstone, but device is not a crownstone, abort
-						if (!device.isCrownstone()) return;
+					case iBeacon:
+						if (!device.isIBeacon()) return;
+						break;
+					case anyStone:
+						if (!device.isStone()) return;
+						break;
+					case crownstonePlug:
+						if (!device.isCrownstonePlug()) return;
+						break;
+					case crownstoneBuiltin:
+						if (!device.isCrownstoneBuiltin()) return;
 						break;
 					case guidestone:
 						if (!device.isGuidestone()) return;
-						break;
-					case iBeacon:
-						// if filter set to beacon, but device is not a beacon, abort
-						if (!device.isIBeacon()) return;
 						break;
 					case fridge:
 						if (!device.isFridge()) return;

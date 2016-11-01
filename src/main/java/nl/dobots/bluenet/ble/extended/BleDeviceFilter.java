@@ -11,9 +11,11 @@ package nl.dobots.bluenet.ble.extended;
 public enum BleDeviceFilter {
 
 	all,
-	crownstone,
-	guidestone,
 	iBeacon,
+	anyStone,
+	crownstonePlug,
+	crownstoneBuiltin,
+	guidestone,
 	@Deprecated
 	fridge
 

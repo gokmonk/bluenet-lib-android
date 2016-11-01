@@ -48,9 +48,10 @@ public class BleDevice {
 	// todo: should we support a device being more than one type?
 	enum DeviceType {
 		unknown,
-		crownstone,
-		guidestone,
 		ibeacon,
+		crownstonePlug,
+		crownstoneBuiltin,
+		guidestone,
 		@Deprecated
 		fridge
 	}
@@ -135,7 +136,7 @@ public class BleDevice {
 			_proximityUuid = (UUID) json.get(BleTypes.PROPERTY_PROXIMITY_UUID);
 			_calibratedRssi = json.getInt(BleTypes.PROPERTY_CALIBRATED_RSSI);
 		}
-		if (isCrownstone()) {
+		if (isStone()) {
 			_serviceData = new CrownstoneServiceData(json.getString(BleTypes.PROPERTY_SERVICE_DATA));
 		}
 
@@ -160,7 +161,7 @@ public class BleDevice {
 		else {
 			str += " iBeacon: no";
 		}
-		if (isCrownstone() && _serviceData != null) {
+		if (isStone() && _serviceData != null) {
 			str += " serviceData: " + _serviceData.toString();
 		}
 		return str;
@@ -175,13 +176,15 @@ public class BleDevice {
 		return _isIBeacon;
 	}
 
-	public boolean isGuidestone() {
-		return _type == DeviceType.guidestone;
+	public boolean isStone() {
+		return _type == DeviceType.crownstonePlug || _type == DeviceType.crownstoneBuiltin || _type == DeviceType.guidestone;
 	}
 
-	public boolean isCrownstone() {
-		return _type == DeviceType.crownstone;
-	}
+	public boolean isCrownstonePlug() { return _type == DeviceType.crownstonePlug; }
+
+	public boolean isCrownstoneBuiltin() { return _type == DeviceType.crownstoneBuiltin; }
+
+	public boolean isGuidestone() { return _type == DeviceType.guidestone; }
 
 	@Deprecated
 	public boolean isFridge() {
@@ -197,9 +200,14 @@ public class BleDevice {
 	public boolean isDfuMode() { return _crownstoneMode == CrownstoneMode.dfu; }
 
 	private DeviceType determineDeviceType(JSONObject json) throws JSONException {
-		if (json.has(BleTypes.PROPERTY_IS_CROWNSTONE)) {
-			if (json.getBoolean(BleTypes.PROPERTY_IS_CROWNSTONE)) {
-				return DeviceType.crownstone;
+		if (json.has(BleTypes.PROPERTY_IS_CROWNSTONE_PLUG)) {
+			if (json.getBoolean(BleTypes.PROPERTY_IS_CROWNSTONE_PLUG)) {
+				return DeviceType.crownstonePlug;
+			}
+		}
+		if (json.has(BleTypes.PROPERTY_IS_CROWNSTONE_BUILTIN)) {
+			if (json.getBoolean(BleTypes.PROPERTY_IS_CROWNSTONE_BUILTIN)) {
+				return DeviceType.crownstoneBuiltin;
 			}
 		}
 		if (json.has(BleTypes.PROPERTY_IS_GUIDESTONE)) {
@@ -396,7 +404,7 @@ public class BleDevice {
 		// TODO: if in dfu mode: validate differently
 		Log.d(TAG, "validateCrownstone");
 
-		if (!isCrownstone() || _serviceData == null) {
+		if (!isStone() || _serviceData == null) {
 			Log.d(TAG, "no service data or no crownstone");
 			return;
 		}

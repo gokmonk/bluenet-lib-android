@@ -121,9 +121,11 @@ public class BleScanService extends Service {
 	 *   FILTER_IbEACON: return all scanned iBeacon devices
 	 */
 	public static final int FILTER_ALL = 0;
-	public static final int FILTER_CROWNSTONE = 1;
-	public static final int FILTER_GUIDESTONE = 2;
-	public static final int FILTER_IBEACON = 3;
+	public static final int FILTER_IBEACON = 1;
+	public static final int FILTER_ANY_STONE = 2;
+	public static final int FILTER_CROWNSTONE_PLUG = 3;
+	public static final int FILTER_CROWNSTONE_BUILTIN = 4;
+	public static final int FILTER_GUIDESTONE = 5;
 
 	/**
 	 * Default value for EXTRA_SCAN_FILTER
@@ -203,12 +205,16 @@ public class BleScanService extends Service {
 			switch (bundle.getInt(EXTRA_SCAN_FILTER, DEFAULT_SCAN_FILTER)) {
 				case FILTER_ALL:
 					return BleDeviceFilter.all;
-				case FILTER_CROWNSTONE:
-					return BleDeviceFilter.crownstone;
-				case FILTER_GUIDESTONE:
-					return BleDeviceFilter.guidestone;
 				case FILTER_IBEACON:
 					return BleDeviceFilter.iBeacon;
+				case FILTER_ANY_STONE:
+					return BleDeviceFilter.anyStone;
+				case FILTER_CROWNSTONE_PLUG:
+					return BleDeviceFilter.crownstonePlug;
+				case FILTER_CROWNSTONE_BUILTIN:
+					return BleDeviceFilter.crownstoneBuiltin;
+				case FILTER_GUIDESTONE:
+					return BleDeviceFilter.guidestone;
 			}
 		}
 		return BleDeviceFilter.all;

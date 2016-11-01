@@ -288,7 +288,7 @@ public class BleBase extends BleCore {
 				int deviceType = bb.get();
 				switch (deviceType) {
 					case BluenetConfig.DEVICE_CROWNSTONE: {
-						BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE, true);
+						BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE_PLUG, true);
 						break;
 					}
 					case BluenetConfig.DEVICE_GUIDESTONE: {
@@ -301,7 +301,7 @@ public class BleBase extends BleCore {
 					}
 				}
 			} catch (Exception e) {
-				BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE, true);
+				BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE_PLUG, true);
 				BleLog.LOGd(TAG, "old advertisement package: %s", json);
 			}
 		}
@@ -322,14 +322,23 @@ public class BleBase extends BleCore {
 
 		int serviceUUID = bb.getShort();
 
-		if (serviceUUID == BluenetConfig.CROWNSTONE_PLUG_SERVICE_DATA_UUID || serviceUUID == BluenetConfig.CROWNSTONE_BUILTIN_SERVICE_DATA_UUID) {
-			BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE, true); // TODO: need to differ between plug and builtin?
+		if (serviceUUID == BluenetConfig.CROWNSTONE_PLUG_SERVICE_DATA_UUID) {
+			BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE_PLUG, true);
 //			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData(bb.array(), _encryptionEnabled, _encryptionKeys.getGuestKey());
 			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData();
 			if (crownstoneServiceData.parseBytes(bb.array(), _encryptionEnabled, EncryptionKeys.getGuestKey(_encryptionKeys))) {
 				BleCore.addProperty(json, BleTypes.PROPERTY_SERVICE_DATA, crownstoneServiceData);
 			}
-		} else if (serviceUUID == BluenetConfig.GUIDESTONE_SERVICE_DATA_UUID) {
+		}
+		else if (serviceUUID == BluenetConfig.CROWNSTONE_BUILTIN_SERVICE_DATA_UUID) {
+			BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE_BUILTIN, true);
+//			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData(bb.array(), _encryptionEnabled, _encryptionKeys.getGuestKey());
+			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData();
+			if (crownstoneServiceData.parseBytes(bb.array(), _encryptionEnabled, EncryptionKeys.getGuestKey(_encryptionKeys))) {
+				BleCore.addProperty(json, BleTypes.PROPERTY_SERVICE_DATA, crownstoneServiceData);
+			}
+		}
+		else if (serviceUUID == BluenetConfig.GUIDESTONE_SERVICE_DATA_UUID) {
 			BleCore.addProperty(json, BleTypes.PROPERTY_IS_GUIDESTONE, true);
 			// TODO: should probably be GuidestoneServiceData in the future.
 			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData();
