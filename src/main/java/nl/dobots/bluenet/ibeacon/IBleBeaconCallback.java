@@ -24,4 +24,6 @@ public interface IBleBeaconCallback extends IBaseCallback {
 
 	void onBeaconScanned(BleDevice device);
 
+
+
 }

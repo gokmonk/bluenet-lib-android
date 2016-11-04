@@ -15,7 +15,6 @@ import java.util.ArrayList;
 
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.extended.BleDeviceFilter;
-import nl.dobots.bluenet.ble.extended.callbacks.IBleBeaconCallback;
 import nl.dobots.bluenet.ble.extended.callbacks.IBleDeviceCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.extended.BleExt;
@@ -379,19 +378,20 @@ public class BleScanService extends Service {
 						}
 					}
 				}
-			}, new IBleBeaconCallback() {
-				@Override
-				public void onBeaconScanned(BleDevice device) {
-					for (ScanBeaconListener listener : _scanBeaconListeners) {
-						listener.onBeaconScanned(device);
-					}
-				}
-
-				@Override
-				public void onError(int error) {
-
-				}
 			}))
+//			}, new IBleBeaconCallback() {
+//				@Override
+//				public void onBeaconScanned(BleDevice device) {
+//					for (ScanBeaconListener listener : _scanBeaconListeners) {
+//						listener.onBeaconScanned(device);
+//					}
+//				}
+//
+//				@Override
+//				public void onError(int error) {
+//
+//				}
+//			}))
 			{
 				Log.d(TAG, "... scan interval started");
 				_scanning = true;

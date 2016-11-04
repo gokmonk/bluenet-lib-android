@@ -3,6 +3,7 @@ package nl.dobots.bluenet.ibeacon;
 import java.util.UUID;
 
 import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
+import nl.dobots.bluenet.ble.extended.structs.BleDevice;
 
 /**
  * Copyright (c) 2015 Bart van Vliet <bart@dobots.nl>. All rights reserved.
@@ -21,10 +22,11 @@ import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
  *
  * @author Bart van Vliet
  */
-public interface BleBeaconRangingListener extends IBaseCallback {
+public interface BleBeaconRangingListener {
 
 	void onRegionEnter(UUID uuid);
 	void onRegionExit(UUID uuid);
+	void onBeaconScanned(BleDevice device);
 
 
 

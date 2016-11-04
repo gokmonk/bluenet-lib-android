@@ -8,11 +8,8 @@ import android.os.SystemClock;
 import android.support.annotation.Nullable;
 import android.util.Log;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -23,19 +20,16 @@ import nl.dobots.bluenet.ble.base.callbacks.IAlertCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IPowerSamplesCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
 import nl.dobots.bluenet.ble.base.structs.AlertState;
 import nl.dobots.bluenet.ble.base.structs.CommandMsg;
-import nl.dobots.bluenet.ble.base.structs.EncryptionKeys;
 import nl.dobots.bluenet.ble.base.structs.EncryptionSessionData;
 import nl.dobots.bluenet.ble.base.structs.PowerSamples;
-import nl.dobots.bluenet.ble.base.structs.StateMsg;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.core.BleCore;
 import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
-import nl.dobots.bluenet.ble.core.BleCoreTypes;
-import nl.dobots.bluenet.ble.extended.callbacks.IBleBeaconCallback;
+import nl.dobots.bluenet.ibeacon.BleIbeaconRanging;
+import nl.dobots.bluenet.ibeacon.IBleBeaconCallback;
 import nl.dobots.bluenet.ble.extended.callbacks.IBleDeviceCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
@@ -91,7 +85,8 @@ public class BleExt {
 	// only report guidestone devices
 	private BleDeviceFilter _scanFilter = BleDeviceFilter.all;
 
-	private ArrayList<BleIbeaconFilter> _iBeaconFilter = new ArrayList<>();
+//	private ArrayList<BleIbeaconFilter> _iBeaconFilter = new ArrayList<>();
+	private BleIbeaconRanging _iBeaconRanger = new BleIbeaconRanging();
 
 	// current connection state
 	private BleDeviceConnectionState _connectionState = BleDeviceConnectionState.uninitialized;
@@ -134,6 +129,8 @@ public class BleExt {
 
 	public BleExtState getBleExtState() { return _bleExtState; }
 
+	public BleIbeaconRanging getIbeaconRanger() { return _iBeaconRanger; }
+
 	/**
 	 * Set the scan device filter. by setting a filter, only the devices specified will
 	 * pass through the filter and be reported to the application, any other detected devices
@@ -152,25 +149,25 @@ public class BleExt {
 		return _scanFilter;
 	}
 
-	public void addIbeaconFilter(BleIbeaconFilter filter) {
-		_iBeaconFilter.add(filter);
-	}
-
-	public void remIbeaconFilter(BleIbeaconFilter filter) {
-		for (int i=_iBeaconFilter.size(); i>0; i--) {
-			if (_iBeaconFilter.get(i).equals(filter)) {
-				_iBeaconFilter.remove(i);
-			}
-		}
-	}
-
-	public void clearIbeaconFilter() {
-		_iBeaconFilter.clear();
-	}
-
-	public ArrayList<BleIbeaconFilter> getIbeaconFilter() {
-		return _iBeaconFilter;
-	}
+//	public void addIbeaconFilter(BleIbeaconFilter filter) {
+//		_iBeaconFilter.add(filter);
+//	}
+//
+//	public void remIbeaconFilter(BleIbeaconFilter filter) {
+//		for (int i=_iBeaconFilter.size(); i>0; i--) {
+//			if (_iBeaconFilter.get(i).equals(filter)) {
+//				_iBeaconFilter.remove(i);
+//			}
+//		}
+//	}
+//
+//	public void clearIbeaconFilter() {
+//		_iBeaconFilter.clear();
+//	}
+//
+//	public ArrayList<BleIbeaconFilter> getIbeaconFilter() {
+//		return _iBeaconFilter;
+//	}
 
 	/**
 	 * Get the current target address, i.e. the address of the device we are connected to
@@ -239,6 +236,7 @@ public class BleExt {
 	 */
 	public void destroy() {
 		_handler.removeCallbacksAndMessages(null);
+		_iBeaconRanger.destroy();
 		_bleBase.destroy();
 	}
 
@@ -299,24 +297,25 @@ public class BleExt {
 		if (clearList) {
 			clearDeviceMap();
 		}
-		return startEndlessScan(callback, null);
+//		return startEndlessScan(callback, null);
+		return startEndlessScan(callback);
 	}
 
-	/**
-	 * Starts a scan used for interval scanning,  devices will be provided through the callback. see
-	 * startEndlessScan for details
-	 *
-	 * @param clearList if true, clears the list before starting the scan
-	 * @param callback callback used to report back scanned devices
-	 * @param beaconCallback callback used to report back scanned devices that match the iBeacon filter
-	 * @return true if the scan was started, false if an error occurred
-	 */
-	public boolean startScan(boolean clearList, final IBleDeviceCallback callback, final IBleBeaconCallback beaconCallback) {
-		if (clearList) {
-			clearDeviceMap();
-		}
-		return startEndlessScan(callback, beaconCallback);
-	}
+//	/**
+//	 * Starts a scan used for interval scanning,  devices will be provided through the callback. see
+//	 * startEndlessScan for details
+//	 *
+//	 * @param clearList if true, clears the list before starting the scan
+//	 * @param callback callback used to report back scanned devices
+//	 * @param beaconCallback callback used to report back scanned devices that match the iBeacon filter
+//	 * @return true if the scan was started, false if an error occurred
+//	 */
+//	public boolean startScan(boolean clearList, final IBleDeviceCallback callback, final IBleBeaconCallback beaconCallback) {
+//		if (clearList) {
+//			clearDeviceMap();
+//		}
+//		return startEndlessScan(callback, beaconCallback);
+//	}
 
 	/**
 	 * Helper function to start an endless scan. endless meaning, it will continue scanning
@@ -329,7 +328,8 @@ public class BleExt {
 	 * @param callback callback used to report back scanned devices
 	 * @return true if the scan was started, false if an error occurred
 	 */
-	private boolean startEndlessScan(final IBleDeviceCallback callback, @Nullable final IBleBeaconCallback beaconCallback) {
+//	private boolean startEndlessScan(final IBleDeviceCallback callback, @Nullable final IBleBeaconCallback beaconCallback) {
+	private boolean startEndlessScan(final IBleDeviceCallback callback) {
 //		checkConnectionState(BleDeviceConnectionState.initialized, null);
 		if (_connectionState != BleDeviceConnectionState.initialized) {
 			BleLog.LOGe(TAG, "State is not initialized: %s", _connectionState.toString());
@@ -352,25 +352,28 @@ public class BleExt {
 					return;
 				}
 
-				boolean iBeaconMatch = false;
-				if (!_iBeaconFilter.isEmpty() && beaconCallback != null) {
-					if (device.isIBeacon()) {
-						for (BleIbeaconFilter iBeaconFilter : _iBeaconFilter) {
-							if (iBeaconFilter.matches(device.getProximityUuid(), device.getMajor(), device.getMinor())) {
-								iBeaconMatch = true;
-								break;
-							}
-						}
-					}
-					if (iBeaconMatch) {
-						Log.d(TAG, "matching ibeacon filter: " + device.getAddress() + " (" + device.getName() + ")");
-						device = updateDevice(device);
-						beaconCallback.onBeaconScanned(device);
-					}
-					else {
-						Log.d(TAG, "not matching any ibeacon filter:" + device.getAddress() + " (" + device.getName() + ")");
-					}
-				}
+//				boolean iBeaconMatch = _iBeaconRanger.onScannedDevice(device, beaconCallback);
+				boolean iBeaconMatch = _iBeaconRanger.onScannedDevice(device, null);
+
+//				boolean iBeaconMatch = false;
+//				if (!_iBeaconFilter.isEmpty() && beaconCallback != null) {
+//					if (device.isIBeacon()) {
+//						for (BleIbeaconFilter iBeaconFilter : _iBeaconFilter) {
+//							if (iBeaconFilter.matches(device.getProximityUuid(), device.getMajor(), device.getMinor())) {
+//								iBeaconMatch = true;
+//								break;
+//							}
+//						}
+//					}
+//					if (iBeaconMatch) {
+//						Log.d(TAG, "matching ibeacon filter: " + device.getAddress() + " (" + device.getName() + ")");
+//						device = updateDevice(device);
+//						beaconCallback.onBeaconScanned(device);
+//					}
+//					else {
+//						Log.d(TAG, "not matching any ibeacon filter:" + device.getAddress() + " (" + device.getName() + ")");
+//					}
+//				}
 
 				switch (_scanFilter) {
 					case iBeacon:

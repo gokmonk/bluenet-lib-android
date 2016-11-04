@@ -1,5 +1,7 @@
 package nl.dobots.bluenet.ibeacon;
 
+import android.util.Log;
+
 import java.util.UUID;
 
 /**
@@ -20,20 +22,19 @@ import java.util.UUID;
  * @author Bart van Vliet
  */
 public class BleIbeaconFilter {
-	public UUID uuid;
-	public int major; // Use -1 to ignore this value
-	public int minor; // Use -1 to ignore this value
+	private UUID uuid;
+	private int major; // Use -1 to ignore this value
+	private int minor; // Use -1 to ignore this value
 
 	public BleIbeaconFilter(UUID uuid) {
-		this.uuid = uuid;
-		this.major = -1;
-		this.minor = -1;
+		this(uuid, -1, -1);
 	}
 
 	public BleIbeaconFilter(UUID uuid, int major, int minor) {
 		this.uuid = uuid;
 		this.major = major;
 		this.minor = minor;
+//		Log.d("bluenet ibeacon filter", "Set filter to: " + uuid.toString() + "=" + this.uuid.toString() + " " + major + " " + minor);
 	}
 
 	public boolean equals(BleIbeaconFilter filter) {
@@ -41,6 +42,7 @@ public class BleIbeaconFilter {
 	}
 
 	public boolean matches(UUID uuid, int major, int minor) {
+//		Log.d("bluenet ibeacon filter", "filter: " + this.uuid.toString() + " vs " + uuid.toString());
 		if (!this.uuid.equals(uuid)) {
 			return false;
 		}
@@ -51,5 +53,9 @@ public class BleIbeaconFilter {
 			return false;
 		}
 		return true;
+	}
+
+	public UUID getUuid() {
+		return uuid;
 	}
 }
