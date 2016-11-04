@@ -1,4 +1,4 @@
-package nl.dobots.bluenet.ble.extended.callbacks;
+package nl.dobots.bluenet.ibeacon;
 
 import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
 import nl.dobots.bluenet.ble.extended.structs.BleDevice;

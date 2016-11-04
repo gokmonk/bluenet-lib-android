@@ -1,4 +1,4 @@
-package nl.dobots.bluenet.ble.extended;
+package nl.dobots.bluenet.ibeacon;
 
 import java.util.UUID;
 

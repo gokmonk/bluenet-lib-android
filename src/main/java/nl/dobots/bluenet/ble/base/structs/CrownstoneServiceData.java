@@ -145,8 +145,8 @@ public class CrownstoneServiceData extends JSONObject {
 	}
 
 	private boolean isSetupPacket() {
-		Log.d(TAG, "setup=" + isSetupMode() + " id=" + getCrownstoneId() + " switch=" + getSwitchState() + " power=" + getPowerUsage() + " energy=" + getAccumulatedEnergy());
-		return (isSetupMode() && getCrownstoneId() == 0 && getSwitchState() == 0 && getPowerUsage() == 0 && getAccumulatedEnergy() == 0);
+		Log.d(TAG, "setup=" + isSetupMode(getEventBitmask()) + " id=" + getCrownstoneId() + " switch=" + getSwitchState() + " power=" + getPowerUsage() + " energy=" + getAccumulatedEnergy());
+		return (isSetupMode(getEventBitmask()) && getCrownstoneId() == 0 && getSwitchState() == 0 && getPowerUsage() == 0 && getAccumulatedEnergy() == 0);
 	}
 
 
@@ -295,8 +295,15 @@ public class CrownstoneServiceData extends JSONObject {
 		return ((eventBitmask & (1L << 1)) != 0);
 	}
 
-	public boolean isSetupMode() { return isSetupMode(getEventBitmask()); }
-	public static boolean isSetupMode(byte eventBitmask) {
+//	public boolean isSetupMode() { return isSetupMode(getEventBitmask()); }
+//	public static boolean isSetupMode(byte eventBitmask) {
+//		return ((eventBitmask & (1L << 7)) != 0);
+//	}
+	public boolean isSetupMode() { return isSetupPacket(); }
+//	public static boolean isSetupMode(byte eventBitmask) {
+//		return isSetupPacket();
+//	}
+	private static boolean isSetupMode(byte eventBitmask) {
 		return ((eventBitmask & (1L << 7)) != 0);
 	}
 
