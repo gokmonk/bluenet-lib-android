@@ -343,7 +343,7 @@ public class BleExt {
 			@Override
 			public void onDeviceScanned(BleDevice device) {
 
-				Log.d(TAG, "scanned:" + device.toString());
+//				BleLog.LOGd(TAG, "scanned:" + device.toString());
 
 				if (_blackList != null && _blackList.contains(device.getAddress())) {
 					return;
@@ -366,12 +366,12 @@ public class BleExt {
 //						}
 //					}
 //					if (iBeaconMatch) {
-//						Log.d(TAG, "matching ibeacon filter: " + device.getAddress() + " (" + device.getName() + ")");
+//						BleLog.LOGd(TAG, "matching ibeacon filter: " + device.getAddress() + " (" + device.getName() + ")");
 //						device = updateDevice(device);
 //						beaconCallback.onBeaconScanned(device);
 //					}
 //					else {
-//						Log.d(TAG, "not matching any ibeacon filter:" + device.getAddress() + " (" + device.getName() + ")");
+//						BleLog.LOGd(TAG, "not matching any ibeacon filter:" + device.getAddress() + " (" + device.getName() + ")");
 //					}
 //				}
 
@@ -2059,13 +2059,13 @@ public class BleExt {
 		_bleBase.write(_targetAddress, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_RECOVERY_UUID, code, BleBaseEncryption.ACCESS_LEVEL_ENCRYPTION_DISABLED, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
-				Log.d(TAG, "written to recovery characteristic");
+				BleLog.LOGd(TAG, "written to recovery characteristic");
 				_bleBase.read(_targetAddress, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_RECOVERY_UUID, false, new IDataCallback() {
 					@Override
 					public void onData(JSONObject json) {
 						// Verify that the crownstone accepted the recover command
 						byte[] data = BleCore.getValue(json);
-						Log.d(TAG, "read recover data: " + BleUtils.bytesToString(data));
+						BleLog.LOGd(TAG, "read recover data: " + BleUtils.bytesToString(data));
 //						if (data == null || data.length != 1) {
 						if (data == null || data.length < 1) {
 							callback.onError(BleErrors.ERROR_RETURN_VALUE_PARSING);
@@ -2145,7 +2145,7 @@ public class BleExt {
 									case BleErrors.ERROR_RETURN_VALUE_PARSING:
 									case BleErrors.ERROR_RECOVER_MODE_DISABLED:
 									case BleErrors.ERROR_NOT_IN_RECOVERY_MODE: {
-										Log.d(TAG, "recover mode disabled or not in recovery mode");
+										BleLog.LOGd(TAG, "recover mode disabled or not in recovery mode");
 										callback.onError(error);
 										execCallback.onSuccess();
 										break;

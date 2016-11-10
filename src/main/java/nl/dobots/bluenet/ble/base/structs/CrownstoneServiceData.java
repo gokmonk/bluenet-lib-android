@@ -50,7 +50,7 @@ public class CrownstoneServiceData extends JSONObject {
 
 	public boolean parseBytes(byte[] bytes, boolean encrypted, byte[] key) {
 		// Includes the service UUID (first 2 bytes)
-		Log.d(TAG, "serviceData: " + BleUtils.bytesToString(bytes));
+		BleLog.LOGd(TAG, "serviceData: " + BleUtils.bytesToString(bytes));
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 		try {
@@ -95,7 +95,7 @@ public class CrownstoneServiceData extends JSONObject {
 		byte[] test = new byte[16];
 		bb.mark();
 		bb.get(test);
-		Log.d(TAG, "parseDecryptedData: " + BleUtils.bytesToString(test));
+		BleLog.LOGd(TAG, "parseDecryptedData: " + BleUtils.bytesToString(test));
 		bb.reset();
 
 		switch(firmwareVersion) {
@@ -145,7 +145,7 @@ public class CrownstoneServiceData extends JSONObject {
 	}
 
 	private boolean isSetupPacket() {
-		Log.d(TAG, "setup=" + isSetupMode(getEventBitmask()) + " id=" + getCrownstoneId() + " switch=" + getSwitchState() + " power=" + getPowerUsage() + " energy=" + getAccumulatedEnergy());
+		BleLog.LOGd(TAG, "setup=" + isSetupMode(getEventBitmask()) + " id=" + getCrownstoneId() + " switch=" + getSwitchState() + " power=" + getPowerUsage() + " energy=" + getAccumulatedEnergy());
 		return (isSetupMode(getEventBitmask()) && getCrownstoneId() == 0 && getSwitchState() == 0 && getPowerUsage() == 0 && getAccumulatedEnergy() == 0);
 	}
 
