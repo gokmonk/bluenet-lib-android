@@ -750,7 +750,7 @@ public class BleExt {
 	 * @return true if control characteristic is available, false otherwise
 	 */
 	public boolean hasControlCharacteristic(IBaseCallback callback) {
-		return hasCharacteristic(BluenetConfig.CHAR_CONTROL_UUID, null);
+		return hasCharacteristic(BluenetConfig.CHAR_CONTROL_UUID, callback);
 	}
 
 	private void handleOnSuccess() {
@@ -1995,6 +1995,74 @@ public class BleExt {
 			}
 		});
 	}
+
+
+	/**
+	 * Function to factory reset the device. This will erase all settings on the device, and
+	 * boots it in setup mode.
+	 *
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void writeFactoryReset(IStatusCallback callback) {
+		if (isConnected(callback)) {
+			int value = BluenetConfig.FACTORY_RESET_CODE;
+			BleLog.LOGd(TAG, "Write factory reset with %d", value);
+			if (hasControlCharacteristic(callback)) {
+				BleLog.LOGd(TAG, "use control characteristic");
+				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_FACTORY_RESET, 4, BleUtils.intToByteArray(value)), callback);
+			}
+		}
+	}
+
+	/**
+	 * Function to factory reset the device. This will erase all settings on the device, and
+	 * boots it in setup mode.
+	 *
+	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
+	 * @param address the MAC address of the device
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void writeFactoryReset(final String address, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				final int value = BluenetConfig.FACTORY_RESET_CODE;
+				BleLog.LOGd(TAG, "Set Reset to %d", value);
+//				if (checkConnection(address)) {
+//					writeReset(value, callback);
+//				} else {
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IStatusCallback execCallback) {
+						writeReset(value, new IStatusCallback() {
+							@Override
+							public void onSuccess() {
+								callback.onSuccess();
+								execCallback.onSuccess();
+							}
+
+							@Override
+							public void onError(int error) {
+								execCallback.onError(error);
+							}
+						});
+					}
+				}, new IStatusCallback() {
+					@Override
+					public void onSuccess() { /* don't care */ }
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				});
+//				}
+			}
+		});
+	}
+
 
 	/**
 	 * Function to reset / reboot the device
