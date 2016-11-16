@@ -2028,15 +2028,13 @@ public class BleExt {
 		getHandler().post(new Runnable() {
 			@Override
 			public void run() {
-				final int value = BluenetConfig.FACTORY_RESET_CODE;
-				BleLog.LOGd(TAG, "Set Reset to %d", value);
 //				if (checkConnection(address)) {
 //					writeReset(value, callback);
 //				} else {
 				connectAndExecute(address, new IExecuteCallback() {
 					@Override
 					public void execute(final IStatusCallback execCallback) {
-						writeReset(value, new IStatusCallback() {
+						writeFactoryReset(new IStatusCallback() {
 							@Override
 							public void onSuccess() {
 								callback.onSuccess();
