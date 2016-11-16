@@ -120,6 +120,22 @@ public class BleUtils {
 		return num & 0xFFFFFFFFL;
 	}
 
+	public static byte[] hexStringToBytes(String hex) {
+		byte[] result = new byte[hex.length() / 2];
+		for (int i = 0; i < result.length; ++i) {
+			result[i] = Integer.valueOf(hex.substring(2*i, 2*i+2), 16).byteValue();
+		}
+		return result;
+	}
+
+	public static String bytesToHexString(byte[] bytes) {
+		StringBuilder sb = new StringBuilder();
+		for (byte b : bytes) {
+			sb.append(String.format("%02x", b));
+		}
+		return sb.toString();
+	}
+
 	public static byte[] addressToBytes(String address) {
 		if (address == null || address.length() != STR_ADDRESS_LENGTH) {
 			return null;

@@ -160,7 +160,7 @@ public class LocationsDbAdapter {
 			String locationStr = cursor.getString(cursor.getColumnIndexOrThrow(KEY_LOCATION_NAME));
 
 //			if (!locationStr.matches(lastLocationStr)) {
-//				location = new Location(locationStr);
+//				location = new Fingerprint(locationStr);
 //				list.add(location);
 //			}
 			if (hashMap.containsKey(locationStr)) {

@@ -89,6 +89,8 @@ public class CrownstoneServiceData extends JSONObject {
 	}
 
 	private boolean parseDecryptedData(byte[] bytes, int offset, int firmwareVersion) {
+		if (bytes.length - offset < 16) return false;
+
 		ByteBuffer bb = ByteBuffer.wrap(bytes, offset, bytes.length-offset);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 

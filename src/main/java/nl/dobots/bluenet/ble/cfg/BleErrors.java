@@ -50,6 +50,8 @@ public class BleErrors {
 	public static final int NO_SUBSCRIBER_ID = 237;
 	public static final int ERROR_RECOVER_MODE_DISABLED = 238;
 	public static final int ERROR_NOT_IN_RECOVERY_MODE = 239;
+	public static final int ERROR_SETUP_FAILED = 240;
+	public static final int ERROR_VALIDATION_FAILED = 241;
 
 
 	// BleBase

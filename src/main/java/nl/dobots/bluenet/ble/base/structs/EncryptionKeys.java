@@ -3,6 +3,7 @@ package nl.dobots.bluenet.ble.base.structs;
 import android.support.annotation.Nullable;
 
 import nl.dobots.bluenet.ble.base.BleBaseEncryption;
+import nl.dobots.bluenet.utils.BleUtils;
 
 /**
  * Copyright (c) 2015 Bart van Vliet <bart@dobots.nl>. All rights reserved.
@@ -29,21 +30,41 @@ public class EncryptionKeys {
 	private byte[] _memberKeyBytes;
 	private byte[] _guestKeyBytes;
 
+	protected EncryptionKeys() {};
+
 	public EncryptionKeys(@Nullable String adminKey, @Nullable String memberKey, @Nullable String guestKey) {
 		_adminKey = adminKey;
 		_memberKey = memberKey;
 		_guestKey = guestKey;
 		_adminKeyBytes = null;
 		if (_adminKey != null) {
-			_adminKeyBytes = adminKey.getBytes();
+			_adminKeyBytes = BleUtils.hexStringToBytes(adminKey);
 		}
 		_memberKeyBytes = null;
 		if (_memberKey != null) {
-			_memberKeyBytes = memberKey.getBytes();
+			_memberKeyBytes = BleUtils.hexStringToBytes(memberKey);
 		}
 		_guestKeyBytes = null;
 		if (_guestKey != null) {
-			_guestKeyBytes = guestKey.getBytes();
+			_guestKeyBytes = BleUtils.hexStringToBytes(guestKey);
+		}
+	}
+
+	public EncryptionKeys(@Nullable byte[] adminKey, @Nullable byte[] memberKey, @Nullable byte[] guestKey) {
+		_adminKeyBytes = adminKey;
+		_memberKeyBytes = memberKey;
+		_guestKeyBytes = guestKey;
+		_adminKey = null;
+		if (_adminKeyBytes != null) {
+			_adminKey = BleUtils.bytesToHexString(_adminKeyBytes);
+		}
+		_memberKey = null;
+		if (_memberKeyBytes != null) {
+			_memberKey = BleUtils.bytesToHexString(_memberKeyBytes);
+		}
+		_guestKey = null;
+		if (_guestKeyBytes != null) {
+			_guestKey = BleUtils.bytesToHexString(_guestKeyBytes);
 		}
 	}
 

@@ -67,6 +67,7 @@ public class BleBase extends BleCore {
 	private boolean _encryptionEnabled = false;
 	private EncryptionKeys _encryptionKeys = null;
 	private EncryptionSessionData _encryptionSessionData = null;
+	private boolean _setupMode = false;
 
 	/** Hashmap of all subscribers, based on characeristic UUID */
 	private HashMap<UUID, ArrayList<IDataCallback>> _subscribers = new HashMap<>();
@@ -98,6 +99,18 @@ public class BleBase extends BleCore {
 		handlerThread.start();
 		_timeoutHandler = new Handler(handlerThread.getLooper());
 	}
+
+	IStatusCallback _silentStatusCallback = new IStatusCallback() {
+		@Override
+		public void onSuccess() {
+			BleLog.LOGd(TAG, "onSuccess");
+		}
+
+		@Override
+		public void onError(int error) {
+			BleLog.LOGe(TAG, "onError %d", error);
+		}
+	};
 
 	public boolean enableEncryption(boolean enable) {
 		_encryptionEnabled = enable;
@@ -392,6 +405,8 @@ public class BleBase extends BleCore {
 	 * @param callback the callback used to report discovered services and characteristics
 	 */
 	public void discoverServices(String address, final IDiscoveryCallback callback) {
+		_setupMode = false;
+
 		super.discoverServices(address, new IDataCallback() {
 			@Override
 			public void onData(JSONObject json) {
@@ -406,6 +421,10 @@ public class BleBase extends BleCore {
 							String characteristicUuid = charac.getString(BleCoreTypes.PROPERTY_CHARACTERISTIC_UUID);
 							BleLog.LOGd(TAG, "found service %s with characteristic %s", serviceUuid, characteristicUuid);
 							callback.onDiscovery(serviceUuid, characteristicUuid);
+						}
+
+						if (serviceUuid.equals(BluenetConfig.SETUP_SERVICE_UUID)) {
+							_setupMode = true;
 						}
 					}
 					callback.onSuccess();
@@ -654,21 +673,22 @@ public class BleBase extends BleCore {
 				},
 				new IDataCallback() {
 					@Override
-					public void onData(JSONObject json) {
-						callback.onData(json);
-
-						// do the unsubscribe silently, i.e. not inform the callback about
-						// success or error
+					public void onData(final JSONObject json) {
+						// need to wait until unsubscribe is completed before returning the data
+						// otherwise if a new read/write is started before the unsubscribe
+						// completed the command will get lost
 						unsubscribe(address, serviceUuid, characteristicUuid, subscribeId[0],
 								new IStatusCallback() {
 									@Override
 									public void onSuccess() {
 										BleLog.LOGd(TAG, "unsubscribed successfully");
+										callback.onData(json);
 									}
 
 									@Override
 									public void onError(int error) {
 										BleLog.LOGw(TAG, "unsubscribe failed %d", error);
+										callback.onData(json);
 									}
 								});
 					}
@@ -715,21 +735,22 @@ public class BleBase extends BleCore {
 				},
 				new IDataCallback() {
 					@Override
-					public void onData(JSONObject json) {
-						callback.onData(json);
-
-						// do the unsubscribe silently, i.e. not inform the callback about
-						// success or error
+					public void onData(final JSONObject json) {
+						// need to wait until unsubscribe is completed before returning the data
+						// otherwise if a new read/write is started before the unsubscribe
+						// completed the command will get lost
 						unsubscribe(address, serviceUuid, characteristicUuid, subscribeId[0],
 								new IStatusCallback() {
 									@Override
 									public void onSuccess() {
 										BleLog.LOGd(TAG, "unsubscribed successfully");
+										callback.onData(json);
 									}
 
 									@Override
 									public void onError(int error) {
 										BleLog.LOGw(TAG, "unsubscribe failed %d", error);
+										callback.onData(json);
 									}
 								});
 					}
@@ -1033,24 +1054,124 @@ public class BleBase extends BleCore {
 	 */
 	public void getConfiguration(final String address, final int configurationType, final IConfigurationCallback callback) {
 
-		selectConfiguration(address, configurationType, new IStatusCallback() {
-			@Override
-			public void onSuccess() {
-				// todo: do we need a timeout here?
-				_timeoutHandler.postDelayed(new Runnable() {
-					@Override
-					public void run() {
-						readConfiguration(address, callback);
-					}
-				}, 50);
-//				readConfiguration(address, callback);
-			}
+		final int[] subscriberId = new int[1];
 
-			@Override
-			public void onError(int error) {
-				callback.onError(error);
-			}
-		});
+		subscribeConfiguration(address,
+				new IIntegerCallback() {
+					@Override
+					public void onSuccess(int result) {
+						subscriberId[0] = result;
+						selectConfiguration(address, configurationType, new IStatusCallback() {
+							@Override
+							public void onSuccess() {
+								// yippi, wait for configuration to come in on notification
+							}
+
+							@Override
+							public void onError(int error) {
+								// select failed, unsubscribe again
+								unsubscribeConfiguration(address, subscriberId[0], _silentStatusCallback);
+								callback.onError(error);
+							}
+						});
+					}
+
+					@Override
+					public void onError(int error) {
+						// subscribe failed
+						callback.onError(error);
+					}
+				},
+				new IConfigurationCallback() {
+					@Override
+					public void onSuccess(final ConfigurationMsg configuration) {
+						// need to wait until unsubscribe is completed before returning the data
+						// otherwise if a new read/write is started before the unsubscribe
+						// completed the command will get lost
+						unsubscribeConfiguration(address, subscriberId[0], new IStatusCallback() {
+							@Override
+							public void onSuccess() {
+								callback.onSuccess(configuration);
+							}
+
+							@Override
+							public void onError(int error) {
+								callback.onError(error);
+							}
+						});
+					}
+
+					@Override
+					public void onError(int error) {
+						unsubscribeConfiguration(address, subscriberId[0], _silentStatusCallback);
+						callback.onError(error);
+					}
+				}
+		);
+	}
+
+	public void unsubscribeConfiguration(String address, int subscriberId, IStatusCallback callback) {
+		if (_setupMode) {
+			unsubscribe(address, BluenetConfig.SETUP_SERVICE_UUID, BluenetConfig.CHAR_SETUP_CONFIG_READ_UUID,
+					subscriberId, callback);
+		} else {
+			unsubscribe(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONFIG_READ_UUID,
+					subscriberId, callback);
+		}
+	}
+
+	public void subscribeConfiguration(String address, final IIntegerCallback statusCallback, final IConfigurationCallback callback) {
+		if (_setupMode) {
+			subscribeConfiguration(address, BluenetConfig.SETUP_SERVICE_UUID,
+					BluenetConfig.CHAR_SETUP_CONFIG_READ_UUID, statusCallback, callback);
+		} else {
+			subscribeConfiguration(address, BluenetConfig.CROWNSTONE_SERVICE_UUID,
+					BluenetConfig.CHAR_CONFIG_READ_UUID, statusCallback, callback);
+		}
+	}
+
+	/**
+	 * Subscribe to the StateRead characteristic to receive gatt notifications. the statusCallback's
+	 * onSuccess function will be triggered on success with the subscriber id. this id is needed
+	 * for unsubscribing afterwards.
+	 *
+	 * @param address the address of the device
+	 * @param statusCallback the callback which will be informed about success or failure.
+	 *                       in case of success, the onSuccess function will return the subscriber
+	 *                       id which is needed for unsubscribing afterwards
+	 * @param callback the callback which will be triggered every time a gatt notification arrives
+	 */
+	private void subscribeConfiguration(String address, String serviceUuid, String characteristicUuid,
+										final IIntegerCallback statusCallback, final IConfigurationCallback callback) {
+
+		subscribeMultipart(address, serviceUuid, characteristicUuid,
+				statusCallback,
+				new IDataCallback() {
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+
+					@Override
+					public void onData(JSONObject json) {
+						final byte[] bytes = BleCore.getValue(json);
+						byte[] decryptedBytes;
+						if (_encryptionEnabled) {
+							decryptedBytes = _encryption.decryptCtr(bytes, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, _encryptionKeys);
+						}
+						else {
+							decryptedBytes = bytes;
+						}
+
+						BleLog.LOGd(TAG, BleUtils.bytesToString(decryptedBytes));
+
+						ConfigurationMsg configuration = new ConfigurationMsg(decryptedBytes);
+						BleLog.LOGd(TAG, "read configuration: %s", configuration.toString());
+						callback.onSuccess(configuration);
+					}
+				}
+		);
 	}
 
 	/**
@@ -1062,10 +1183,12 @@ public class BleBase extends BleCore {
 	 * @param configuration configuration to be written to the set configuration characteristic
 	 * @param callback callback function to be called on success or error
 	 */
-	public void writeConfiguration(String address, ConfigurationMsg configuration, final IStatusCallback callback) {
+	private void writeConfiguration(final String address, final ConfigurationMsg configuration,
+									final boolean verify, String serviceUuid, String characteristicUuid,
+									final IStatusCallback callback) {
 		byte[] bytes = configuration.toArray();
-		BleLog.LOGd(TAG, "configuration: write %s at service %s and characteristic %s", Arrays.toString(bytes), BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONFIG_CONTROL_UUID);
-		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONFIG_CONTROL_UUID, bytes,
+		BleLog.LOGd(TAG, "configuration: write %s at service %s and characteristic %s", Arrays.toString(bytes), serviceUuid, characteristicUuid);
+		write(address, serviceUuid, characteristicUuid, bytes,
 				new IStatusCallback() {
 
 					@Override
@@ -1077,7 +1200,27 @@ public class BleBase extends BleCore {
 						_timeoutHandler.postDelayed(new Runnable() {
 							@Override
 							public void run() {
-								callback.onSuccess();
+								// if verify is set, get the configuration value from the crownstone
+								// and verify that the value we read is the value we set
+								if (verify) {
+									getConfiguration(address, configuration.getType(), new IConfigurationCallback() {
+										@Override
+										public void onSuccess(ConfigurationMsg readConfig) {
+											if (Arrays.equals(readConfig.getPayload(), configuration.getPayload())) {
+												callback.onSuccess();
+											} else {
+												callback.onError(BleErrors.ERROR_VALIDATION_FAILED);
+											}
+										}
+
+										@Override
+										public void onError(int error) {
+											callback.onError(error);
+										}
+									});
+								} else {
+									callback.onSuccess();
+								}
 							}
 						}, 200);
 					}
@@ -1091,6 +1234,29 @@ public class BleBase extends BleCore {
 	}
 
 	/**
+	 * Write the configuration value to the set configuration characteristic. the configuration is a
+	 * ConfigurationMsg object which starts with a byte for the configuration type, then 1 byte
+	 * reserved for byte alignment, 2 bytes for the length of the payload data, and the payload
+	 * data
+	 * Note: this function selects the appropriate characteristic/service automatically depending
+	 * on whether the Crownstone is in Setup or Normal operation mode
+	 * @param address the address of the device
+	 * @param configuration configuration to be written to the set configuration characteristic
+	 * @param verify
+	 * @param callback callback function to be called on success or error
+	 */
+	public void writeConfiguration(String address, ConfigurationMsg configuration,
+								   boolean verify, final IStatusCallback callback) {
+		if (_setupMode) {
+			writeConfiguration(address, configuration, verify, BluenetConfig.SETUP_SERVICE_UUID,
+					BluenetConfig.CHAR_SETUP_CONFIG_CONTROL_UUID, callback);
+		} else {
+			writeConfiguration(address, configuration, verify, BluenetConfig.CROWNSTONE_SERVICE_UUID,
+					BluenetConfig.CHAR_CONFIG_CONTROL_UUID, callback);
+		}
+	}
+
+	/**
 	 * Write to the configuration control characteristic to select a configuration that we want to
 	 * read afterwards. Need to delay the call to readConfiguration to give the device some time
 	 * to process the request.
@@ -1098,11 +1264,12 @@ public class BleBase extends BleCore {
 	 * @param configurationType the configuration type, see enum ConfigurationMsg Types in BluenetConfig.
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	private void selectConfiguration(String address, int configurationType, final IStatusCallback callback) {
+	private void selectConfiguration(String address, int configurationType, String serviceUuid,
+									 String characteristicUuid, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(configurationType, BluenetConfig.READ_VALUE, 0, new byte[]{});
 		byte[] bytes = configuration.toArray();
-		BleLog.LOGd(TAG, "select configuration: write %d at service %s and characteristic %s", configurationType, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONFIG_CONTROL_UUID);
-		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONFIG_CONTROL_UUID, bytes,
+		BleLog.LOGd(TAG, "select configuration: write %d at service %s and characteristic %s", configurationType, serviceUuid, characteristicUuid);
+		write(address, serviceUuid, characteristicUuid, bytes,
 				new IStatusCallback() {
 
 					@Override
@@ -1120,6 +1287,27 @@ public class BleBase extends BleCore {
 	}
 
 	/**
+	 * Write to the configuration control characteristic to select a configuration that we want to
+	 * read afterwards. Need to delay the call to readConfiguration to give the device some time
+	 * to process the request.
+	 * Note: this function selects the appropriate characteristic/service automatically depending
+	 * on whether the Crownstone is in Setup or Normal operation mode
+	 * @param address the address of the device
+	 * @param configurationType the configuration type, see enum ConfigurationMsg Types in BluenetConfig.
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	private void selectConfiguration(String address, int configurationType, final IStatusCallback callback) {
+		if (_setupMode) {
+			selectConfiguration(address, configurationType, BluenetConfig.SETUP_SERVICE_UUID,
+					BluenetConfig.CHAR_SETUP_CONFIG_CONTROL_UUID, callback);
+		} else {
+			selectConfiguration(address, configurationType, BluenetConfig.CROWNSTONE_SERVICE_UUID,
+					BluenetConfig.CHAR_CONFIG_CONTROL_UUID, callback);
+
+		}
+	}
+
+	/**
 	 * Read the get configuration characteristic to get the configuration value which was
 	 * previously selected. Need to call selectConfiguration first to select a configuration value
 	 * to be read.
@@ -1129,9 +1317,10 @@ public class BleBase extends BleCore {
 	 * @param address the address of the device
 	 * @param callback callback function to be called with the read configuration object
 	 */
-	private void readConfiguration(String address, final IConfigurationCallback callback) {
-		BleLog.LOGd(TAG, "read configuration at service %s and characteristic %s", BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONFIG_READ_UUID);
-		read(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONFIG_READ_UUID, new IDataCallback() {
+	private void readConfiguration(String address, String serviceUuid, String characteristicUuid,
+								   final IConfigurationCallback callback) {
+		BleLog.LOGd(TAG, "read configuration at service %s and characteristic %s", serviceUuid, characteristicUuid);
+		read(address, serviceUuid, characteristicUuid, new IDataCallback() {
 			@Override
 			public void onError(int error) {
 				BleLog.LOGe(TAG, "Failed to read configuration characteristic");
@@ -1146,6 +1335,28 @@ public class BleBase extends BleCore {
 				callback.onSuccess(configuration);
 			}
 		});
+	}
+
+	/**
+	 * Read the get configuration characteristic to get the configuration value which was
+	 * previously selected. Need to call selectConfiguration first to select a configuration value
+	 * to be read.
+	 * Note: Need to delay the call to readConfiguration to give the device some time
+	 * to process the request.
+	 * Consider using @getConfiguration instead
+	 * Note: this function selects the appropriate characteristic/service automatically depending
+	 * on whether the Crownstone is in Setup or Normal operation mode
+	 * @param address the address of the device
+	 * @param callback callback function to be called with the read configuration object
+	 */
+	private void readConfiguration(String address, final IConfigurationCallback callback) {
+		if (_setupMode) {
+			readConfiguration(address, BluenetConfig.SETUP_SERVICE_UUID,
+					BluenetConfig.CHAR_SETUP_CONFIG_READ_UUID, callback);
+		} else {
+			readConfiguration(address, BluenetConfig.CROWNSTONE_SERVICE_UUID,
+					BluenetConfig.CHAR_CONFIG_READ_UUID, callback);
+		}
 	}
 
 	/**
@@ -1214,7 +1425,7 @@ public class BleBase extends BleCore {
 							decryptedBytes = bytes;
 						}
 
-						Log.d(TAG, BleUtils.bytesToString(decryptedBytes));
+						BleLog.LOGd(TAG, BleUtils.bytesToString(decryptedBytes));
 						StateMsg state = new StateMsg(decryptedBytes);
 						BleLog.LOGd(TAG, "received state notification: %s", state.toString());
 						callback.onSuccess(state);
@@ -1361,9 +1572,23 @@ public class BleBase extends BleCore {
 			},
 			new IStateCallback() {
 				@Override
-				public void onSuccess(StateMsg state) {
-					unsubscribeState(address, subscriberId[0]);
-					callback.onSuccess(state);
+				public void onSuccess(final StateMsg state) {
+					// need to wait until unsubscribe is completed before returning the data
+					// otherwise if a new read/write is started before the unsubscribe
+					// completed the command will get lost
+					unsubscribeState(address, subscriberId[0], new IStatusCallback() {
+						@Override
+						public void onSuccess() {
+							BleLog.LOGd(TAG, "unsubscribe state success");
+							callback.onSuccess(state);
+						}
+
+						@Override
+						public void onError(int error) {
+							BleLog.LOGe(TAG, "unsubscribe state error: %d", error);
+							callback.onSuccess(state);
+						}
+					});
 //					_timeoutHandler.postDelayed(new Runnable() {
 //						@Override
 //						public void run() {
@@ -1463,17 +1688,11 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	/**
-	 * Send the give command to the control characteristic. the device then executes the command defined
-	 * by the command parameter
-	 * @param address the address of the device
-	 * @param command command to be executed on the device
-	 * @param callback callback function to be called on success or error
-	 */
-	public void sendCommand(String address, CommandMsg command, final IStatusCallback callback) {
+	private void sendCommand(String address, CommandMsg command, String serviceUuid, String characteristicUuid,
+							 final IStatusCallback callback) {
 		byte[] bytes = command.toArray();
 		BleLog.LOGd(TAG, "control command: write %s at service %s and characteristic %s", Arrays.toString(bytes), BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONTROL_UUID);
-		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONTROL_UUID, bytes,
+		write(address, serviceUuid, characteristicUuid, bytes,
 				new IStatusCallback() {
 
 					@Override
@@ -1497,6 +1716,23 @@ public class BleBase extends BleCore {
 						callback.onError(error);
 					}
 				});
+	}
+
+	/**
+	 * Send the give command to the control characteristic. the device then executes the command defined
+	 * by the command parameter
+	 * Note: this function selects the appropriate characteristic/service automatically depending
+	 * on whether the Crownstone is in Setup or Normal operation mode
+	 * @param address the address of the device
+	 * @param command command to be executed on the device
+	 * @param callback callback function to be called on success or error
+	 */
+	public void sendCommand(String address, CommandMsg command, final IStatusCallback callback) {
+		if (_setupMode) {
+			sendCommand(address, command, BluenetConfig.SETUP_SERVICE_UUID, BluenetConfig.CHAR_SETUP_CONTROL_UUID, callback);
+		} else {
+			sendCommand(address, command, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONTROL_UUID, callback);
+		}
 	}
 
 	/**
@@ -1736,7 +1972,7 @@ public class BleBase extends BleCore {
 								}
 							}
 						} catch (BufferOverflowException e) {
-							Log.e(TAG, "notification buffer overflow. missed some messages?!");
+							BleLog.LOGe(TAG, "notification buffer overflow. missed some messages?!");
 							_notificationBufferValid = false;
 						}
 
@@ -1805,15 +2041,14 @@ public class BleBase extends BleCore {
 				});
 	}
 
-	public void readSessionNonce(final String address, final boolean setupMode, final IDataCallback callback) {
-		Log.d(TAG, "readSessionNonce");
+	public void readSessionNonce(final String address, final IDataCallback callback) {
+		BleLog.LOGd(TAG, "readSessionNonce");
 		IDataCallback sessionCallback = new IDataCallback() {
 			@Override
 			public void onData(JSONObject json) {
 				byte[] data = getValue(json);
-				EncryptionSessionData sessionData = null;
-				if (setupMode) {
-					sessionData = BleBaseEncryption.getSessionData(data, false);
+				if (_setupMode) {
+					_encryptionSessionData = BleBaseEncryption.getSessionData(data, false);
 				}
 				else {
 					if (_encryptionKeys == null) {
@@ -1821,17 +2056,17 @@ public class BleBase extends BleCore {
 						return;
 					}
 					byte[] decryptedData = BleBaseEncryption.decryptEcb(data, _encryptionKeys.getGuestKey());
-					sessionData = BleBaseEncryption.getSessionData(decryptedData);
+					_encryptionSessionData = BleBaseEncryption.getSessionData(decryptedData);
 				}
 
-				if (sessionData == null) {
+				if (_encryptionSessionData == null) {
 					callback.onError(BleErrors.ENCRYPTION_ERROR);
 					return;
 				}
-				Log.d(TAG, "sessionNonce:" + BleUtils.bytesToString(sessionData.sessionNonce));
-				Log.d(TAG, "validationKey:" + BleUtils.bytesToString(sessionData.validationKey));
-				addBytes(json, "sessionNonce", sessionData.sessionNonce);
-				addBytes(json, "validationKey", sessionData.validationKey);
+				BleLog.LOGd(TAG, "sessionNonce:" + BleUtils.bytesToString(_encryptionSessionData.sessionNonce));
+				BleLog.LOGd(TAG, "validationKey:" + BleUtils.bytesToString(_encryptionSessionData.validationKey));
+				addBytes(json, "sessionNonce", _encryptionSessionData.sessionNonce);
+				addBytes(json, "validationKey", _encryptionSessionData.validationKey);
 				callback.onData(json);
 			}
 
@@ -1840,13 +2075,36 @@ public class BleBase extends BleCore {
 				callback.onError(error);
 			}
 		};
-		if (setupMode) {
+		if (_setupMode) {
 			read(address, BluenetConfig.SETUP_SERVICE_UUID, BluenetConfig.CHAR_SETUP_SESSION_NONCE_UUID, false, sessionCallback);
 		}
 		else {
 			read(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_SESSION_NONCE_UUID, false, sessionCallback);
 		}
 
+	}
+	
+	public void readSessionKey(final String address, final IByteArrayCallback callback) {
+		if (_setupMode) {
+			BleLog.LOGd(TAG, "readSessionKey");
+			read(address, BluenetConfig.SETUP_SERVICE_UUID, BluenetConfig.CHAR_SESSION_KEY_UUID, false, new IDataCallback() {
+
+				@Override
+				public void onData(JSONObject json) {
+					byte[] bytes = BleCore.getValue(json);
+					BleLog.LOGd(TAG, "session key: %s", Arrays.toString(bytes));
+					callback.onSuccess(bytes);
+				}
+
+				@Override
+				public void onError(int error) {
+					BleLog.LOGe(TAG, "Failed to read session key");
+					callback.onError(error);
+				}
+			});
+		} else {
+			callback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
+		}
 	}
 
 }

@@ -137,9 +137,20 @@ public class BleDevice {
 			_calibratedRssi = json.getInt(BleTypes.PROPERTY_CALIBRATED_RSSI);
 		}
 		if (isStone()) {
-			_serviceData = new CrownstoneServiceData(json.getString(BleTypes.PROPERTY_SERVICE_DATA));
+			if (json.has(BleTypes.PROPERTY_SERVICE_DATA)) {
+				_serviceData = new CrownstoneServiceData(json.getString(BleTypes.PROPERTY_SERVICE_DATA));
+			} else {
+				_serviceData = new CrownstoneServiceData();
+			}
+
+			if (_serviceData.isSetupMode()) {
+				_crownstoneMode = CrownstoneMode.setup;
+			} else {
+				_crownstoneMode = CrownstoneMode.normal;
+			}
 		}
 
+		validateCrownstone();
 		updateRssiValue((new Date()).getTime(), _rssi);
 //		_rssiHistory.add(new RssiMeasurement(this._rssi, (new Date()).getTime()));
 	}
@@ -408,15 +419,13 @@ public class BleDevice {
 			Log.d(TAG, "no service data or no crownstone");
 			return;
 		}
-		if (_serviceData.isSetupMode()) {
+		if (isSetupMode()) {
 			Log.d(TAG, "validated crownstone in setup mode!");
 			_lastCrownstoneId = -1;
 			_lastRandom = null;
 			_isValidatedCrownstone = true;
-			_crownstoneMode = CrownstoneMode.setup;
 			return;
 		}
-		_crownstoneMode = CrownstoneMode.normal;
 
 		Log.d(TAG, "_lastCrownstoneId=" + _lastCrownstoneId + " _lastRandom=" + _lastRandom);
 		if (_lastCrownstoneId != -1 && _lastRandom != null) {

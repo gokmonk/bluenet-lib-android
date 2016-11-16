@@ -13,6 +13,7 @@ import javax.crypto.spec.SecretKeySpec;
 import nl.dobots.bluenet.ble.base.structs.EncryptionKeys;
 import nl.dobots.bluenet.ble.base.structs.EncryptionSessionData;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
+import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
 /**
@@ -58,7 +59,7 @@ public class BleBaseEncryption {
 //		try {
 //			_cipher = Cipher.getInstance("AES/CTR/NoPadding");
 //		} catch (GeneralSecurityException e) {
-//			Log.e(TAG, "Encryption not available");
+//			BleLog.LOGe(TAG, "Encryption not available");
 //			e.printStackTrace();
 //		}
 	}
@@ -70,7 +71,7 @@ public class BleBaseEncryption {
 //			_cipherInitialized = true;
 //			return true;
 //		} catch (InvalidKeyException e) {
-//			Log.e(TAG, "Encryption not available");
+//			BleLog.LOGe(TAG, "Encryption not available");
 //			e.printStackTrace();
 //		}
 //		return false;
@@ -93,13 +94,13 @@ public class BleBaseEncryption {
 			Log.w(TAG, "wrong key length");
 			return null;
 		}
-		Log.d(TAG, "payloadData: " + BleUtils.bytesToString(payloadData));
+		BleLog.LOGd(TAG, "payloadData: " + BleUtils.bytesToString(payloadData));
 
 		// Packet nonce is randomly generated.
 		SecureRandom random = new SecureRandom();
 		byte[] packetNonce = new byte[PACKET_NONCE_LENGTH];
 		random.nextBytes(packetNonce);
-		Log.d(TAG, "packetNonce: " + BleUtils.bytesToString(packetNonce));
+		BleLog.LOGd(TAG, "packetNonce: " + BleUtils.bytesToString(packetNonce));
 
 		// Create iv by concatting session nonce and packet nonce.
 		byte[] iv = new byte[AES_BLOCK_SIZE];
@@ -113,7 +114,7 @@ public class BleBaseEncryption {
 		//Arrays.fill(payload, (byte)0); // Already zeroes by default
 		System.arraycopy(validationKey, 0, payload, 0, VALIDATION_KEY_LENGTH);
 		System.arraycopy(payloadData, 0, payload, VALIDATION_KEY_LENGTH, payloadData.length);
-		Log.d(TAG, "payload: " + BleUtils.bytesToString(payload));
+		BleLog.LOGd(TAG, "payload: " + BleUtils.bytesToString(payload));
 
 		// Allocate output array
 		byte[] encryptedData = new byte[PACKET_NONCE_LENGTH + ACCESS_LEVEL_LENGTH + payloadLen + paddingLen];
@@ -124,10 +125,10 @@ public class BleBaseEncryption {
 		try {
 			Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding");
 			cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
-			Log.d(TAG, "IV before: " + BleUtils.bytesToString(cipher.getIV()));
+			BleLog.LOGd(TAG, "IV before: " + BleUtils.bytesToString(cipher.getIV()));
 			// doFinal(byte[] input, int inputOffset, int inputLen, byte[] output, int outputOffset)
 			cipher.doFinal(payload, 0, payload.length, encryptedData, PACKET_NONCE_LENGTH+ACCESS_LEVEL_LENGTH);
-			Log.d(TAG, "IV after: " + BleUtils.bytesToString(cipher.getIV()));
+			BleLog.LOGd(TAG, "IV after: " + BleUtils.bytesToString(cipher.getIV()));
 		} catch (GeneralSecurityException e) {
 			e.printStackTrace();
 			return null;
@@ -138,7 +139,7 @@ public class BleBaseEncryption {
 //			cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"));
 //			for (int ctr=0; ctr<payload.length/16; ctr++) {
 //				iv[AES_BLOCK_SIZE-1] = (byte)ctr;
-//				Log.d(TAG, "IV: " + BleUtils.bytesToString(iv));
+//				BleLog.LOGd(TAG, "IV: " + BleUtils.bytesToString(iv));
 //				byte[] encryptedIv = new byte[AES_BLOCK_SIZE];
 //				cipher.doFinal(iv, 0, iv.length, encryptedIv, 0);
 //				for (int i=0; i<AES_BLOCK_SIZE; i++) {
@@ -149,7 +150,7 @@ public class BleBaseEncryption {
 //			e.printStackTrace();
 //			return null;
 //		}
-		Log.d(TAG, "encryptedData: " + BleUtils.bytesToString(encryptedData));
+		BleLog.LOGd(TAG, "encryptedData: " + BleUtils.bytesToString(encryptedData));
 		return encryptedData;
 	}
 
@@ -170,7 +171,7 @@ public class BleBaseEncryption {
 			Log.w(TAG, "no keys supplied");
 			return null;
 		}
-		Log.d(TAG, "encryptedData: " + BleUtils.bytesToString(encryptedData));
+		BleLog.LOGd(TAG, "encryptedData: " + BleUtils.bytesToString(encryptedData));
 
 		byte[] decryptedData = new byte[encryptedData.length - PACKET_NONCE_LENGTH - ACCESS_LEVEL_LENGTH];
 		if (decryptedData.length % AES_BLOCK_SIZE != 0) {
@@ -179,7 +180,7 @@ public class BleBaseEncryption {
 		}
 
 		char accessLevel = (char)BleUtils.toUint8(encryptedData[PACKET_NONCE_LENGTH]);
-		Log.d(TAG, "accessLevel: " + (int)accessLevel);
+		BleLog.LOGd(TAG, "accessLevel: " + (int)accessLevel);
 		byte[] key = keys.getKey(accessLevel);
 		if (key == null || key.length != AES_BLOCK_SIZE) {
 			Log.w(TAG, "wrong key length: " + key);
@@ -195,7 +196,7 @@ public class BleBaseEncryption {
 		try {
 			Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding");
 			cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
-			Log.d(TAG, "IV: " + Arrays.toString(cipher.getIV()));
+			BleLog.LOGd(TAG, "IV: " + Arrays.toString(cipher.getIV()));
 			// doFinal(byte[] input, int inputOffset, int inputLen, byte[] output, int outputOffset)
 			cipher.doFinal(encryptedData, PACKET_NONCE_LENGTH+ACCESS_LEVEL_LENGTH, decryptedData.length, decryptedData, 0);
 		} catch (GeneralSecurityException e) {

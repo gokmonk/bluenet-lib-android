@@ -137,7 +137,7 @@ public class BluenetConfig {
 	public static final char CONFIG_WIFI_SETTINGS =                     10;   // 0x0A
 	public static final char CONFIG_TX_POWER =                          11;   // 0x0B
 	public static final char CONFIG_ADV_INTERVAL =                      12;   // 0x0C
-	public static final char CONFIG_PASSKEY =							13;   // 0x0D
+	public static final char CONFIG_PASSKEY =                           13;   // 0x0D
 	public static final char CONFIG_MIN_ENV_TEMP =                      14;   // 0x0E
 	public static final char CONFIG_MAX_ENV_TEMP =                      15;   // 0x0F
 	public static final char CONFIG_SCAN_DURATION =                     16;   // 0x10
@@ -159,6 +159,22 @@ public class BluenetConfig {
 	public static final char CONFIG_POWER_SAMPLE_CONT_INTERVAL =        32;   // 0x20
 	public static final char CONFIG_POWER_SAMPLE_CONT_NUM_SAMPLES =     33;   // 0x21
 	public static final char CONFIG_CROWNSTONE_ID =                     34;   // 0x22
+	public static final char CONFIG_KEY_ADMIN =                         35;   //! 0x23
+	public static final char CONFIG_KEY_MEMBER =                        36;   //! 0x24
+	public static final char CONFIG_KEY_GUEST =                         37;   //! 0x25
+	public static final char CONFIG_DEFAULT_ON =                        38;   //! 0x26
+	public static final char CONFIG_SCAN_INTERVAL =                     39;   //! 0x27
+	public static final char CONFIG_SCAN_WINDOW =                       40;   //! 0x28
+	public static final char CONFIG_RELAY_HIGH_DURATION =               41;   //! 0x29
+	public static final char CONFIG_LOW_TX_POWER =                      42;   //! 0x2A
+	public static final char CONFIG_VOLTAGE_MULTIPLIER =                43;   //! 0x2B
+	public static final char CONFIG_CURRENT_MULTIPLIER =                44;   //! 0x2C
+	public static final char CONFIG_VOLTAGE_ZERO =                      45;   //! 0x2D
+	public static final char CONFIG_CURRENT_ZERO =                      46;   //! 0x2E
+	public static final char CONFIG_POWER_ZERO =                        47;   //! 0x2F
+	public static final char CONFIG_POWER_ZERO_AVG_WINDOW =             48;   //! 0x30
+	public static final char CONFIG_MESH_ACCESS_ADDRESS =               49;   //! 0x31
+	public static final char CONFIG_KEEP_ALIVE_INTERVAL =               50;   //! 0x32
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////

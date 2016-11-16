@@ -37,14 +37,14 @@ import nl.dobots.bluenet.utils.BleUtils;
  * parses it, i.e. the length value is verified, and if successful the value is returned (based
  * on the length parameter)
  *
- * No other sanity checks are done (i.e. check if connected or check if characteristic is available,
- * if you want those, use @BleExtConfiguration instead.
- *
  * @author Dominik Egger
  */
 public class BleBaseConfiguration {
 
 	public static final String TAG = BleBaseConfiguration.class.getCanonicalName();
+
+	public static final int IBEACON_PROXIMITY_UUID_LENGTH = 16;
+	public static final int ENCRYPTION_KEY_LENGTH = 16;
 
 	private BleBase _bleBase;
 
@@ -61,7 +61,7 @@ public class BleBaseConfiguration {
 	public void setDeviceName(String address, String value, final IStatusCallback callback) {
 		byte[] bytes = value.getBytes(Charset.forName("UTF-8"));
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_NAME, bytes.length, bytes);
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -98,7 +98,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setCrownstoneId(String address, int value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_CROWNSTONE_ID, 2, BleUtils.shortToByteArray(value));
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -111,7 +111,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 2) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int crownstoneId = configuration.getShortValue();
@@ -136,7 +136,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setTxPower(String address, int value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_TX_POWER, 1, new byte[]{(byte)value});
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -149,7 +149,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int txPower = configuration.getByteValue();
@@ -175,7 +175,7 @@ public class BleBaseConfiguration {
 		// convert ms to value used by the crownstone (which is in increments of 0.625 ms)
 		int advertisementInterval = (int)Math.floor(value / BluenetConfig.ADVERTISEMENT_INCREMENT);
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_ADV_INTERVAL, 2, BleUtils.shortToByteArray(advertisementInterval));
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -188,7 +188,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 2) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int advertisementInterval = (int) (configuration.getShortValue() * BluenetConfig.ADVERTISEMENT_INCREMENT);
@@ -212,7 +212,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setBeaconMajor(String address, int value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_IBEACON_MAJOR, 2, BleUtils.shortToByteArray(value));
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -225,7 +225,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 2) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int major = configuration.getShortValue();
@@ -249,7 +249,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setBeaconMinor(String address, int value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_IBEACON_MINOR, 2, BleUtils.shortToByteArray(value));
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -262,7 +262,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 2) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int minor = configuration.getShortValue();
@@ -286,7 +286,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setBeaconCalibratedRssi(String address, int value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_IBEACON_TXPOWER, 1, new byte[]{(byte)value});
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -299,7 +299,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int calibratedRssi = configuration.getByteValue();
@@ -324,7 +324,7 @@ public class BleBaseConfiguration {
 	public void setBeaconProximityUuid(String address, String value, final IStatusCallback callback) {
 		byte[] bytes = BleUtils.uuidToBytes(value);
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_IBEACON_PROXIMITY_UUID, bytes.length, bytes);
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -336,8 +336,8 @@ public class BleBaseConfiguration {
 		_bleBase.getConfiguration(address, BluenetConfig.CONFIG_IBEACON_PROXIMITY_UUID, new IConfigurationCallback() {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
-				if (configuration.getLength() != 16) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+				if (configuration.getLength() != IBEACON_PROXIMITY_UUID_LENGTH) {
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					String proximityUuid = BleUtils.bytesToUuid(configuration.getPayload());
@@ -353,7 +353,148 @@ public class BleBaseConfiguration {
 		});
 	}
 
+	/**
+	 *
+	 * @param address
+	 * @param value
+	 * @param callback
+	 */
+	public void setAdminKey(String address, String value, IStatusCallback callback) {
+//		byte[] bytes = value.getBytes(Charset.forName("UTF-8"));
+		byte[] bytes = BleUtils.hexStringToBytes(value);
+		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_KEY_ADMIN, bytes.length, bytes);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
+	}
 
+	/**
+	 *
+	 * @param address
+	 * @param callback
+	 */
+	public void getAdminKey(String address, final IStringCallback callback) {
+		_bleBase.getConfiguration(address, BluenetConfig.CONFIG_KEY_ADMIN, new IConfigurationCallback() {
+			@Override
+			public void onSuccess(ConfigurationMsg configuration) {
+				if (configuration.getLength() != ENCRYPTION_KEY_LENGTH) {
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
+					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+				} else {
+					String key = new String(configuration.getPayload());
+					BleLog.LOGd(TAG, "admin key: %s", key);
+					callback.onSuccess(key);
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
+
+	/**
+	 *
+	 * @param address
+	 * @param value
+	 * @param callback
+	 */
+	public void setMemberKey(String address, String value, IStatusCallback callback) {
+//		byte[] bytes = value.getBytes(Charset.forName("UTF-8"));
+		byte[] bytes = BleUtils.hexStringToBytes(value);
+		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_KEY_MEMBER, bytes.length, bytes);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
+	}
+
+	/**
+	 *
+	 * @param address
+	 * @param callback
+	 */
+	public void getMemberKey(String address, final IStringCallback callback) {
+		_bleBase.getConfiguration(address, BluenetConfig.CONFIG_KEY_MEMBER, new IConfigurationCallback() {
+			@Override
+			public void onSuccess(ConfigurationMsg configuration) {
+				if (configuration.getLength() != ENCRYPTION_KEY_LENGTH) {
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
+					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+				} else {
+					String key = new String(configuration.getPayload());
+					BleLog.LOGd(TAG, "member key: %s", key);
+					callback.onSuccess(key);
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
+
+	/**
+	 *
+	 * @param address
+	 * @param value
+	 * @param callback
+	 */
+	public void setGuestKey(String address, String value, IStatusCallback callback) {
+//		byte[] bytes = value.getBytes(Charset.forName("UTF-8"));
+		byte[] bytes = BleUtils.hexStringToBytes(value);
+		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_KEY_GUEST, bytes.length, bytes);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
+	}
+
+	/**
+	 *
+	 * @param address
+	 * @param callback
+	 */
+	public void getGuestKey(String address, final IStringCallback callback) {
+		_bleBase.getConfiguration(address, BluenetConfig.CONFIG_KEY_GUEST, new IConfigurationCallback() {
+			@Override
+			public void onSuccess(ConfigurationMsg configuration) {
+				if (configuration.getLength() != ENCRYPTION_KEY_LENGTH) {
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
+					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+				} else {
+					String key = new String(configuration.getPayload());
+					BleLog.LOGd(TAG, "guest key: %s", key);
+					callback.onSuccess(key);
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
+
+	public void setMeshAccessAddress(String address, int value, IStatusCallback callback) {
+		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_MESH_ACCESS_ADDRESS, 4, BleUtils.intToByteArray(value));
+		_bleBase.writeConfiguration(address, configuration, true, callback);
+	}
+
+	public void getMeshAccessAddress(String address, final IIntegerCallback callback) {
+		_bleBase.getConfiguration(address, BluenetConfig.CONFIG_MESH_ACCESS_ADDRESS, new IConfigurationCallback() {
+			@Override
+			public void onSuccess(ConfigurationMsg configuration) {
+				if (configuration.getLength() != 4) {
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
+					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+				} else {
+					int meshAccessAddress = configuration.getIntValue();
+					BleLog.LOGd(TAG, "mesh access address: %X", meshAccessAddress);
+					callback.onSuccess(meshAccessAddress);
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
 
 	/**
 	 * Write the nearby timeout to the configuration
@@ -363,7 +504,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setNearbyTimeout(String address, int value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_NEARBY_TIMEOUT, 2, BleUtils.shortToByteArray(value));
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -376,7 +517,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 2) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int nearbyTimeout = configuration.getShortValue();
@@ -400,7 +541,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setCurrentLimit(String address, int value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_CURRENT_LIMIT, 1, new byte[]{(byte)value});
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -413,7 +554,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int currentLimit = configuration.getUint8Value();
@@ -437,7 +578,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setPasskey(String address, String value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_PASSKEY, 6, value.getBytes(Charset.forName("UTF-8")));
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -450,7 +591,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 6) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					String passkey = new String(configuration.getPayload());
@@ -474,7 +615,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setScanDuration(String address, int value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_SCAN_DURATION, 2, BleUtils.shortToByteArray(value));
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -487,7 +628,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 2) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int scanDuration = configuration.getShortValue();
@@ -511,7 +652,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setScanSendDelay(String address, int value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_SCAN_SEND_DELAY, 2, BleUtils.shortToByteArray(value));
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -524,7 +665,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 2) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int scanSendDelay = configuration.getShortValue();
@@ -548,7 +689,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setScanBreakDuration(String address, int value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_SCAN_BREAK_DURATION, 2, BleUtils.shortToByteArray(value));
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -561,7 +702,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 2) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int scanBreakDuration = configuration.getShortValue();
@@ -585,7 +726,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setScanFilter(String address, int value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_SCAN_FILTER, 1, new byte[]{(byte)value});
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -598,7 +739,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int scanFilter = configuration.getUint8Value();
@@ -622,7 +763,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setScanFilterFraction(String address, int value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_SCAN_FILTER_SEND_FRACTION, 2, BleUtils.shortToByteArray(value));
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -635,7 +776,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 2) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int scanFilterFraction = configuration.getShortValue();
@@ -679,7 +820,7 @@ public class BleBaseConfiguration {
 //			@Override
 //			public void onSuccess(ConfigurationMsg configuration) {
 //				if (configuration.getLength() != 1) {
-//					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+//					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 //					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 //				} else {
 //					int floor = configuration.getUint8Value();
@@ -703,7 +844,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setWifi(String address, String value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_WIFI_SETTINGS, value.length(), value.getBytes(Charset.forName("UTF-8")));
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -824,7 +965,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setMinEnvTemp(String address, int value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_MIN_ENV_TEMP, 1, new byte[]{(byte)value});
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -837,7 +978,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int temperature = configuration.getByteValue();
@@ -861,7 +1002,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setMaxEnvTemp(String address, int value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_MAX_ENV_TEMP, 1, new byte[]{(byte)value});
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -874,7 +1015,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int temperature = configuration.getByteValue();
@@ -898,7 +1039,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setBootDelay(String address, int value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_BOOT_DELAY, 2, BleUtils.shortToByteArray(value));
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -911,7 +1052,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 2) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int bootDelay = configuration.getShortValue();
@@ -935,7 +1076,7 @@ public class BleBaseConfiguration {
 	 */
 	public void setMaxChipTemperature(String address, int value, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_MAX_CHIP_TEMP, 1, new byte[]{(byte)value});
-		_bleBase.writeConfiguration(address, configuration, callback);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -948,7 +1089,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					int maxChipTemp = configuration.getByteValue();
@@ -989,7 +1130,7 @@ public class BleBaseConfiguration {
 //			@Override
 //			public void onSuccess(ConfigurationMsg configuration) {
 //				if (configuration.getLength() != ) {
-//					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+//					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 //					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 //				} else {
 //					= configuration.getValue();
@@ -1030,7 +1171,7 @@ public class BleBaseConfiguration {
 //			@Override
 //			public void onSuccess(ConfigurationMsg configuration) {
 //				if (configuration.getLength() != ) {
-//					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+//					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 //					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 //				} else {
 //					= configuration.getValue();
@@ -1071,7 +1212,7 @@ public class BleBaseConfiguration {
 //			@Override
 //			public void onSuccess(ConfigurationMsg configuration) {
 //				if (configuration.getLength() != ) {
-//					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+//					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 //					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 //				} else {
 //					= configuration.getValue();
@@ -1112,7 +1253,7 @@ public class BleBaseConfiguration {
 //			@Override
 //			public void onSuccess(ConfigurationMsg configuration) {
 //				if (configuration.getLength() != ) {
-//					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+//					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 //					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 //				} else {
 //					= configuration.getValue();
@@ -1151,7 +1292,7 @@ public class BleBaseConfiguration {
 //			@Override
 //			public void onSuccess(ConfigurationMsg configuration) {
 //				if (configuration.getLength() != 1) {
-//					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+//					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 //					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 //				} else {
 //					int pwmFrequency = configuration.getUint8Value();
@@ -1181,7 +1322,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					boolean meshEnabled = configuration.getBooleanValue();
@@ -1207,7 +1348,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					boolean encryptionEnabled = configuration.getBooleanValue();
@@ -1233,7 +1374,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					boolean iBeaconEnabled = configuration.getBooleanValue();
@@ -1259,7 +1400,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					boolean scannerEnabled = configuration.getBooleanValue();
@@ -1285,7 +1426,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					boolean contPowerSamplerEnabled = configuration.getBooleanValue();
@@ -1311,7 +1452,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != 1) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					boolean trackerEnabled = configuration.getBooleanValue();
@@ -1339,7 +1480,7 @@ public class BleBaseConfiguration {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
 				if (configuration.getLength() != ) {
-					BleLog.LOGe(TAG, "Wrong length parameter: %s", configuration.getLength());
+					BleLog.LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
 					 = configuration.getValue();
