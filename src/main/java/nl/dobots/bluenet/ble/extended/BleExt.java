@@ -2006,13 +2006,33 @@ public class BleExt {
 	 * with address otherwise
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void writeFactoryReset(IStatusCallback callback) {
+	public void writeFactoryReset(final IStatusCallback callback) {
 		if (isConnected(callback)) {
 			int value = BluenetConfig.FACTORY_RESET_CODE;
 			BleLog.LOGd(TAG, "Write factory reset with %d", value);
 			if (hasControlCharacteristic(callback)) {
 				BleLog.LOGd(TAG, "use control characteristic");
-				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_FACTORY_RESET, 4, BleUtils.intToByteArray(value)), callback);
+				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_FACTORY_RESET, 4, BleUtils.intToByteArray(value)), new IStatusCallback() {
+					@Override
+					public void onSuccess() {
+						disconnectAndClose(true, new IStatusCallback() {
+							@Override
+							public void onSuccess() {
+								callback.onSuccess();
+							}
+
+							@Override
+							public void onError(int error) {
+								callback.onSuccess();
+							}
+						});
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				});
 			}
 		}
 	}
