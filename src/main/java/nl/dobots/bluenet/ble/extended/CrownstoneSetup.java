@@ -87,14 +87,14 @@ public class CrownstoneSetup {
 			case 1: {
 				// hack, make sure step is set to 1 in case function was called with step 0
 				_currentStep = 1;
-				_bleBase.enableEncryption(false);
+//				_bleBase.enableEncryption(false);
 				_bleBase.readSessionKey(_targetAddress, new IByteArrayCallback() {
 					@Override
 					public void onSuccess(byte[] result) {
 						_progressCallback.onProgress(1, null);
 						SetupEncryptionKey encryptionKey = new SetupEncryptionKey(result);
 						_bleBase.setEncryptionKeys(encryptionKey);
-						_bleBase.enableEncryption(true);
+//						_bleBase.enableEncryption(true);
 
 //						setupStep(step+1);
 						// go directly to step 3
