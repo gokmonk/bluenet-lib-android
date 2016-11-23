@@ -238,7 +238,7 @@ public class BleScanService extends Service {
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
 
-		Log.d(TAG, "onStartcommand");
+		BleLog.LOGd(TAG, "onStartcommand");
 		boolean autoStart = false;
 		BleDeviceFilter scanFilter = BleDeviceFilter.all;
 
@@ -307,7 +307,7 @@ public class BleScanService extends Service {
 
 			switch (error) {
 				case BleErrors.ERROR_BLUETOOTH_TURNED_OFF: {
-					Log.e(TAG, "Bluetooth turned off!!");
+					BleLog.LOGe(TAG, "Bluetooth turned off!!");
 
 					// if bluetooth was turned off and scanning is enabled, issue a notification that present
 					// detection won't work without BLE ...
@@ -324,19 +324,19 @@ public class BleScanService extends Service {
 					break;
 				}
 				case BleErrors.ERROR_BLUETOOTH_NOT_ENABLED: {
-					Log.e(TAG, "Failed to enable bluetooth!!");
+					BleLog.LOGe(TAG, "Failed to enable bluetooth!!");
 					_running = false;
 					onEvent(EventListener.Event.BLUETOOTH_NOT_ENABLED);
 					break;
 				}
 				case BleErrors.ERROR_BLE_PERMISSION_MISSING: {
-					Log.e(TAG, "Ble permissions missing, need to call BleExt.requestPermissions first!!");
+					BleLog.LOGe(TAG, "Ble permissions missing, need to call BleExt.requestPermissions first!!");
 					_running = false;
 					onEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
 					break;
 				}
 				default:
-					Log.e(TAG, "Ble Error: " + error);
+					BleLog.LOGe(TAG, "Ble Error: " + error);
 			}
 			_initialized = false;
 		}
@@ -368,7 +368,7 @@ public class BleScanService extends Service {
 				@Override
 				public void onError(int error) {
 					_running = false;
-					Log.e(TAG, "... scan interval error: " + error);
+					BleLog.LOGe(TAG, "... scan interval error: " + error);
 					onEvent(EventListener.Event.BLUETOOTH_START_SCAN_ERROR);
 
 					if (error == BleErrors.ERROR_ALREADY_SCANNING) {
@@ -393,7 +393,7 @@ public class BleScanService extends Service {
 //				}
 //			}))
 			{
-				Log.d(TAG, "... scan interval started");
+				BleLog.LOGd(TAG, "... scan interval started");
 				_scanning = true;
 				_stopScanRetryNum = 0;
 				onIntervalScanStart();
@@ -411,7 +411,7 @@ public class BleScanService extends Service {
 	 * @param device the scanned device
 	 */
 	private void notifyDeviceScanned(BleDevice device) {
-		BleLog.LOGd(TAG, String.format("scanned device: %s [%d] (%d)", device.getName(), device.getRssi(), device.getOccurrences()));
+		BleLog.LOGv(TAG, String.format("scanned device: %s [%d] (%d)", device.getName(), device.getRssi(), device.getOccurrences()));
 
 		for (ScanDeviceListener listener : _scanDeviceListeners) {
 			listener.onDeviceScanned(device);
@@ -443,7 +443,7 @@ public class BleScanService extends Service {
 					onEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
 				}
 			})) {
-				Log.d(TAG, "... scan interval paused");
+				BleLog.LOGd(TAG, "... scan interval paused");
 				_scanning = false;
 			}
 			else {
@@ -478,16 +478,16 @@ public class BleScanService extends Service {
 	public void startIntervalScan(BleDeviceFilter filter) {
 		_ble.setScanFilter(filter);
 		setScanningState(true);
-		Log.i(TAG, "startIntervalScan");
+		BleLog.LOGi(TAG, "startIntervalScan");
 
 		if (!_initialized) {
-			Log.i(TAG, "Start scan");
+			BleLog.LOGi(TAG, "Start scan");
 			// set wasScanning flag to true so that once bluetooth is enabled, and we receive
 			// the event, the service will automatically start scanning
 			_wasRunning = true;
 			_ble.init(this, _btStateCallback);
 		} else if (!_running) {
-			Log.i(TAG, "Start scan");
+			BleLog.LOGi(TAG, "Start scan");
 			_running = true;
 			_intervalScanHandler.removeCallbacksAndMessages(null);
 			_intervalScanHandler.post(_startScanRunnable);
@@ -509,19 +509,19 @@ public class BleScanService extends Service {
 	 */
 	public void stopIntervalScan() {
 		if (_running) {
-			Log.i(TAG, "Stop scan");
+			BleLog.LOGi(TAG, "Stop scan");
 			_intervalScanHandler.removeCallbacksAndMessages(null);
 			_running = false;
 			setScanningState(false);
 			_ble.stopScan(new IStatusCallback() {
 				@Override
 				public void onSuccess() {
-					Log.i(TAG, "scan stopped");
+					BleLog.LOGi(TAG, "scan stopped");
 				}
 
 				@Override
 				public void onError(int error) {
-					Log.e(TAG, "Failed to stop scan: " + error);
+					BleLog.LOGe(TAG, "Failed to stop scan: " + error);
 					onEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
 				}
 			});

@@ -16,6 +16,7 @@ import java.util.UUID;
 
 import nl.dobots.bluenet.ble.extended.structs.BleDevice;
 import nl.dobots.bluenet.ble.extended.structs.BleDeviceMap;
+import nl.dobots.bluenet.utils.BleLog;
 
 /**
  * Copyright (c) 2015 Bart van Vliet <bart@dobots.nl>. All rights reserved.
@@ -126,7 +127,7 @@ public class BleIbeaconRanging {
 //		} else { Log.d(TAG, "is not ibeacon"); }
 		}
 		if (iBeaconMatch) {
-			Log.d(TAG, "matching ibeacon filter: " + device.getAddress() + " (" + device.getName() + ")");
+			BleLog.LOGv(TAG, "matching ibeacon filter: " + device.getAddress() + " (" + device.getName() + ")");
 			device = updateDevice(device);
 //			for (IBleBeaconCallback cb : _scanCallbacks) {
 //				cb.onBeaconScanned(device);
@@ -142,7 +143,7 @@ public class BleIbeaconRanging {
 				listener.onBeaconScanned(device);
 			}
 		} else {
-			Log.d(TAG, "not matching any ibeacon filter:" + device.getAddress() + " (" + device.getName() + ")");
+			BleLog.LOGv(TAG, "not matching any ibeacon filter:" + device.getAddress() + " (" + device.getName() + ")");
 		}
 		return iBeaconMatch;
 	}
@@ -165,22 +166,20 @@ public class BleIbeaconRanging {
 	}
 
 	private void enterRegion(UUID uuid) {
-		Log.d(TAG, "enterRegion: " + uuid.toString());
+		BleLog.LOGd(TAG, "enterRegion: " + uuid.toString());
 		_inRegion.add(uuid);
 		for (BleBeaconRangingListener listener : _rangingListeners) {
 			listener.onRegionEnter(uuid);
 		}
-
 	}
 
 	private void exitRegion(UUID uuid) {
-		Log.d(TAG, "exitRegion: " + uuid.toString());
+		BleLog.LOGd(TAG, "exitRegion: " + uuid.toString());
 //		_lastSeen.remove(uuid);
 		_inRegion.remove(uuid);
 		for (BleBeaconRangingListener listener : _rangingListeners) {
 			listener.onRegionExit(uuid);
 		}
-
 	}
 
 	private synchronized BleDevice updateDevice(BleDevice device) {

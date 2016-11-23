@@ -113,6 +113,7 @@ public class BleBase extends BleCore {
 	};
 
 	public boolean enableEncryption(boolean enable) {
+		BleLog.LOGi(TAG, "enableEncryption: " + enable);
 		_encryptionEnabled = enable;
 		return true;
 	}
@@ -233,6 +234,7 @@ public class BleBase extends BleCore {
 //				}
 
 				parseAdvertisement(advertisement, 0xFF, new IByteArrayCallback() {
+					// The callbacks can be called multiple times
 					@Override
 					public void onSuccess(byte[] result) {
 						int companyID = BleUtils.byteArrayToShort(result, 0);
@@ -246,11 +248,12 @@ public class BleBase extends BleCore {
 
 					@Override
 					public void onError(int error) {
-//						BleLog.LOGd(TAG, "json: " + json.toString());
+						BleLog.LOGv(TAG, "json: " + json.toString());
 					}
 				});
 
 				parseAdvertisement(advertisement, 0x16, new IByteArrayCallback() {
+					// The callbacks can be called multiple times
 					@Override
 					public void onSuccess(byte[] result) {
 						int serviceUUID = BleUtils.byteArrayToShort(result, 0);
@@ -263,7 +266,7 @@ public class BleBase extends BleCore {
 
 					@Override
 					public void onError(int error) {
-//						BleLog.LOGd(TAG, "json: " + json.toString());
+						BleLog.LOGv(TAG, "json: " + json.toString());
 					}
 				});
 
@@ -271,8 +274,8 @@ public class BleBase extends BleCore {
 				try {
 					device = new BleDevice(json);
 				} catch (JSONException e) {
-//					BleLog.LOGe(TAG, "Failed to parse json into device! Err: " + e.getMessage());
-//					BleLog.LOGd(TAG, "json: " + json.toString());
+					BleLog.LOGe(TAG, "Failed to parse json into device! Err: " + e.getMessage());
+					BleLog.LOGd(TAG, "json: " + json.toString());
 					return;
 				}
 				callback.onDeviceScanned(device);
