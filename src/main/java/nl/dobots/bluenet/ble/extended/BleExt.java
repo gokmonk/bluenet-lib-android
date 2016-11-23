@@ -776,10 +776,34 @@ public class BleExt {
 				 *   was received in between.
 				 *   If the delay is really necessary, we need to find a better solution
 				 */
+				// TODO: is this delay necessary?
 				_handler.postDelayed(new Runnable() {
 					@Override
 					public void run() {
-						discoverServices(callback);
+						discoverServices(new IDiscoveryCallback() {
+							@Override
+							public void onDiscovery(String serviceUuid, String characteristicUuid) {
+								callback.onDiscovery(serviceUuid, characteristicUuid);
+							}
+
+							@Override
+							public void onSuccess() {
+								callback.onSuccess();
+							}
+
+							@Override
+							public void onError(int error) {
+								switch (error) {
+									case BleErrors.ERROR_NOT_CONNECTED:
+										/* [18 nov 2016] When there was a successful connect, but a disconnect shortly after,
+										 * the callback.onError() was called twice. This avoids that behaviour.
+										 */
+										break;
+									default:
+										callback.onError(error);
+								}
+							}
+						});
 					}
 				}, 500);
 //				discoverServices(callback);
