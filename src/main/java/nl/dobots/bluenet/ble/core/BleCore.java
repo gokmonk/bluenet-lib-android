@@ -862,13 +862,17 @@ public class BleCore {
 		try {
 			while (bb.hasRemaining()) {
 				int length = BleUtils.toUint8(bb.get());
+				if (length == 0) {
+					// we have reached the end of the valid scan record data
+					// the rest of the buffer should be filled with 0
+					return;
+				}
+
 				int type = BleUtils.toUint8(bb.get());
 				if (type == search) {
 					byte[] result = new byte[length - 1];
 					bb.get(result, 0, length - 1);
 					callback.onSuccess(result);
-				} else if (type == 0 && length == 0) {
-					return;
 				} else {
 					// skip length elements
 					bb.position(bb.position() + length - 1); // length also includes the type field, so only advance by length-1
