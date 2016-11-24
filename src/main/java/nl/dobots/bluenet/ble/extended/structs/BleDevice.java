@@ -309,7 +309,7 @@ public class BleDevice {
 
 	public synchronized void updateRssiValue(long timestamp, int rssi) {
 		if (rssi != 127) {
-			this._rssi = rssi;
+			_rssi = rssi;
 			// todo: maybe also add a capacity limit, in case we only scan and never check
 			//   for rssi or distance values, we would only add and never remove any values
 			//   and the history will only grow
@@ -512,6 +512,34 @@ public class BleDevice {
 		calculateDistance();
 //		}
 
+	}
+
+	public void copyFromOld(BleDevice old) {
+		// Copy from old to new
+		_isValidatedCrownstone   = old._isValidatedCrownstone;
+		_lastCrownstoneId        = old._lastCrownstoneId;
+		_lastRandom              = old._lastRandom;
+		_numSimilarCrownstoneIds = old._numSimilarCrownstoneIds;
+		_rssiHistory             = old._rssiHistory;
+
+		updateRssiValue(System.currentTimeMillis(), getRssi());
+	}
+
+	public void update(BleDevice newDev) {
+		// Copy from new to old
+		_serviceData             = newDev._serviceData;
+		_type                    = newDev._type;
+		_crownstoneMode          = newDev._crownstoneMode;
+
+		//TODO: are these necessary?
+		_name                    = newDev._name;
+		_isIBeacon               = newDev._isIBeacon;
+		_major                   = newDev._major;
+		_minor                   = newDev._minor;
+		_proximityUuid           = newDev._proximityUuid;
+		_calibratedRssi          = newDev._calibratedRssi;
+
+		updateRssiValue(System.currentTimeMillis(), newDev.getRssi());
 	}
 
 }

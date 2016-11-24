@@ -51,10 +51,13 @@ public class BleDeviceMap extends HashMap<String, BleDevice> {
 	public synchronized BleDevice updateDevice(BleDevice device) {
 		if (contains(device)) {
 			BleDevice old = getDevice(device.getAddress());
-			old.updateRssiValue(System.currentTimeMillis(), device.getRssi());
-			old.setServiceData(device.getServiceData());
-			old.validateCrownstone();
-			return old;
+//			old.update(device);
+//			old.validateCrownstone();
+//			return old;
+			device.copyFromOld(old);
+			device.validateCrownstone();
+			put(device.getAddress(), device);
+			return device;
 		} else {
 			put(device.getAddress(), device);
 			return device;
@@ -134,9 +137,12 @@ public class BleDeviceMap extends HashMap<String, BleDevice> {
 				double rd = rhs.getDistance();
 				// we need to handle the -1 value specifically, because we want it
 				// to end up at the end of the list
-				if (ld == -1 && rd == -1) return 0;
-				if (ld == -1) return 1;
-				if (rd == -1) return -1;
+//				if (ld == -1 && rd == -1) return 0;
+//				if (ld == -1) return 1;
+//				if (rd == -1) return -1;
+				if (ld < 0 && rd < 0) return 0;
+				if (ld < 0) return 1;
+				if (rd < 0) return -1;
 				// if neither of the values is -1,
 				if (ld > rd) {
 					return 1;
