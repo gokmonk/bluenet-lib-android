@@ -7,6 +7,7 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
+import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
 /**
@@ -95,11 +96,11 @@ public class StreamMsg {
 	public StreamMsg(byte[] bytes) {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
-		Log.d("streammsg", BleUtils.bytesToString(bytes));
+		BleLog.LOGv("streammsg", BleUtils.bytesToString(bytes));
 		type = BleUtils.toUint8(bb.get());
 		opCode = BleUtils.toUint8(bb.get());
 		length = bb.getShort();
-		Log.d("streammsg", "type=" + type + " opCode=" + opCode + " length=" + length);
+		BleLog.LOGd("streammsg", "type=" + type + " opCode=" + opCode + " length=" + length);
 		payload = new byte[length];
 		bb.get(payload);
 	}

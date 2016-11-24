@@ -168,6 +168,7 @@ public class BleDevice {
 		str += ", rssi: [" + _rssi + " avg=" + _averageRssi + "]";
 		str += ", type: " + _type.name();
 		str += ", mode: " + _crownstoneMode.name();
+		str += ", validated: " + _isValidatedCrownstone;
 		if (_isIBeacon) {
 			str += ", iBeacon: [uuid=" + _proximityUuid + " major=" + _major + " minor=" + _minor + " rssi@1m=" + _calibratedRssi + "]";
 		}

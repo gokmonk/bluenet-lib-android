@@ -1167,7 +1167,7 @@ public class BleBase extends BleCore {
 							decryptedBytes = bytes;
 						}
 
-						BleLog.LOGd(TAG, BleUtils.bytesToString(decryptedBytes));
+						BleLog.LOGv(TAG, BleUtils.bytesToString(decryptedBytes));
 
 						ConfigurationMsg configuration = new ConfigurationMsg(decryptedBytes);
 						BleLog.LOGd(TAG, "read configuration: %s", configuration.toString());
