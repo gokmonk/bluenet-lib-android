@@ -46,7 +46,7 @@ public class BleBaseEncryption {
 	public static final char ACCESS_LEVEL_ENCRYPTION_DISABLED = 255;
 
 
-	private static final int AES_BLOCK_SIZE = 16;
+	public static final int AES_BLOCK_SIZE = 16;
 	private static final int VALIDATION_KEY_LENGTH = 4;
 	private static final int SESSION_NONCE_LENGTH = 5;
 	private static final int PACKET_NONCE_LENGTH = 3;
@@ -79,28 +79,28 @@ public class BleBaseEncryption {
 
 	public static byte[] encryptCtr(byte[] payloadData, byte[] sessionNonce, byte[] validationKey, byte[] key, char accessLevel) {
 		if (payloadData == null || payloadData.length < 1) {
-			Log.w(TAG, "wrong data length");
+			BleLog.LOGw(TAG, "wrong data length");
 			return null;
 		}
 		if (sessionNonce == null || sessionNonce.length != SESSION_NONCE_LENGTH) {
-			Log.w(TAG, "wrong session nonce length");
+			BleLog.LOGw(TAG, "wrong session nonce length");
 			return null;
 		}
 		if (validationKey == null || validationKey.length != VALIDATION_KEY_LENGTH) {
-			Log.w(TAG, "wrong validation key length");
+			BleLog.LOGw(TAG, "wrong validation key length");
 			return null;
 		}
 		if (key == null || key.length != AES_BLOCK_SIZE) {
-			Log.w(TAG, "wrong key length");
+			BleLog.LOGw(TAG, "wrong key length");
 			return null;
 		}
-		BleLog.LOGd(TAG, "payloadData: " + BleUtils.bytesToString(payloadData));
+		BleLog.LOGv(TAG, "payloadData: " + BleUtils.bytesToString(payloadData));
 
 		// Packet nonce is randomly generated.
 		SecureRandom random = new SecureRandom();
 		byte[] packetNonce = new byte[PACKET_NONCE_LENGTH];
 		random.nextBytes(packetNonce);
-		BleLog.LOGd(TAG, "packetNonce: " + BleUtils.bytesToString(packetNonce));
+		BleLog.LOGv(TAG, "packetNonce: " + BleUtils.bytesToString(packetNonce));
 
 		// Create iv by concatting session nonce and packet nonce.
 		byte[] iv = new byte[AES_BLOCK_SIZE];
@@ -114,7 +114,7 @@ public class BleBaseEncryption {
 		//Arrays.fill(payload, (byte)0); // Already zeroes by default
 		System.arraycopy(validationKey, 0, payload, 0, VALIDATION_KEY_LENGTH);
 		System.arraycopy(payloadData, 0, payload, VALIDATION_KEY_LENGTH, payloadData.length);
-		BleLog.LOGd(TAG, "payload: " + BleUtils.bytesToString(payload));
+		BleLog.LOGv(TAG, "payload: " + BleUtils.bytesToString(payload));
 
 		// Allocate output array
 		byte[] encryptedData = new byte[PACKET_NONCE_LENGTH + ACCESS_LEVEL_LENGTH + payloadLen + paddingLen];
@@ -125,10 +125,10 @@ public class BleBaseEncryption {
 		try {
 			Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding");
 			cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
-			BleLog.LOGd(TAG, "IV before: " + BleUtils.bytesToString(cipher.getIV()));
+			BleLog.LOGv(TAG, "IV before: " + BleUtils.bytesToString(cipher.getIV()));
 			// doFinal(byte[] input, int inputOffset, int inputLen, byte[] output, int outputOffset)
 			cipher.doFinal(payload, 0, payload.length, encryptedData, PACKET_NONCE_LENGTH+ACCESS_LEVEL_LENGTH);
-			BleLog.LOGd(TAG, "IV after: " + BleUtils.bytesToString(cipher.getIV()));
+			BleLog.LOGv(TAG, "IV after: " + BleUtils.bytesToString(cipher.getIV()));
 		} catch (GeneralSecurityException e) {
 			e.printStackTrace();
 			return null;
@@ -150,40 +150,40 @@ public class BleBaseEncryption {
 //			e.printStackTrace();
 //			return null;
 //		}
-		BleLog.LOGd(TAG, "encryptedData: " + BleUtils.bytesToString(encryptedData));
+		BleLog.LOGv(TAG, "encryptedData: " + BleUtils.bytesToString(encryptedData));
 		return encryptedData;
 	}
 
 	public static byte[] decryptCtr(byte[] encryptedData, byte[] sessionNonce, byte[] validationKey, EncryptionKeys keys) {
 		if (encryptedData == null || encryptedData.length < PACKET_NONCE_LENGTH + ACCESS_LEVEL_LENGTH + AES_BLOCK_SIZE) {
-			Log.w(TAG, "wrong data length");
+			BleLog.LOGw(TAG, "wrong data length");
 			return null;
 		}
 		if (sessionNonce == null || sessionNonce.length != SESSION_NONCE_LENGTH) {
-			Log.w(TAG, "wrong session nonce length");
+			BleLog.LOGw(TAG, "wrong session nonce length");
 			return null;
 		}
 		if (validationKey == null || validationKey.length != VALIDATION_KEY_LENGTH) {
-			Log.w(TAG, "wrong validation key length");
+			BleLog.LOGw(TAG, "wrong validation key length");
 			return null;
 		}
 		if (keys == null) {
-			Log.w(TAG, "no keys supplied");
+			BleLog.LOGw(TAG, "no keys supplied");
 			return null;
 		}
-		BleLog.LOGd(TAG, "encryptedData: " + BleUtils.bytesToString(encryptedData));
+		BleLog.LOGv(TAG, "encryptedData: " + BleUtils.bytesToString(encryptedData));
 
 		byte[] decryptedData = new byte[encryptedData.length - PACKET_NONCE_LENGTH - ACCESS_LEVEL_LENGTH];
 		if (decryptedData.length % AES_BLOCK_SIZE != 0) {
-			Log.w(TAG, "encrypted data length must be multiple of 16");
+			BleLog.LOGw(TAG, "encrypted data length must be multiple of 16");
 			return null;
 		}
 
 		char accessLevel = (char)BleUtils.toUint8(encryptedData[PACKET_NONCE_LENGTH]);
-		BleLog.LOGd(TAG, "accessLevel: " + (int)accessLevel);
+		BleLog.LOGv(TAG, "accessLevel: " + (int)accessLevel);
 		byte[] key = keys.getKey(accessLevel);
 		if (key == null || key.length != AES_BLOCK_SIZE) {
-			Log.w(TAG, "wrong key length: " + key);
+			BleLog.LOGw(TAG, "wrong key length: " + key);
 			return null;
 		}
 
@@ -196,7 +196,7 @@ public class BleBaseEncryption {
 		try {
 			Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding");
 			cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
-			BleLog.LOGd(TAG, "IV: " + Arrays.toString(cipher.getIV()));
+			BleLog.LOGv(TAG, "IV: " + Arrays.toString(cipher.getIV()));
 			// doFinal(byte[] input, int inputOffset, int inputLen, byte[] output, int outputOffset)
 			cipher.doFinal(encryptedData, PACKET_NONCE_LENGTH+ACCESS_LEVEL_LENGTH, decryptedData.length, decryptedData, 0);
 		} catch (GeneralSecurityException e) {
@@ -207,7 +207,7 @@ public class BleBaseEncryption {
 		// Check validation key
 		for (int i=0; i<VALIDATION_KEY_LENGTH; i++) {
 			if (decryptedData[i] != validationKey[i]) {
-				Log.w(TAG, "incorrect validation key");
+				BleLog.LOGw(TAG, "incorrect validation key");
 				return null;
 			}
 		}
@@ -226,15 +226,15 @@ public class BleBaseEncryption {
 			return null;
 		}
 		if (payloadData == null || (payloadData.length-inputOffset) < AES_BLOCK_SIZE) {
-			Log.w(TAG, "payload data too short");
+			BleLog.LOGw(TAG, "payload data too short");
 			return null;
 		}
 		if ((payloadData.length-inputOffset) % 16 != 0) {
-			Log.w(TAG, "wrong payload data length");
+			BleLog.LOGw(TAG, "wrong payload data length");
 			return null;
 		}
 		if (key == null || key.length != AES_BLOCK_SIZE) {
-			Log.w(TAG, "wrong key length");
+			BleLog.LOGw(TAG, "wrong key length");
 			return null;
 		}
 
