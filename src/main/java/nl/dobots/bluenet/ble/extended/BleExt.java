@@ -2107,6 +2107,44 @@ public class BleExt {
 
 
 	/**
+	 * Function to make the device disconnect you.
+	 *
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void writeDisconnectCommand(final IStatusCallback callback) {
+		if (isConnected(callback)) {
+			BleLog.LOGd(TAG, "Write disconnect command");
+			if (hasControlCharacteristic(callback)) {
+				BleLog.LOGd(TAG, "use control characteristic");
+				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_DISCONNECT, 0, new byte[0]), new IStatusCallback() {
+					@Override
+					public void onSuccess() {
+						disconnectAndClose(true, new IStatusCallback() {
+							@Override
+							public void onSuccess() {
+								callback.onSuccess();
+							}
+
+							@Override
+							public void onError(int error) {
+								callback.onSuccess();
+							}
+						});
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				});
+			}
+		}
+	}
+
+
+	/**
 	 * Function to reset / reboot the device
 	 *
 	 * Note: needs to be already connected or an error is created! Use overloaded function

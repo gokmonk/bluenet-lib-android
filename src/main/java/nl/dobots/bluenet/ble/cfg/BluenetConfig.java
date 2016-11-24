@@ -120,6 +120,7 @@ public class BluenetConfig {
 	public static final char CMD_RELAY =                                16;   // 0x10
 	public static final char CMD_VALIDATE_SETUP =                       17;   // 0x11
 	public static final char CMD_REQUEST_SERVICE_DATA =                 18;   // 0x12
+	public static final char CMD_DISCONNECT =                           19;   // 0x13
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
