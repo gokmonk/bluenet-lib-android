@@ -30,15 +30,10 @@ public class SetupEncryptionKey extends EncryptionKeys {
 
 	public static byte[] getSetupKey(SetupEncryptionKey keys) {
 		if (keys == null) {
-			return new byte[0];
+			return null;
 		}
 		byte [] key = keys.getSetupKey();
-		if (key == null) {
-			return new byte[0];
-		}
-		else {
-			return key;
-		}
+		return key;
 	}
 
 	public KeyAccessLevelPair getHighestKey() {

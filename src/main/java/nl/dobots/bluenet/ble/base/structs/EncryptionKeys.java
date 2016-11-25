@@ -23,14 +23,14 @@ import nl.dobots.bluenet.utils.BleUtils;
  * @author Bart van Vliet
  */
 public class EncryptionKeys {
-	private String _adminKey;
-	private String _memberKey;
-	private String _guestKey;
-	private byte[] _adminKeyBytes;
-	private byte[] _memberKeyBytes;
-	private byte[] _guestKeyBytes;
+	private String _adminKey = null;
+	private String _memberKey = null;
+	private String _guestKey = null;
+	private byte[] _adminKeyBytes = null;
+	private byte[] _memberKeyBytes = null;
+	private byte[] _guestKeyBytes = null;
 
-	protected EncryptionKeys() {};
+	protected EncryptionKeys() {}
 
 	public EncryptionKeys(@Nullable String adminKey, @Nullable String memberKey, @Nullable String guestKey) {
 		_adminKey = adminKey;
@@ -107,41 +107,26 @@ public class EncryptionKeys {
 
 	public static byte[] getAdminKey(EncryptionKeys keys) {
 		if (keys == null) {
-			return new byte[0];
+			return null;
 		}
 		byte [] key = keys.getAdminKey();
-		if (key == null) {
-			return new byte[0];
-		}
-		else {
-			return key;
-		}
+		return key;
 	}
 
 	public static byte[] getMemberKey(EncryptionKeys keys) {
 		if (keys == null) {
-			return new byte[0];
+			return null;
 		}
 		byte [] key = keys.getMemberKey();
-		if (key == null) {
-			return new byte[0];
-		}
-		else {
-			return key;
-		}
+		return key;
 	}
 
 	public static byte[] getGuestKey(EncryptionKeys keys) {
 		if (keys == null) {
-			return new byte[0];
+			return null;
 		}
 		byte [] key = keys.getGuestKey();
-		if (key == null) {
-			return new byte[0];
-		}
-		else {
-			return key;
-		}
+		return key;
 	}
 
 	public KeyAccessLevelPair getHighestKey() {
