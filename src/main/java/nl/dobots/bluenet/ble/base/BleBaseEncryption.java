@@ -229,20 +229,25 @@ public class BleBaseEncryption {
 			BleLog.LOGw(TAG, "payload data too short");
 			return null;
 		}
-		if ((payloadData.length-inputOffset) % 16 != 0) {
+		int length = payloadData.length-inputOffset;
+		if (length % AES_BLOCK_SIZE != 0) {
 			BleLog.LOGw(TAG, "wrong payload data length");
 			return null;
 		}
-		if (key == null || key.length != AES_BLOCK_SIZE) {
-			BleLog.LOGw(TAG, "wrong key length");
+		byte[] decryptedData = new byte[length];
+		if (key == null) {
+			// If there is no key set, then simply do not decrypt.
+			System.arraycopy(payloadData, inputOffset, decryptedData, 0, length);
+			return decryptedData;
+		}
+		if (key.length != AES_BLOCK_SIZE) {
+			BleLog.LOGw(TAG, "wrong key length: " + key.length);
 			return null;
 		}
-
-		byte[] decryptedData = new byte[payloadData.length-inputOffset];
 		try {
 			Cipher cipher = Cipher.getInstance("AES/ECB/NoPadding");
 			cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"));
-			cipher.doFinal(payloadData, inputOffset, payloadData.length-inputOffset, decryptedData, 0);
+			cipher.doFinal(payloadData, inputOffset, length, decryptedData, 0);
 		} catch (GeneralSecurityException e) {
 			e.printStackTrace();
 			return null;
