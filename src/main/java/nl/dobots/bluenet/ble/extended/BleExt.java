@@ -2236,29 +2236,26 @@ public class BleExt {
 		writeReset(address, BluenetConfig.RESET_DFU, callback);
 	}
 
-	private void writeRecovery(final IStatusCallback callback) {
-		if (!isConnected(callback)) {
-			return;
-		}
-		BleLog.LOGd(TAG, "Write recovery");
+
+	private void recoverReadWrite(final IStatusCallback callback) {
+		BleLog.LOGd(TAG, "Check if device has recovery characteristic");
 		if (!hasCharacteristic(BluenetConfig.CHAR_RECOVERY_UUID, null)) {
 			callback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
 			return;
 		}
-		BleLog.LOGd(TAG, "has characteristic");
-
+		BleLog.LOGd(TAG, "Write recovery characteristic");
 		byte[] code = BleUtils.intToByteArray(BluenetConfig.RECOVERY_CODE);
-
 		_bleBase.write(_targetAddress, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_RECOVERY_UUID, code, BleBaseEncryption.ACCESS_LEVEL_ENCRYPTION_DISABLED, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
-				BleLog.LOGd(TAG, "written to recovery characteristic");
+				BleLog.LOGd(TAG, "Read recovery characteristic");
 				_bleBase.read(_targetAddress, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_RECOVERY_UUID, false, new IDataCallback() {
 					@Override
 					public void onData(JSONObject json) {
+
 						// Verify that the crownstone accepted the recover command
 						byte[] data = BleCore.getValue(json);
-						BleLog.LOGd(TAG, "read recover data: " + BleUtils.bytesToString(data));
+						BleLog.LOGd(TAG, "Read recover data: " + BleUtils.bytesToString(data));
 //						if (data == null || data.length != 1) {
 						if (data == null || data.length < 1) {
 							callback.onError(BleErrors.ERROR_RETURN_VALUE_PARSING);
@@ -2266,7 +2263,18 @@ public class BleExt {
 						}
 						switch (BleUtils.toUint8(data[0])) {
 							case 1: {
-								callback.onSuccess();
+								// Success!
+								disconnectAndClose(true, new IStatusCallback() {
+									@Override
+									public void onSuccess() {
+										callback.onSuccess();
+									}
+
+									@Override
+									public void onError(int error) {
+										callback.onSuccess();
+									}
+								});
 								break;
 							}
 							case 2: {
@@ -2281,25 +2289,19 @@ public class BleExt {
 
 					@Override
 					public void onError(int error) {
-						switch (error) {
-
-						}
-						callback.onError(BleErrors.ERROR_CHARACTERISTIC_READ_FAILED);
+						callback.onError(error);
 					}
 				});
-
-
-//						callback.onSuccess();
 			}
-
 			@Override
 			public void onError(int error) {
-				callback.onError(BleErrors.ERROR_CHARACTERISTIC_WRITE_FAILED);
+				callback.onError(error);
 			}
 		});
 	}
 
-	public void recover(final String address, final IStatusCallback callback) {
+
+	private void recoverStep(final String address, final IStatusCallback callback) {
 		getHandler().post(new Runnable() {
 			@Override
 			public void run() {
@@ -2307,27 +2309,9 @@ public class BleExt {
 				connectAndExecute(address, new IExecuteCallback() {
 					@Override
 					public void execute(final IStatusCallback execCallback) {
-						writeRecovery(new IStatusCallback() {
+						recoverReadWrite(new IStatusCallback() {
 							@Override
 							public void onSuccess() {
-//								_handler.postDelayed(new Runnable() {
-//									@Override
-//									public void run() {
-//										BleLog.LOGd(TAG, "low TX phase");
-//										writeRecovery(new IStatusCallback() {
-//											@Override
-//											public void onSuccess() {
-//												callback.onSuccess();
-//												execCallback.onSuccess();
-//											}
-//
-//											@Override
-//											public void onError(int error) {
-//												callback.onError(error);
-//											}
-//										});
-//									}
-//								}, 200);
 								callback.onSuccess();
 								execCallback.onSuccess();
 							}
@@ -2344,7 +2328,10 @@ public class BleExt {
 										break;
 									}
 									default: {
-										execCallback.onError(error);
+										// Do not auto retry
+										callback.onError(error);
+										execCallback.onSuccess();
+//										execCallback.onError(error);
 									}
 								}
 							}
@@ -2358,8 +2345,22 @@ public class BleExt {
 					public void onError(int error) {
 						callback.onError(error);
 					}
-				});
+				}, false);
 //				}
+			}
+		});
+	}
+
+	public void recover(final String address, final IStatusCallback callback) {
+		recoverStep(address, new IStatusCallback() {
+			@Override
+			public void onSuccess() {
+				recoverStep(address, callback);
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
 			}
 		});
 	}
