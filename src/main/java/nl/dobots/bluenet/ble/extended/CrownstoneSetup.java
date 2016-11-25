@@ -3,16 +3,16 @@ package nl.dobots.bluenet.ble.extended;
 import nl.dobots.bluenet.ble.base.BleBase;
 import nl.dobots.bluenet.ble.base.BleBaseConfiguration;
 import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IExecStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IProgressCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
+import nl.dobots.bluenet.ble.base.callbacks.SimpleExecStatusCallback;
 import nl.dobots.bluenet.ble.base.structs.CommandMsg;
 import nl.dobots.bluenet.ble.base.structs.EncryptionKeys;
 import nl.dobots.bluenet.ble.base.structs.SetupEncryptionKey;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.extended.callbacks.IExecuteCallback;
-import nl.dobots.bluenet.ble.extended.callbacks.IStringCallback;
 import nl.dobots.bluenet.utils.BleLog;
 
 /**
@@ -77,6 +77,7 @@ public class CrownstoneSetup {
 	private void setupError(int error) {
 		BleLog.LOGe(TAG, "setup failed at step %d with error %d", _currentStep, error);
 		_progressCallback.onProgress(0, null);
+		_progressCallback.onError(BleErrors.ERROR_SETUP_FAILED);
 		_statusCallback.onError(BleErrors.ERROR_SETUP_FAILED);
 	}
 
@@ -87,16 +88,13 @@ public class CrownstoneSetup {
 			case 1: {
 				// hack, make sure step is set to 1 in case function was called with step 0
 				_currentStep = 1;
-//				_bleBase.enableEncryption(false);
 				_bleBase.readSessionKey(_targetAddress, new IByteArrayCallback() {
 					@Override
 					public void onSuccess(byte[] result) {
 						_progressCallback.onProgress(1, null);
 						SetupEncryptionKey encryptionKey = new SetupEncryptionKey(result);
 						_bleBase.setEncryptionKeys(encryptionKey);
-//						_bleBase.enableEncryption(true);
 
-//						setupStep(step+1);
 						// go directly to step 3
 						setupStep(3);
 					}
@@ -205,13 +203,29 @@ public class CrownstoneSetup {
 				BleLog.LOGd(TAG, "connect and executeSetup");
 				_bleExt.connectAndExecute(address, new IExecuteCallback() {
 					@Override
-					public void execute(final IStatusCallback execCallback) {
+					public void execute(final IExecStatusCallback execCallback) {
 						executeSetup(crownstoneId, adminKey, memberKey, guestKey, meshAccessAddress, iBeaconUuid,
-								iBeaconMajor, iBeaconMinor, progressCallback, statusCallback);
+								iBeaconMajor, iBeaconMinor, progressCallback, new IStatusCallback() {
+									@Override
+									public void onSuccess() {
+										statusCallback.onSuccess();
+										// use parameter false because the setup already
+										// disconnects as part of the setup process, so trying to
+										// disconnect again would cause unnecessary errors
+										execCallback.onExecuteSuccess(false);
+									}
+
+									@Override
+									public void onError(int error) {
+										execCallback.onError(error);
+									}
+								});
 					}
-				}, new IStatusCallback() {
+				}, new SimpleExecStatusCallback() {
 					@Override
-					public void onSuccess() { /* don't care */ }
+					public void onSuccess() {
+						/* don't care */
+					}
 
 					@Override
 					public void onError(int error) {

@@ -1,7 +1,5 @@
 package nl.dobots.bluenet.ble.base.callbacks;
 
-import nl.dobots.bluenet.ble.base.structs.AlertState;
-
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
  * <p/>
@@ -15,12 +13,15 @@ import nl.dobots.bluenet.ble.base.structs.AlertState;
  * version 3 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  * <p/>
- * Created on 22-9-15
+ * Created on 28-7-15
+ *
+ * Status callback used for connectAndExecute calls. will call the onSuccess depending on the
+ * function that is executed
  *
  * @author Dominik Egger
  */
-public interface IAlertCallback extends IBaseCallback {
+public interface IExecStatusCallback extends IBaseCallback, IStatusCallback, IIntegerCallback, IBooleanCallback {
 
-	void onSuccess(AlertState state);
+	void onExecuteSuccess(boolean disconnect);
 
 }

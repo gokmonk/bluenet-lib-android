@@ -7,8 +7,9 @@ import java.util.HashMap;
 
 import nl.dobots.bluenet.ble.base.BleBase;
 import nl.dobots.bluenet.ble.base.BleBaseState;
+import nl.dobots.bluenet.ble.base.callbacks.IExecStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
+import nl.dobots.bluenet.ble.base.callbacks.SimpleExecStatusCallback;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.extended.callbacks.IExecuteCallback;
 import nl.dobots.bluenet.utils.BleLog;
@@ -61,29 +62,10 @@ public class BleExtState {
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
 				@Override
-				public void execute(final IStatusCallback execCallback) {
-					getSwitchState(new IIntegerCallback() {
-						@Override
-						public void onSuccess(int result) {
-							callback.onSuccess(result);
-							execCallback.onSuccess();
-						}
-
-						@Override
-						public void onError(int error) {
-							execCallback.onError(error);
-						}
-					});
+				public void execute(final IExecStatusCallback execCallback) {
+					getSwitchState(execCallback);
 				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
+			}, new SimpleExecStatusCallback(callback));
 		}
 	}
 
@@ -100,29 +82,10 @@ public class BleExtState {
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
 				@Override
-				public void execute(final IStatusCallback execCallback) {
-					getAccumulatedEnergy(new IIntegerCallback() {
-						@Override
-						public void onSuccess(int result) {
-							callback.onSuccess(result);
-							execCallback.onSuccess();
-						}
-
-						@Override
-						public void onError(int error) {
-							execCallback.onError(error);
-						}
-					});
+				public void execute(final IExecStatusCallback execCallback) {
+					getAccumulatedEnergy(execCallback);
 				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
+			}, new SimpleExecStatusCallback(callback));
 		}
 	}
 
@@ -139,29 +102,10 @@ public class BleExtState {
 		} else {
 			_bleExt.connectAndExecute(address, new IExecuteCallback() {
 				@Override
-				public void execute(final IStatusCallback execCallback) {
-					getPowerUsage(new IIntegerCallback() {
-						@Override
-						public void onSuccess(int result) {
-							callback.onSuccess(result);
-							execCallback.onSuccess();
-						}
-
-						@Override
-						public void onError(int error) {
-							execCallback.onError(error);
-						}
-					});
+				public void execute(final IExecStatusCallback execCallback) {
+					getPowerUsage(execCallback);
 				}
-			}, new IStatusCallback() {
-				@Override
-				public void onSuccess() { /* don't care */ }
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			});
+			}, new SimpleExecStatusCallback(callback));
 		}
 	}
 
@@ -187,29 +131,10 @@ public class BleExtState {
 //				} else {
 					_bleExt.connectAndExecute(address, new IExecuteCallback() {
 						@Override
-						public void execute(final IStatusCallback execCallback) {
-							getTemperature(new IIntegerCallback() {
-								@Override
-								public void onSuccess(int result) {
-									callback.onSuccess(result);
-									execCallback.onSuccess();
-								}
-
-								@Override
-								public void onError(int error) {
-									execCallback.onError(error);
-								}
-							});
+						public void execute(final IExecStatusCallback execCallback) {
+							getTemperature(execCallback);
 						}
-					}, new IStatusCallback() {
-						@Override
-						public void onSuccess() { /* don't care */ }
-
-						@Override
-						public void onError(int error) {
-							callback.onError(error);
-						}
-					});
+					}, new SimpleExecStatusCallback(callback));
 //				}
 			}
 		});

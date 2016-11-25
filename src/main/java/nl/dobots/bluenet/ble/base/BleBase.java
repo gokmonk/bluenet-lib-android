@@ -3,7 +3,6 @@ package nl.dobots.bluenet.ble.base;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
-import android.util.Log;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -18,7 +17,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.UUID;
 
-import nl.dobots.bluenet.ble.base.callbacks.IAlertCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IConfigurationCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
@@ -29,7 +27,6 @@ import nl.dobots.bluenet.ble.base.callbacks.IPowerSamplesCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.ISubscribeCallback;
-import nl.dobots.bluenet.ble.base.structs.AlertState;
 import nl.dobots.bluenet.ble.base.structs.CommandMsg;
 import nl.dobots.bluenet.ble.base.structs.ConfigurationMsg;
 import nl.dobots.bluenet.ble.base.structs.CrownstoneServiceData;
@@ -506,7 +503,7 @@ public class BleBase extends BleCore {
 
 	}
 
-	class MultiPartNotificationCallback implements IDataCallback {
+	private class MultiPartNotificationCallback implements IDataCallback {
 
 		IDataCallback callback;
 
@@ -1212,6 +1209,7 @@ public class BleBase extends BleCore {
 											if (Arrays.equals(readConfig.getPayload(), configuration.getPayload())) {
 												callback.onSuccess();
 											} else {
+												BleLog.LOGe(TAG, "write: %s, read: %s", Arrays.toString(configuration.getPayload()), Arrays.toString(readConfig.getPayload()));
 												callback.onError(BleErrors.ERROR_VALIDATION_FAILED);
 											}
 										}
@@ -1821,10 +1819,6 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writeReset(String address, int value, final IStatusCallback callback) {
-//		if (BluenetConfig.USE_COMMAND_CHARACTERISTIC) {
-//			BleLog.LOGd(TAG, "use control characteristic");
-//			sendCommand(address, new CommandMsg(BluenetConfig.CMD_RESET, 1, new byte[]{(byte) value}), callback);
-//		} else {
 			BleLog.LOGd(TAG, "reset: write %d at service %s and characteristic %s", value, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_RESET_UUID);
 			write(address, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_RESET_UUID, new byte[]{(byte) value},
 					new IStatusCallback() {
@@ -1841,53 +1835,6 @@ public class BleBase extends BleCore {
 							callback.onError(error);
 						}
 					});
-//		}
-	}
-
-	@Deprecated
-	public void readAlert(String address, final IAlertCallback callback) {
-		BleLog.LOGd(TAG, "read Alert at service %s and characteristic %s", BluenetConfig.ALERT_SERVICE_UUID, BluenetConfig.CHAR_NEW_ALERT_UUID);
-		read(address, BluenetConfig.ALERT_SERVICE_UUID, BluenetConfig.CHAR_NEW_ALERT_UUID, new IDataCallback() {
-			@Override
-			public void onError(int error) {
-				BleLog.LOGe(TAG, "Failed to read Alert characteristic");
-				callback.onError(error);
-			}
-
-			@Override
-			public void onData(JSONObject json) {
-				byte[] bytes = BleCore.getValue(json);
-				try {
-					int alertValue = BleUtils.toUint8(bytes[0]);
-					int num = BleUtils.toUint8(bytes[1]);
-					BleLog.LOGd(TAG, "Alert: %d, num: %d", alertValue, num);
-					callback.onSuccess(new AlertState(alertValue, num));
-				} catch (Exception e) {
-					callback.onError(BleErrors.ERROR_RETURN_VALUE_PARSING);
-				}
-			}
-		});
-	}
-
-	// only used to reset alerts (set value to 0)
-	@Deprecated
-	public void writeAlert(String address, int value, final IStatusCallback callback) {
-		BleLog.LOGd(TAG, "Alert: write %d at service %s and characteristic %s", value, BluenetConfig.ALERT_SERVICE_UUID, BluenetConfig.CHAR_NEW_ALERT_UUID);
-		write(address, BluenetConfig.ALERT_SERVICE_UUID, BluenetConfig.CHAR_NEW_ALERT_UUID, BleUtils.shortToByteArray(value),
-				new IStatusCallback() {
-
-					@Override
-					public void onSuccess() {
-						BleLog.LOGd(TAG, "Successfully written to Alert characteristic");
-						callback.onSuccess();
-					}
-
-					@Override
-					public void onError(int error) {
-						BleLog.LOGe(TAG, "Failed to write to Alert characteristic");
-						callback.onError(error);
-					}
-				});
 	}
 
 	public void readMeshData(String address, final IMeshDataCallback callback) {
