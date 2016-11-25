@@ -643,6 +643,21 @@ public class BleExt {
 	 * @param callback the callback used to report discovered services and characteristics
 	 */
 	public void discoverServices(final IDiscoveryCallback callback) {
+		discoverServices(callback, true);
+	}
+
+	/**
+	 * Discover the available services and characteristics of the connected device. The callbacks
+	 * onDiscovery function will be called with service UUID and characteristic UUID for each
+	 * discovered characteristic. Once the discovery completes, the onSuccess is called or the onError
+	 * if an error occurs
+	 *
+	 * Note: if you get wrong services and characteristics returned, try to clear the cache by calling
+	 * close with parameter clearCache set to true. this makes sure that next discover will really
+	 * read the services and characteristics from the device and not the cache
+	 * @param callback the callback used to report discovered services and characteristics
+	 */
+	public void discoverServices(final IDiscoveryCallback callback, final boolean readSessionNonce) {
 		BleLog.LOGd(TAG, "discovering services ...");
 		_detectedCharacteristics.clear();
 		_bleBase.discoverServices(_targetAddress, new IDiscoveryCallback() {
@@ -656,7 +671,7 @@ public class BleExt {
 			public void onSuccess() {
 				BleLog.LOGd(TAG, "... discovery done");
 
-				if (_bleBase.isEncryptionEnabled()) {
+				if (readSessionNonce && _bleBase.isEncryptionEnabled()) {
 					_bleBase.readSessionNonce(_targetAddress, new IDataCallback() {
 						@Override
 						public void onData(JSONObject json) {
@@ -766,6 +781,19 @@ public class BleExt {
 	 *                 characteristics
 	 */
 	public void connectAndDiscover(final String address, final IDiscoveryCallback callback) {
+		connectAndDiscover(address, callback, true);
+	}
+
+	/**
+	 * Connect to the given device, once connection is established, discover the available
+	 * services and characteristics. The connection will be kept open. Need to disconnect and
+	 * close manually afterwards.
+	 * @param address the MAC address of the device for which we want to discover the services
+	 * @param callback the callback which will be notified about discovered services and
+	 *                 characteristics
+	 * @param readSessionNonce whether to read the session nonce after discovery
+	 */
+	public void connectAndDiscover(final String address, final IDiscoveryCallback callback, final boolean readSessionNonce) {
 		connect(address, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
@@ -803,7 +831,7 @@ public class BleExt {
 										callback.onError(error);
 								}
 							}
-						});
+						}, readSessionNonce);
 					}
 				}, 500);
 //				discoverServices(callback);
@@ -1023,6 +1051,24 @@ public class BleExt {
 	 *                 completed (after closing the device, or if an error occurs)
 	 */
 	public void connectAndExecute(final String address, final IExecuteCallback function, final IStatusCallback callback) {
+		connectAndExecute(address, function, callback, true);
+	}
+
+
+	/**
+	 * Connects to the given device, discovers the available services, then executes the provided
+	 * function, before disconnecting and closing the device again. Once everything completed, the
+	 * callbacks onSuccess function is called.
+	 * Note: the disconnect and close will be delayed, so consequent calls (within the timeout) to
+	 * connectAndExecute functions will keep the connection alive until the last call expires
+	 * @param address the MAC address of the device on which the function should be executed
+	 * @param function the function to be executed, i.e. the object providing the execute function
+	 *                 which should be executed
+	 * @param callback the callback which should be notified once the connectAndExecute function
+	 *                 completed (after closing the device, or if an error occurs)
+	 * @param readSessionNonce whether to read the session nonce after discovery
+	 */
+	public void connectAndExecute(final String address, final IExecuteCallback function, final IStatusCallback callback, final boolean readSessionNonce) {
 		final boolean resumeDelayedDisconnect = clearDelayedDisconnect();
 
 		// TODO: if function.execute was successful ignore the connect errors. Need a class variable for that.
@@ -1049,7 +1095,7 @@ public class BleExt {
 						if (!retry(error)) {
 							callback.onError(error);
 						} else {
-							connectAndExecute(address, function, callback);
+							connectAndExecute(address, function, callback, readSessionNonce);
 						}
 					}
 				}
@@ -1077,7 +1123,7 @@ public class BleExt {
 							if (!retry(error)) {
 								callback.onError(error);
 							} else {
-								connectAndExecute(address, function, callback);
+								connectAndExecute(address, function, callback, readSessionNonce);
 							}
 						}
 					});
@@ -1093,7 +1139,7 @@ public class BleExt {
 							if (!retry(error)) {
 								callback.onError(error);
 							} else {
-								connectAndExecute(address, function, callback);
+								connectAndExecute(address, function, callback, readSessionNonce);
 							}
 						}
 
@@ -1102,12 +1148,12 @@ public class BleExt {
 							if (!retry(error)) {
 								callback.onError(error);
 							} else {
-								connectAndExecute(address, function, callback);
+								connectAndExecute(address, function, callback, readSessionNonce);
 							}
 						}
 					});
 				}
-			});
+			}, readSessionNonce);
 		}
 	}
 
