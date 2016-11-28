@@ -58,6 +58,7 @@ public class CrownstoneServiceData extends JSONObject {
 
 			bb.mark();
 			int firmwareVersion = BleUtils.toUint8(bb.get());
+			setFirmwareVersion(firmwareVersion);
 
 			// First parse without decrypting
 			if (!parseDecryptedData(bytes, 3, firmwareVersion)) {
