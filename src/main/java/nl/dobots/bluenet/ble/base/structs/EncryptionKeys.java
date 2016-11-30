@@ -2,7 +2,10 @@ package nl.dobots.bluenet.ble.base.structs;
 
 import android.support.annotation.Nullable;
 
+import java.nio.charset.Charset;
+
 import nl.dobots.bluenet.ble.base.BleBaseEncryption;
+import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
 /**
@@ -23,6 +26,7 @@ import nl.dobots.bluenet.utils.BleUtils;
  * @author Bart van Vliet
  */
 public class EncryptionKeys {
+	private static final String TAG = EncryptionKeys.class.getCanonicalName();
 	private String _adminKey = null;
 	private String _memberKey = null;
 	private String _guestKey = null;
@@ -33,20 +37,25 @@ public class EncryptionKeys {
 	protected EncryptionKeys() {}
 
 	public EncryptionKeys(@Nullable String adminKey, @Nullable String memberKey, @Nullable String guestKey) {
-		_adminKey = adminKey;
-		_memberKey = memberKey;
-		_guestKey = guestKey;
+		_adminKey = getKeyFromString(adminKey);
+		_memberKey = getKeyFromString(memberKey);
+		_guestKey = getKeyFromString(guestKey);
 		_adminKeyBytes = null;
-		if (_adminKey != null) {
-			_adminKeyBytes = BleUtils.hexStringToBytes(adminKey);
-		}
 		_memberKeyBytes = null;
-		if (_memberKey != null) {
-			_memberKeyBytes = BleUtils.hexStringToBytes(memberKey);
-		}
 		_guestKeyBytes = null;
-		if (_guestKey != null) {
-			_guestKeyBytes = BleUtils.hexStringToBytes(guestKey);
+		try {
+			if (_adminKey != null) {
+				_adminKeyBytes = BleUtils.hexStringToBytes(_adminKey);
+			}
+			if (_memberKey != null) {
+				_memberKeyBytes = BleUtils.hexStringToBytes(_memberKey);
+			}
+			if (_guestKey != null) {
+				_guestKeyBytes = BleUtils.hexStringToBytes(_guestKey);
+			}
+		} catch (java.lang.NumberFormatException e) {
+			BleLog.LOGe(TAG, "Invalid key format");
+			e.printStackTrace();
 		}
 	}
 
@@ -55,14 +64,14 @@ public class EncryptionKeys {
 		_memberKeyBytes = memberKey;
 		_guestKeyBytes = guestKey;
 		_adminKey = null;
+		_memberKey = null;
+		_guestKey = null;
 		if (_adminKeyBytes != null) {
 			_adminKey = BleUtils.bytesToHexString(_adminKeyBytes);
 		}
-		_memberKey = null;
 		if (_memberKeyBytes != null) {
 			_memberKey = BleUtils.bytesToHexString(_memberKeyBytes);
 		}
-		_guestKey = null;
 		if (_guestKeyBytes != null) {
 			_guestKey = BleUtils.bytesToHexString(_guestKeyBytes);
 		}
@@ -150,5 +159,18 @@ public class EncryptionKeys {
 			this.key = key;
 			this.accessLevel = accessLevel;
 		}
+	}
+
+	private String getKeyFromString(String key) {
+		if (key == null) { return null; }
+		String retKey = null;
+		if (key.length() == BleBaseEncryption.AES_BLOCK_SIZE * 2) {
+			retKey = key;
+		}
+		if (key.length() == BleBaseEncryption.AES_BLOCK_SIZE) {
+			byte[] keyBytes = key.getBytes(Charset.forName("UTF-8"));
+			retKey = BleUtils.bytesToHexString(keyBytes);
+		}
+		return retKey;
 	}
 }
