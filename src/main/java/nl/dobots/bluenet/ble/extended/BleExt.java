@@ -13,16 +13,13 @@ import java.util.Arrays;
 import java.util.HashMap;
 
 import nl.dobots.bluenet.ble.base.BleBase;
-import nl.dobots.bluenet.ble.base.BleBaseConfiguration;
 import nl.dobots.bluenet.ble.base.BleBaseEncryption;
 import nl.dobots.bluenet.ble.base.callbacks.IAlertCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IPowerSamplesCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IProgressCallback;
 import nl.dobots.bluenet.ble.base.structs.AlertState;
 import nl.dobots.bluenet.ble.base.structs.CommandMsg;
-import nl.dobots.bluenet.ble.base.structs.EncryptionKeys;
 import nl.dobots.bluenet.ble.base.structs.PowerSamples;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
@@ -1502,21 +1499,21 @@ public class BleExt {
 	}
 
 	/**
-	 * Toggle power between ON (pwm = BluenetConfig.PWM_ON) and OFF (pwm = BluenetConfig.PWM_OFF).
+	 * Toggle pwm between ON (pwm = BluenetConfig.PWM_ON) and OFF (pwm = BluenetConfig.PWM_OFF).
 	 * Reads first the current PWM value from the device, then switches the PWM value accordingly.
 	 *
 	 * Note: needs to be already connected or an error is created! Use overloaded function
 	 * with address otherwise
 	 * @param callback callback which will be informed about success or failure
 	 */
-	public void togglePower(final IStatusCallback callback) {
+	public void togglePwm(final IStatusCallback callback) {
 		readPwm(new IIntegerCallback() {
 			@Override
 			public void onSuccess(int result) {
 				if (result > 0) {
-					powerOff(callback);
+					pwmOff(callback);
 				} else {
-					powerOn(callback);
+					pwmOn(callback);
 				}
 			}
 
@@ -1528,14 +1525,14 @@ public class BleExt {
 	}
 
 	/**
-	 * Toggle power between ON (pwm = BluenetConfig.PWM_ON) and OFF (pwm = BluenetConfig.PWM_OFF).
+	 * Toggle pwm between ON (pwm = BluenetConfig.PWM_ON) and OFF (pwm = BluenetConfig.PWM_OFF).
 	 * Reads first the current PWM value from the device, then switches the PWM value accordingly.
 	 *
 	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
 	 * @param address the MAC address of the device
 	 * @param callback callback which will be informed about success or failure
 	 */
-	public void togglePower(final String address, final IStatusCallback callback) {
+	public void togglePwm(final String address, final IStatusCallback callback) {
 		getHandler().post(new Runnable() {
 			@Override
 			public void run() {
@@ -1546,7 +1543,7 @@ public class BleExt {
 				connectAndExecute(address, new IExecuteCallback() {
 					@Override
 					public void execute(final IStatusCallback execCallback) {
-						togglePower(new IStatusCallback() {
+						togglePwm(new IStatusCallback() {
 							@Override
 							public void onSuccess() {
 								callback.onSuccess();
@@ -1574,23 +1571,23 @@ public class BleExt {
 	}
 
 	/**
-	 * Helper function to set power ON (sets pwm value to BluenetConfig.PWM_ON)
+	 * Helper function to set pwm ON (sets pwm value to BluenetConfig.PWM_ON)
 	 *
 	 * Note: needs to be already connected or an error is created! Use overloaded function
 	 * with address otherwise
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void powerOn(IStatusCallback callback) {
+	public void pwmOn(IStatusCallback callback) {
 		writePwm(BluenetConfig.PWM_ON, callback);
 	}
 
 	/**
-	 * Helper function to set power ON (sets pwm value to BluenetConfig.PWM_ON)
+	 * Helper function to set pwm ON (sets pwm value to BluenetConfig.PWM_ON)
 	 *
 	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void powerOn(String address, final IStatusCallback callback) {
+	public void pwmOn(String address, final IStatusCallback callback) {
 		writePwm(address, BluenetConfig.PWM_ON, callback);
 	}
 
@@ -1601,7 +1598,7 @@ public class BleExt {
 	 * with address otherwise
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void powerOff(IStatusCallback callback) {
+	public void pwmOff(IStatusCallback callback) {
 		writePwm(BluenetConfig.PWM_OFF, callback);
 	}
 
@@ -1611,7 +1608,7 @@ public class BleExt {
 	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void powerOff(String address, final IStatusCallback callback) {
+	public void pwmOff(String address, final IStatusCallback callback) {
 		writePwm(address, BluenetConfig.PWM_OFF, callback);
 	}
 
