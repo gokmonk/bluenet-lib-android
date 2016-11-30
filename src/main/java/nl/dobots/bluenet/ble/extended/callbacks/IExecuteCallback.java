@@ -1,6 +1,6 @@
 package nl.dobots.bluenet.ble.extended.callbacks;
 
-import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IExecStatusCallback;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -21,6 +21,6 @@ import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
  */
 public interface IExecuteCallback {
 
-	void execute(IStatusCallback callback);
+	void execute(IExecStatusCallback callback);
 
 }

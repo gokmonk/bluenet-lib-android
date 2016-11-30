@@ -163,6 +163,10 @@ public class BleUtils {
 		return (value & (1 << bit)) > 0;
 	}
 
+	public static int clearBit(int value, int bit) {
+		return value & ~(1 << bit);
+	}
+
 	public static byte[] reverse(byte[] array) {
 		byte[] result = new byte[array.length];
 		for (int i = 0; i < array.length; ++i) {

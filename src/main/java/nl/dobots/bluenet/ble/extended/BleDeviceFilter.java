@@ -16,7 +16,5 @@ public enum BleDeviceFilter {
 	crownstonePlug,
 	crownstoneBuiltin,
 	guidestone,
-	@Deprecated
-	fridge
-
+	setupStone
 }
