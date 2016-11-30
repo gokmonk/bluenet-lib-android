@@ -1362,7 +1362,7 @@ public class BleExt {
 						_bleExtState.getSwitchState(_targetAddress, new IIntegerCallback() {
 							@Override
 							public void onSuccess(int result) {
-								callback.onSuccess(result > 0);
+								callback.onSuccess(BleUtils.isBitSet(result,7));
 							}
 
 							@Override
