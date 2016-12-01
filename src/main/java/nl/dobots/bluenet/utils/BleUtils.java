@@ -143,8 +143,15 @@ public class BleUtils {
 
 		byte[] result = new byte[ADDRESS_LENGTH];
 
-		for (int i = 0; i < ADDRESS_LENGTH; ++i) {
-			result[i] = Byte.valueOf(address.substring(3*i, 3*i+2), 16);
+		try {
+			for (int i = 0; i < ADDRESS_LENGTH; ++i) {
+//				result[i] = Byte.valueOf(address.substring(3 * i, 3 * i + 2), 16);
+				result[ADDRESS_LENGTH-1-i] = Integer.valueOf(address.substring(3 * i, 3 * i + 2), 16).byteValue();
+			}
+		} catch (java.lang.NumberFormatException e) {
+			BleLog.LOGe(TAG, "Wrong address format: " + address);
+			e.printStackTrace();
+			result = null;
 		}
 
 		return result;
