@@ -161,6 +161,10 @@ public class EncryptionKeys {
 		}
 	}
 
+	public String toString() {
+		return "Keys: [" + _adminKey + ", " + _memberKey + ", " + _guestKey + "]";
+	}
+
 	private String getKeyFromString(String key) {
 		if (key == null) { return null; }
 		String retKey = null;

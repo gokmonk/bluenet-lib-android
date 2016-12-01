@@ -62,7 +62,7 @@ public class TrackedDeviceMsg {
 	 */
 	public TrackedDeviceMsg(String address, int rssi) {
 		this.rssi = rssi;
-		BleUtils.addressToBytes(address);
+		this.address = BleUtils.addressToBytes(address);
 	}
 
 	/**
@@ -85,7 +85,9 @@ public class TrackedDeviceMsg {
 	 */
 	@Override
 	public String toString() {
-		return String.format("{address: %s, rssi: %d}", Arrays.toString(address), rssi);
+//		return String.format("{address: %s, rssi: %d}", BleUtils.bytesToString(address), rssi);
+//		return BleUtils.bytesToString(toArray());
+		return String.format("{address: %s, rssi: %d, array: %s}", BleUtils.bytesToString(address), rssi, BleUtils.bytesToString(toArray()));
 	}
 
 	/**

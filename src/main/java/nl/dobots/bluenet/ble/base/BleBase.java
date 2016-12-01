@@ -120,6 +120,7 @@ public class BleBase extends BleCore {
 	}
 
 	public void setEncryptionKeys(EncryptionKeys encryptionKeys) {
+		BleLog.LOGd(TAG, "setEncryptionKeys: " + encryptionKeys.toString());
 		_encryptionKeys = encryptionKeys;
 	}
 
@@ -953,7 +954,7 @@ public class BleBase extends BleCore {
 			@Override
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
-				BleLog.LOGd(TAG, "device list: %s", Arrays.toString(bytes));
+				BleLog.LOGd(TAG, "device list: %s", BleUtils.bytesToString(bytes));
 				callback.onSuccess(bytes);
 				// todo: add function to extended, with nice classes and list of objects, etc.
 			}
@@ -1187,7 +1188,7 @@ public class BleBase extends BleCore {
 									final boolean verify, String serviceUuid, String characteristicUuid,
 									final IStatusCallback callback) {
 		byte[] bytes = configuration.toArray();
-		BleLog.LOGd(TAG, "configuration: write %s at service %s and characteristic %s", Arrays.toString(bytes), serviceUuid, characteristicUuid);
+		BleLog.LOGd(TAG, "configuration: write %s at service %s and characteristic %s", BleUtils.bytesToString(bytes), serviceUuid, characteristicUuid);
 		write(address, serviceUuid, characteristicUuid, bytes,
 				new IStatusCallback() {
 
@@ -1209,7 +1210,7 @@ public class BleBase extends BleCore {
 											if (Arrays.equals(readConfig.getPayload(), configuration.getPayload())) {
 												callback.onSuccess();
 											} else {
-												BleLog.LOGe(TAG, "write: %s, read: %s", Arrays.toString(configuration.getPayload()), Arrays.toString(readConfig.getPayload()));
+												BleLog.LOGe(TAG, "write: %s, read: %s", BleUtils.bytesToString(configuration.getPayload()), BleUtils.bytesToString(readConfig.getPayload()));
 												callback.onError(BleErrors.ERROR_VALIDATION_FAILED);
 											}
 										}
@@ -1692,7 +1693,7 @@ public class BleBase extends BleCore {
 	private void sendCommand(String address, CommandMsg command, String serviceUuid, String characteristicUuid,
 							 final IStatusCallback callback) {
 		byte[] bytes = command.toArray();
-		BleLog.LOGd(TAG, "control command: write %s at service %s and characteristic %s", Arrays.toString(bytes), BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONTROL_UUID);
+		BleLog.LOGd(TAG, "control command: write %s at service %s and characteristic %s", BleUtils.bytesToString(bytes), BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONTROL_UUID);
 		write(address, serviceUuid, characteristicUuid, bytes,
 				new IStatusCallback() {
 
@@ -1779,7 +1780,7 @@ public class BleBase extends BleCore {
 			@Override
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
-				BleLog.LOGd(TAG, "tracked devices: %s", Arrays.toString(bytes));
+				BleLog.LOGd(TAG, "tracked devices: %s", BleUtils.bytesToString(bytes));
 				callback.onSuccess(bytes);
 				// todo: add function to extended, with nice classes and list of objects, etc.
 			}
@@ -1794,7 +1795,7 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void addTrackedDevice(String address, TrackedDeviceMsg device, final IStatusCallback callback) {
-		BleLog.LOGd(TAG, "add tracked device: write %d at service %s and characteristic %s", device.toString(), BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_TRACK_CONTROL_UUID);
+		BleLog.LOGd(TAG, "add tracked device: write %s at service %s and characteristic %s", device.toString(), BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_TRACK_CONTROL_UUID);
 		write(address, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_TRACK_CONTROL_UUID, device.toArray(),
 				new IStatusCallback() {
 
@@ -2042,7 +2043,7 @@ public class BleBase extends BleCore {
 				@Override
 				public void onData(JSONObject json) {
 					byte[] bytes = BleCore.getValue(json);
-					BleLog.LOGd(TAG, "session key: %s", Arrays.toString(bytes));
+					BleLog.LOGd(TAG, "session key: %s", BleUtils.bytesToString(bytes));
 					callback.onSuccess(bytes);
 				}
 

@@ -4,7 +4,6 @@ import android.util.Log;
 
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
-import java.util.Arrays;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -196,7 +195,7 @@ public class BleBaseEncryption {
 		try {
 			Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding");
 			cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
-			BleLog.LOGv(TAG, "IV: " + Arrays.toString(cipher.getIV()));
+			BleLog.LOGv(TAG, "IV: " + BleUtils.bytesToString(cipher.getIV()));
 			// doFinal(byte[] input, int inputOffset, int inputLen, byte[] output, int outputOffset)
 			cipher.doFinal(encryptedData, PACKET_NONCE_LENGTH+ACCESS_LEVEL_LENGTH, decryptedData.length, decryptedData, 0);
 		} catch (GeneralSecurityException e) {

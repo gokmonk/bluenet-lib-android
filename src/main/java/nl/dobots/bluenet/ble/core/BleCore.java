@@ -1503,7 +1503,7 @@ public class BleCore {
 
 			ISubscribeCallback callback = _notificationCallbacks.get(uuidCharacteristic);
 			if (callback != null) {
-				BleLog.LOGd(TAG, "notification: %s", Arrays.toString(characteristic.getValue()));
+				BleLog.LOGd(TAG, "notification: %s", BleUtils.bytesToString(characteristic.getValue()));
 				callback.onData(uuidService, uuidCharacteristic, json);
 			}
 
