@@ -1495,7 +1495,8 @@ public class BleExt {
 	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
 	 *
 	 * @param address  the MAC address of the device
-	 * @param callback callback which will be informed about success or failure
+	 * @param callback callback which will be informed about success or failure.
+	 *                    In case of success, the value is true when the relay was switched on, false for off.
 	 */
 	public void togglePwm(final String address, final IBooleanCallback callback) {
 		getHandler().post(new Runnable() {
@@ -1565,7 +1566,8 @@ public class BleExt {
 	 * Note: needs to be already connected or an error is created! Use overloaded function
 	 * with address otherwise
 	 *
-	 * @param callback callback which will be informed about success or failure
+	 * @param callback callback which will be informed about success or failure.
+	 *                    In case of success, the value is true when the relay was switched on, false for off.
 	 */
 	public void toggleRelay(final IBooleanCallback callback) {
 		readRelay(new IBooleanCallback() {
@@ -1610,8 +1612,9 @@ public class BleExt {
 	 * Reads first the current relay value from the device, then switches the relay value accordingly.
 	 * <p>
 	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
-	 *  @param address  the MAC address of the device
-	 * @param callback callback which will be informed about success or failure
+	 * @param address  the MAC address of the device
+	 * @param callback callback which will be informed about success or failure.
+	 *                    In case of success, the value is true when the relay was switched on, false for off.
 	 */
 	public void toggleRelay(final String address, final IBooleanCallback callback) {
 		getHandler().post(new Runnable() {
