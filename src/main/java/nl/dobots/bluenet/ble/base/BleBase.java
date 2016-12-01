@@ -1426,7 +1426,11 @@ public class BleBase extends BleCore {
 						else {
 							decryptedBytes = bytes;
 						}
-
+						if (decryptedBytes == null) {
+							BleLog.LOGw(TAG, "Unable to decrypt");
+							callback.onError(BleErrors.ENCRYPTION_ERROR);
+							return;
+						}
 						BleLog.LOGd(TAG, BleUtils.bytesToString(decryptedBytes));
 						StateMsg state = new StateMsg(decryptedBytes);
 						BleLog.LOGd(TAG, "received state notification: %s", state.toString());
