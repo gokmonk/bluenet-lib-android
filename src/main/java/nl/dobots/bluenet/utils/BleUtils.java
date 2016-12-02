@@ -182,6 +182,7 @@ public class BleUtils {
 		return result;
 	}
 
+	// Handy for logging, does not turn byte values into the corresponding ascii values!
 	public static String bytesToString(byte[] bytes) {
 		if (bytes == null) {
 			return "";

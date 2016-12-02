@@ -40,12 +40,13 @@ public class BleIbeaconRanging {
 	private static final long REGION_TIMEOUT_MS = 30000L;
 	private static final long TICK_INTERVAL_MS = 1000L;
 
-	private List<BleIbeaconFilter> _iBeaconFilter = new ArrayList<>();
-//	private Set<IBleBeaconCallback> _scanCallbacks = new HashSet<>();
-	private Set<BleBeaconRangingListener> _rangingListeners = new HashSet<>();
-	private BleDeviceMap _devices = new BleDeviceMap();
-	private Map<UUID, Long> _lastSeen = new HashMap<>();
-	private Set<UUID> _inRegion = new HashSet<>();
+	private List<BleIbeaconFilter> _iBeaconFilter;
+//	private Set<IBleBeaconCallback> _scanCallbacks;
+	private Set<BleBeaconRangingListener> _rangingListeners;
+	private BleDeviceMap _devices;
+	private Map<UUID, Long> _lastSeen;
+	private Set<UUID> _inRegion;
+	private boolean _paused;
 
 
 	// handler used for delayed execution and timeouts
@@ -55,6 +56,14 @@ public class BleIbeaconRanging {
 
 
 	public BleIbeaconRanging() {
+		_iBeaconFilter = new ArrayList<>();
+//		_scanCallbacks = new HashSet<>();
+		_rangingListeners = new HashSet<>();
+		_devices = new BleDeviceMap();
+		_lastSeen = new HashMap<>();
+		_inRegion = new HashSet<>();
+		_paused = false;
+
 		// create handler with its own thread
 		HandlerThread handlerThread = new HandlerThread("BleExtHandler");
 		handlerThread.start();
@@ -68,12 +77,13 @@ public class BleIbeaconRanging {
 	}
 
 
-	public void addIbeaconFilter(BleIbeaconFilter filter) {
+	public synchronized void addIbeaconFilter(BleIbeaconFilter filter) {
 		_iBeaconFilter.add(filter);
 		_lastSeen.put(filter.getUuid(), 0L);
+		BleLog.LOGv(TAG, "lastseen " + filter.getUuid() + " at " + _lastSeen.get(filter.getUuid()));
 	}
 
-	public void remIbeaconFilter(BleIbeaconFilter filter) {
+	public synchronized void remIbeaconFilter(BleIbeaconFilter filter) {
 		for (int i = _iBeaconFilter.size(); i > 0; i--) {
 			if (_iBeaconFilter.get(i).equals(filter)) {
 				_iBeaconFilter.remove(i);
@@ -83,7 +93,7 @@ public class BleIbeaconRanging {
 		_lastSeen.remove(filter.getUuid());
 	}
 
-	public void clearIbeaconFilter() {
+	public synchronized void clearIbeaconFilter() {
 		_iBeaconFilter.clear();
 		_lastSeen.clear();
 	}
@@ -110,11 +120,24 @@ public class BleIbeaconRanging {
 		return _rangingListeners.remove(listener);
 	}
 
+	public void pause() {
+		_paused = true;
+	}
 
-	public boolean onScannedDevice(BleDevice device, @Nullable IBleBeaconCallback callback) {
+	public void resume() {
+		_paused = false;
+		// TODO: Fire event to listeners?
+	}
+
+	public Set getEnteredRegions() {
+		return _inRegion;
+	}
+
+
+	public synchronized boolean onScannedDevice(BleDevice device, @Nullable IBleBeaconCallback callback) {
 
 		boolean iBeaconMatch = false;
-		if (_iBeaconFilter.isEmpty()) return false;
+		if (_iBeaconFilter.isEmpty() || _paused) return false;
 //		if (callback == null && _scanCallbacks.isEmpty()) return false;
 		if (callback == null && _rangingListeners.isEmpty()) return false;
 		if (device.isIBeacon()) {
@@ -133,7 +156,9 @@ public class BleIbeaconRanging {
 //				cb.onBeaconScanned(device);
 //			}
 
-			_lastSeen.put(device.getProximityUuid(), SystemClock.elapsedRealtime());
+			long currentTime = SystemClock.elapsedRealtime();
+			_lastSeen.put(device.getProximityUuid(), currentTime);
+			BleLog.LOGv(TAG, "lastseen " + device.getProximityUuid() + " at " + currentTime + "=" + _lastSeen.get(device.getProximityUuid()));
 			if (!_inRegion.contains(device.getProximityUuid())) {
 				enterRegion(device.getProximityUuid());
 			}
@@ -156,16 +181,21 @@ public class BleIbeaconRanging {
 		}
 	};
 
-	private void checkRegionExits() {
+	private synchronized void checkRegionExits() {
+		// TODO: this crashes on logout, because _lastSeen.get(uuid) returns null for some reason unknown
 		long curTime = SystemClock.elapsedRealtime();
+		if (_lastSeen == null) {
+			BleLog.LOGe(TAG, "lastSeen = null!");
+		}
 		for (UUID uuid : _inRegion) {
+			BleLog.LOGd(TAG, "lastSeen " + uuid + ": " + _lastSeen.get(uuid));
 			if (curTime - _lastSeen.get(uuid) > REGION_TIMEOUT_MS) {
 				exitRegion(uuid);
 			}
 		}
 	}
 
-	private void enterRegion(UUID uuid) {
+	private synchronized void enterRegion(UUID uuid) {
 		BleLog.LOGd(TAG, "enterRegion: " + uuid.toString());
 		_inRegion.add(uuid);
 		for (BleBeaconRangingListener listener : _rangingListeners) {
@@ -173,12 +203,14 @@ public class BleIbeaconRanging {
 		}
 	}
 
-	private void exitRegion(UUID uuid) {
+	private synchronized void exitRegion(UUID uuid) {
 		BleLog.LOGd(TAG, "exitRegion: " + uuid.toString());
 //		_lastSeen.remove(uuid);
 		_inRegion.remove(uuid);
-		for (BleBeaconRangingListener listener : _rangingListeners) {
-			listener.onRegionExit(uuid);
+		if (!_paused) {
+			for (BleBeaconRangingListener listener : _rangingListeners) {
+				listener.onRegionExit(uuid);
+			}
 		}
 	}
 
