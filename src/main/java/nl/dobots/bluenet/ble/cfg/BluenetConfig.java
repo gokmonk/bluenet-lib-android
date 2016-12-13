@@ -38,6 +38,7 @@ public class BluenetConfig {
 	public static final String CHAR_SESSION_KEY_UUID =                  "24f10003-7d10-4805-bfc1-7663a01c3bff";
 	public static final String CHAR_SETUP_CONFIG_CONTROL_UUID =         "24f10004-7d10-4805-bfc1-7663a01c3bff";
 	public static final String CHAR_SETUP_CONFIG_READ_UUID =            "24f10005-7d10-4805-bfc1-7663a01c3bff";
+	public static final String CHAR_SETUP_GOTO_DFU_UUID =               "24f10006-7d10-4805-bfc1-7663a01c3bff";
 	public static final String CHAR_SETUP_SESSION_NONCE_UUID =          "24f10008-7d10-4805-bfc1-7663a01c3bff";
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -109,6 +110,7 @@ public class BluenetConfig {
 	public static final char CMD_VALIDATE_SETUP =                       17;   // 0x11
 	public static final char CMD_REQUEST_SERVICE_DATA =                 18;   // 0x12
 	public static final char CMD_DISCONNECT =                           19;   // 0x13
+	public static final char CMD_SET_LED =                              20;   // 0x14
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////

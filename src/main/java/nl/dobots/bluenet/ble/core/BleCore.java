@@ -206,6 +206,7 @@ public class BleCore {
 						_connections = new HashMap<>();
 //						_scanCallback = null;
 						_initialized = false;
+						_scanning = false;
 
 						// if bluetooth is turned off, call onError on the bt state callback
 						_btStateCallback.onError(BleErrors.ERROR_BLUETOOTH_TURNED_OFF);
@@ -263,7 +264,8 @@ public class BleCore {
 		switch (requestCode) {
 			case PERMISSIONS_REQUEST_LOCATION: {
 				if (grantResults.length > 0 &&	grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-					callback.onSuccess();
+					init(_context, callback);
+//					callback.onSuccess();
 				} else {
 					callback.onError(BleErrors.ERROR_BLE_PERMISSION_MISSING);
 				}

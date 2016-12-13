@@ -10,12 +10,14 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import nl.dobots.bluenet.ble.base.structs.CrownstoneServiceData;
 import nl.dobots.bluenet.ble.cfg.BleTypes;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.utils.BleLog;
+import nl.dobots.bluenet.utils.BleUtils;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -213,6 +215,14 @@ public class BleDevice {
 
 	public boolean isDfuMode() { return _crownstoneMode == CrownstoneMode.dfu; }
 
+	public boolean isEncrypted() {
+		CrownstoneServiceData serviceData = getServiceData();
+		if (serviceData != null) {
+			return !serviceData.getRandomBytes().equals("");
+		}
+		return false;
+	}
+
 	private DeviceType determineDeviceType(JSONObject json) throws JSONException {
 		if (json.has(BleTypes.PROPERTY_IS_CROWNSTONE_PLUG)) {
 			if (json.getBoolean(BleTypes.PROPERTY_IS_CROWNSTONE_PLUG)) {
@@ -268,19 +278,19 @@ public class BleDevice {
 	}
 
 	public int getMajor() {
-		return _major;
+		return BleUtils.toUint16(_major);
 	}
 
 	public void setMajor(int major) {
-		_major = major;
+		_major = BleUtils.toUint16(major);
 	}
 
 	public int getMinor() {
-		return _minor;
+		return BleUtils.toUint16(_minor);
 	}
 
 	public void setMinor(int minor) {
-		_minor = minor;
+		_minor = BleUtils.toUint16(minor);
 	}
 
 	public UUID getProximityUuid() {

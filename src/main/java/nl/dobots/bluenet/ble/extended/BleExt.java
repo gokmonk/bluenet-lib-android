@@ -8,6 +8,7 @@ import android.os.SystemClock;
 
 import org.json.JSONObject;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -2020,7 +2021,15 @@ public class BleExt {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void resetToBootloader(IStatusCallback callback) {
-		writeReset(BluenetConfig.RESET_DFU, callback);
+		if (isConnected(callback)) {
+			if (hasControlCharacteristic(null)) {
+				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_GOTO_DFU), callback);
+			} else if (hasCharacteristic(BluenetConfig.CHAR_RESET_UUID, null)) {
+				_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, callback);
+			} else if (isSetupMode() && hasCharacteristic(BluenetConfig.CHAR_SETUP_GOTO_DFU_UUID, null)) {
+				_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, callback);
+			}
+		}
 	}
 
 	/**
@@ -2032,8 +2041,18 @@ public class BleExt {
 	 * @param address  the MAC address of the device
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void resetToBootloader(String address, final IStatusCallback callback) {
-		writeReset(address, BluenetConfig.RESET_DFU, callback);
+	public void resetToBootloader(final String address, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						resetToBootloader(execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
 	}
 
 
@@ -2628,6 +2647,93 @@ public class BleExt {
 			BleLog.LOGd(TAG, "unsubscribe from mesh data");
 			_bleBase.unsubscribeMeshData(getTargetAddress(), callback);
 		}
+	}
+
+	/**
+	 * Function to write the given PWM value to the device.
+	 * <p>
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 *
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void writeLed(final int led, boolean enable, final IStatusCallback callback) {
+		if (isConnected(callback)) {
+			getLogger().LOGd(TAG, "%s led %d", enable ? "Enable" : "Disable", led);
+			_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_SET_LED, 2, new byte[]{(byte) led, (byte)(enable ? 1 : 0) }), callback);
+		}
+	}
+
+	/**
+	 * Function to write the given PWM value to the device. Connects to the device if not already
+	 * connected, and/or delays the disconnect if necessary.
+	 * <p>
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 *
+	 * @param address  the MAC address of the device to which the PWM value should be written
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void writeLed(final String address, final int led, final boolean enable, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "%s led %d", enable ? "Enable" : "Disable", led);
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						writeLed(led, enable, execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
+	public void writeKeepAliveState(final int switchState, final int timeout, final IStatusCallback callback) {
+		if (isConnected(callback)) {
+			getLogger().LOGd(TAG, "write keep alive with state %d and timeout %d", switchState, timeout);
+			ByteBuffer bb = ByteBuffer.allocate(3);
+			bb.put((byte)switchState);
+			bb.putShort((short)timeout);
+			_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_KEEP_ALIVE_STATE, 3, bb.array()), callback);
+		}
+	}
+
+	public void writeKeepAliveState(final String address, final int switchState, final int timeout, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "write keep alive with state %d and timeout %d", switchState, timeout);
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						writeKeepAliveState(switchState, timeout, execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
+	public void writeKeepAlive(final IStatusCallback callback) {
+		if (isConnected(callback)) {
+			getLogger().LOGd(TAG, "write keep alive");
+			_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_KEEP_ALIVE), callback);
+		}
+	}
+
+	public void writeKeepAlive(final String address, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "write keep alive");
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						writeKeepAlive(execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
 	}
 
 }

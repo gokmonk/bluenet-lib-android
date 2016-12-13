@@ -91,11 +91,13 @@ public class BleIbeaconRanging {
 		}
 		// TODO: Not sure if we can remove this, there may be others with the same UUID
 		_lastSeen.remove(filter.getUuid());
+		_inRegion.remove(filter.getUuid());
 	}
 
 	public synchronized void clearIbeaconFilter() {
 		_iBeaconFilter.clear();
 		_lastSeen.clear();
+		_inRegion.clear();
 	}
 
 	public List<BleIbeaconFilter> getIbeaconFilter() {

@@ -27,6 +27,8 @@ import nl.dobots.bluenet.service.callbacks.ScanDeviceListener;
 import nl.dobots.bluenet.service.callbacks.IScanListCallback;
 import nl.dobots.bluenet.utils.BleLog;
 
+import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
+
 /**
  * Defines a Ble Scan Service which provides the functionality to do interval scanning. This means
  * the service will scan for a given amount of time, then pause for another defined amount of time,
@@ -219,13 +221,17 @@ public class BleScanService extends Service {
 		return BleDeviceFilter.all;
 	}
 
+	private void initBluetooth() {
+		_ble.init(this, _btStateCallback);
+	}
+
 	/**
 	 * Return the Ble Extended object used by this service to access lower level functions
 	 * @return the bluenet extended object used by this service
 	 */
 	public BleExt getBleExt() {
 		if (!_initialized) {
-			_ble.init(this, _btStateCallback);
+			initBluetooth();
 		}
 		return _ble;
 	}
@@ -330,9 +336,7 @@ public class BleScanService extends Service {
 					break;
 				}
 				case BleErrors.ERROR_BLE_PERMISSION_MISSING: {
-					BleLog.LOGe(TAG, "Ble permissions missing, need to call BleExt.requestPermissions first!!");
-					_running = false;
-					onEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
+					onPermissionsMissing();
 					break;
 				}
 				default:
@@ -485,7 +489,7 @@ public class BleScanService extends Service {
 			// set wasScanning flag to true so that once bluetooth is enabled, and we receive
 			// the event, the service will automatically start scanning
 			_wasRunning = true;
-			_ble.init(this, _btStateCallback);
+			initBluetooth();
 		} else if (!_running) {
 			BleLog.LOGi(TAG, "Start scan");
 			_running = true;
@@ -763,6 +767,33 @@ public class BleScanService extends Service {
 
 	public void requestPermissions(Activity activity) {
 		_ble.requestPermissions(activity);
+	}
+
+	public void onPermissionGranted() {
+		onEvent(EventListener.Event.BLE_PERMISSIONS_GRANTED);
+	}
+
+	int permissionRetryCount = 0;
+
+	public void onPermissionDenied() {
+//		onEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
+		if (++permissionRetryCount < 3) {
+			onPermissionsMissing();
+		} else {
+			onEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
+		}
+	}
+
+	private void onPermissionsMissing() {
+		_running = false;
+//					onEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
+		Intent intent = new Intent(BleScanService.this, BluetoothPermissionRequest.class);
+		intent.setFlags(FLAG_ACTIVITY_NEW_TASK);
+		startActivity(intent);
+	}
+
+	public boolean handlePermissionResult(int requestCode, String[] permissions, int[] grantResults, IStatusCallback statusCallback) {
+		return _ble.handlePermissionResult(requestCode, permissions, grantResults, statusCallback);
 	}
 
 	public void enableCloudUpload(IScanListCallback scanCB) {

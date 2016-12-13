@@ -1824,8 +1824,25 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writeReset(String address, int value, final IStatusCallback callback) {
-			BleLog.LOGd(TAG, "reset: write %d at service %s and characteristic %s", value, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_RESET_UUID);
-			write(address, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_RESET_UUID, new byte[]{(byte) value},
+
+		if (_setupMode) {
+			writeReset(address, value, BluenetConfig.SETUP_SERVICE_UUID,
+					BluenetConfig.CHAR_SETUP_GOTO_DFU_UUID, callback);
+		} else {
+			writeReset(address, value, BluenetConfig.GENERAL_SERVICE_UUID,
+					BluenetConfig.CHAR_RESET_UUID, callback);
+		}
+	}
+
+	/**
+	 * Write the reset value to the reset characteristic
+	 * @param address the address of the device
+	 * @param value reset value, can be either RESET_DEFAULT or RESET_BOOTLOADER
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void writeReset(String address, int value, String serviceUuid, String characteristicUuid, final IStatusCallback callback) {
+			getLogger().LOGd(TAG, "reset: write %d at service %s and characteristic %s", value, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_RESET_UUID);
+			write(address, serviceUuid, characteristicUuid, new byte[]{(byte) value},
 					new IStatusCallback() {
 
 						@Override

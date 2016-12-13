@@ -26,6 +26,7 @@ public interface EventListener {
 		BLUETOOTH_START_SCAN_ERROR,
 		BLUETOOTH_STOP_SCAN_ERROR,
 		BLE_PERMISSIONS_MISSING,
+		BLE_PERMISSIONS_GRANTED
 	}
 
 	void onEvent(Event event);
