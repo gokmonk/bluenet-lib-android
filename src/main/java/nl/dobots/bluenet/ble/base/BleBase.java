@@ -59,8 +59,6 @@ public class BleBase extends BleCore {
 //	private Handler _timeoutHandler = new Handler();
 	private Handler _timeoutHandler;
 
-
-	private BleBaseEncryption _encryption = new BleBaseEncryption();
 	private boolean _encryptionEnabled = false;
 	private EncryptionKeys _encryptionKeys = null;
 	private EncryptionSessionData _encryptionSessionData = null;
@@ -100,17 +98,17 @@ public class BleBase extends BleCore {
 	IStatusCallback _silentStatusCallback = new IStatusCallback() {
 		@Override
 		public void onSuccess() {
-			BleLog.LOGd(TAG, "onSuccess");
+			getLogger().LOGd(TAG, "onSuccess");
 		}
 
 		@Override
 		public void onError(int error) {
-			BleLog.LOGe(TAG, "onError %d", error);
+			getLogger().LOGe(TAG, "onError %d", error);
 		}
 	};
 
 	public boolean enableEncryption(boolean enable) {
-		BleLog.LOGi(TAG, "enableEncryption: " + enable);
+		getLogger().LOGi(TAG, "enableEncryption: " + enable);
 		_encryptionEnabled = enable;
 		return true;
 	}
@@ -120,7 +118,7 @@ public class BleBase extends BleCore {
 	}
 
 	public void setEncryptionKeys(EncryptionKeys encryptionKeys) {
-		BleLog.LOGd(TAG, "setEncryptionKeys: " + encryptionKeys.toString());
+		getLogger().LOGd(TAG, "setEncryptionKeys: " + encryptionKeys.toString());
 		_encryptionKeys = encryptionKeys;
 	}
 
@@ -246,7 +244,7 @@ public class BleBase extends BleCore {
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGv(TAG, "json: " + json.toString());
+						getLogger().LOGv(TAG, "json: " + json.toString());
 					}
 				});
 
@@ -264,7 +262,7 @@ public class BleBase extends BleCore {
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGv(TAG, "json: " + json.toString());
+						getLogger().LOGv(TAG, "json: " + json.toString());
 					}
 				});
 
@@ -272,8 +270,8 @@ public class BleBase extends BleCore {
 				try {
 					device = new BleDevice(json);
 				} catch (JSONException e) {
-					BleLog.LOGe(TAG, "Failed to parse json into device! Err: " + e.getMessage());
-					BleLog.LOGd(TAG, "json: " + json.toString());
+					getLogger().LOGe(TAG, "Failed to parse json into device! Err: " + e.getMessage());
+					getLogger().LOGd(TAG, "json: " + json.toString());
 					return;
 				}
 				callback.onDeviceScanned(device);
@@ -316,7 +314,7 @@ public class BleBase extends BleCore {
 				}
 			} catch (Exception e) {
 				BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE_PLUG, true);
-				BleLog.LOGd(TAG, "old advertisement package: %s", json);
+				getLogger().LOGd(TAG, "old advertisement package: %s", json);
 			}
 		}
 	}
@@ -420,7 +418,7 @@ public class BleBase extends BleCore {
 						for (int j = 0; j < characteristics.length(); j++) {
 							JSONObject charac = characteristics.getJSONObject(j);
 							String characteristicUuid = charac.getString(BleCoreTypes.PROPERTY_CHARACTERISTIC_UUID);
-							BleLog.LOGd(TAG, "found service %s with characteristic %s", serviceUuid, characteristicUuid);
+							getLogger().LOGd(TAG, "found service %s with characteristic %s", serviceUuid, characteristicUuid);
 							callback.onDiscovery(serviceUuid, characteristicUuid);
 						}
 
@@ -430,7 +428,7 @@ public class BleBase extends BleCore {
 					}
 					callback.onSuccess();
 				} catch (JSONException e) {
-					BleLog.LOGe(TAG, "failed to parse discovery json");
+					getLogger().LOGe(TAG, "failed to parse discovery json");
 					callback.onError(BleErrors.ERROR_JSON_PARSING);
 					e.printStackTrace();
 				}
@@ -525,13 +523,13 @@ public class BleBase extends BleCore {
 			if (nr == 0) {
 				timeStart = SystemClock.elapsedRealtime();
 				if (messageNr != 0) {
-					BleLog.LOGw(TAG, "notification reset!");
+					getLogger().LOGw(TAG, "notification reset!");
 					buffer.clear();
 				} else {
 					// this is the first
 				}
 			} else if (messageNr > nr) {
-				BleLog.LOGe(TAG, "fatal error");
+				getLogger().LOGe(TAG, "fatal error");
 				callback.onError(0);
 				return;
 			}
@@ -540,8 +538,8 @@ public class BleBase extends BleCore {
 			buffer.put(notificationBytes, 1, notificationBytes.length - 1);
 
 			if (messageNr == 0xFF) {
-				BleLog.LOGd(TAG, "received last part");
-				BleLog.LOGv(TAG, "duration: %d", SystemClock.elapsedRealtime() - timeStart);
+				getLogger().LOGd(TAG, "received last part");
+				getLogger().LOGv(TAG, "duration: %d", SystemClock.elapsedRealtime() - timeStart);
 				JSONObject combinedJson = new JSONObject();
 				byte[] result = new byte[buffer.position()];
 				buffer.rewind();
@@ -553,7 +551,7 @@ public class BleBase extends BleCore {
 				messageNr = 0;
 				buffer.clear();
 			} else {
-				BleLog.LOGd(TAG, "received part %d", messageNr + 1);
+				getLogger().LOGd(TAG, "received part %d", messageNr + 1);
 			}
 		}
 
@@ -682,13 +680,13 @@ public class BleBase extends BleCore {
 								new IStatusCallback() {
 									@Override
 									public void onSuccess() {
-										BleLog.LOGd(TAG, "unsubscribed successfully");
+										getLogger().LOGd(TAG, "unsubscribed successfully");
 										callback.onData(json);
 									}
 
 									@Override
 									public void onError(int error) {
-										BleLog.LOGw(TAG, "unsubscribe failed %d", error);
+										getLogger().LOGw(TAG, "unsubscribe failed %d", error);
 										callback.onData(json);
 									}
 								});
@@ -704,12 +702,12 @@ public class BleBase extends BleCore {
 								new IStatusCallback() {
 									@Override
 									public void onSuccess() {
-										BleLog.LOGd(TAG, "unsubscribed successfully");
+										getLogger().LOGd(TAG, "unsubscribed successfully");
 									}
 
 									@Override
 									public void onError(int error) {
-										BleLog.LOGw(TAG, "unsubscribe failed %d", error);
+										getLogger().LOGw(TAG, "unsubscribe failed %d", error);
 									}
 								});
 					}
@@ -744,13 +742,13 @@ public class BleBase extends BleCore {
 								new IStatusCallback() {
 									@Override
 									public void onSuccess() {
-										BleLog.LOGd(TAG, "unsubscribed successfully");
+										getLogger().LOGd(TAG, "unsubscribed successfully");
 										callback.onData(json);
 									}
 
 									@Override
 									public void onError(int error) {
-										BleLog.LOGw(TAG, "unsubscribe failed %d", error);
+										getLogger().LOGw(TAG, "unsubscribe failed %d", error);
 										callback.onData(json);
 									}
 								});
@@ -766,12 +764,12 @@ public class BleBase extends BleCore {
 								new IStatusCallback() {
 									@Override
 									public void onSuccess() {
-										BleLog.LOGd(TAG, "unsubscribed successfully");
+										getLogger().LOGd(TAG, "unsubscribed successfully");
 									}
 
 									@Override
 									public void onError(int error) {
-										BleLog.LOGw(TAG, "unsubscribe failed %d", error);
+										getLogger().LOGw(TAG, "unsubscribe failed %d", error);
 									}
 								});
 					}
@@ -786,19 +784,19 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will get the read value on success, or an error otherwise
 	 */
 	public void readTemperature(String address, final IIntegerCallback callback) {
-		BleLog.LOGd(TAG, "read Temperature at service %s and characteristic %s", BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_TEMPERATURE_UUID);
+		getLogger().LOGd(TAG, "read Temperature at service %s and characteristic %s", BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_TEMPERATURE_UUID);
 		read(address, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_TEMPERATURE_UUID, new IDataCallback() {
 
 			@Override
 			public void onError(int error) {
-				BleLog.LOGe(TAG, "Failed to read temperature characteristic");
+				getLogger().LOGe(TAG, "Failed to read temperature characteristic");
 				callback.onError(error);
 			}
 
 			@Override
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
-				BleLog.LOGd(TAG, "temperature: %d", bytes[0]);
+				getLogger().LOGd(TAG, "temperature: %d", bytes[0]);
 				callback.onSuccess(bytes[0]);
 			}
 		});
@@ -811,19 +809,19 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writePWM(String address, int value, final IStatusCallback callback) {
-		BleLog.LOGd(TAG, "write %d at service %s and characteristic %s", value, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_PWM_UUID);
+		getLogger().LOGd(TAG, "write %d at service %s and characteristic %s", value, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_PWM_UUID);
 		write(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_PWM_UUID, new byte[]{(byte) value},
 				new IStatusCallback() {
 
 					@Override
 					public void onSuccess() {
-						BleLog.LOGd(TAG, "Successfully written to pwm characteristic");
+						getLogger().LOGd(TAG, "Successfully written to pwm characteristic");
 						callback.onSuccess();
 					}
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGe(TAG, "Failed to write to pwm characteristic");
+						getLogger().LOGe(TAG, "Failed to write to pwm characteristic");
 						callback.onError(error);
 					}
 				}
@@ -837,12 +835,12 @@ public class BleBase extends BleCore {
 	 */
 	public void readPWM(String address, final IIntegerCallback callback) {
 
-		BleLog.LOGd(TAG, "read pwm at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_PWM_UUID);
+		getLogger().LOGd(TAG, "read pwm at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_PWM_UUID);
 		read(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_PWM_UUID, new IDataCallback() {
 
 			@Override
 			public void onError(int error) {
-				BleLog.LOGe(TAG, "Failed to read pwm characteristic");
+				getLogger().LOGe(TAG, "Failed to read pwm characteristic");
 				callback.onError(error);
 			}
 
@@ -850,7 +848,7 @@ public class BleBase extends BleCore {
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
 				int result = BleUtils.toUint8(bytes[0]);
-				BleLog.LOGd(TAG, "pwm: %d", result);
+				getLogger().LOGd(TAG, "pwm: %d", result);
 				callback.onSuccess(result);
 			}
 		});
@@ -864,19 +862,19 @@ public class BleBase extends BleCore {
 	 */
 	public void writeRelay(String address, boolean relayOn, final IStatusCallback callback) {
 		int value = relayOn ? BluenetConfig.RELAY_ON : BluenetConfig.RELAY_OFF;
-		BleLog.LOGd(TAG, "write %d at service %s and characteristic %s", value, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID);
+		getLogger().LOGd(TAG, "write %d at service %s and characteristic %s", value, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID);
 		write(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID, new byte[]{(byte) value},
 				new IStatusCallback() {
 
 					@Override
 					public void onSuccess() {
-						BleLog.LOGd(TAG, "Successfully written to Relay characteristic");
+						getLogger().LOGd(TAG, "Successfully written to Relay characteristic");
 						callback.onSuccess();
 					}
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGe(TAG, "Failed to write to relay characteristic");
+						getLogger().LOGe(TAG, "Failed to write to relay characteristic");
 						callback.onError(error);
 					}
 				}
@@ -890,12 +888,12 @@ public class BleBase extends BleCore {
 	 */
 	public void readRelay(String address, final IBooleanCallback callback) {
 
-		BleLog.LOGd(TAG, "read Relay at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID);
+		getLogger().LOGd(TAG, "read Relay at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID);
 		read(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_RELAY_UUID, new IDataCallback() {
 
 			@Override
 			public void onError(int error) {
-				BleLog.LOGe(TAG, "Failed to read Relay characteristic");
+				getLogger().LOGe(TAG, "Failed to read Relay characteristic");
 				callback.onError(error);
 			}
 
@@ -903,7 +901,7 @@ public class BleBase extends BleCore {
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
 				boolean result = BleUtils.toUint8(bytes[0]) > 0;
-				BleLog.LOGd(TAG, "Relay: %b", result);
+				getLogger().LOGd(TAG, "Relay: %b", result);
 				callback.onSuccess(result);
 			}
 		});
@@ -918,19 +916,19 @@ public class BleBase extends BleCore {
 	 */
 	public void scanDevices(String address, boolean scan, final IStatusCallback callback) {
 		int value = scan ? 1 : 0;
-		BleLog.LOGd(TAG, "writeScanDevices: write %d at service %s and characteristic %s", value, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_SCAN_CONTROL_UUID);
+		getLogger().LOGd(TAG, "writeScanDevices: write %d at service %s and characteristic %s", value, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_SCAN_CONTROL_UUID);
 		write(address, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_SCAN_CONTROL_UUID, new byte[]{(byte) value},
 				new IStatusCallback() {
 
 					@Override
 					public void onSuccess() {
-						BleLog.LOGd(TAG, "Successfully written to writeScanDevices characteristic");
+						getLogger().LOGd(TAG, "Successfully written to writeScanDevices characteristic");
 						callback.onSuccess();
 					}
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGe(TAG, "Failed to write to writeScanDevices characteristic");
+						getLogger().LOGe(TAG, "Failed to write to writeScanDevices characteristic");
 						callback.onError(error);
 					}
 				});
@@ -943,18 +941,18 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will get the list on success, or an error otherwise
 	 */
 	public void listScannedDevices(String address, final IByteArrayCallback callback) {
-		BleLog.LOGd(TAG, "read device list at service %s and characteristic %s", BluenetConfig.CHAR_SCANNED_DEVICES_UUID, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID);
+		getLogger().LOGd(TAG, "read device list at service %s and characteristic %s", BluenetConfig.CHAR_SCANNED_DEVICES_UUID, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID);
 		read(address, BluenetConfig.CHAR_SCANNED_DEVICES_UUID, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, new IDataCallback() {
 			@Override
 			public void onError(int error) {
-				BleLog.LOGe(TAG, "Failed to read device list characteristic");
+				getLogger().LOGe(TAG, "Failed to read device list characteristic");
 				callback.onError(error);
 			}
 
 			@Override
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
-				BleLog.LOGd(TAG, "device list: %s", BleUtils.bytesToString(bytes));
+				getLogger().LOGd(TAG, "device list: %s", BleUtils.bytesToString(bytes));
 				callback.onSuccess(bytes);
 				// todo: add function to extended, with nice classes and list of objects, etc.
 			}
@@ -969,11 +967,11 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void readPowerConsumption(String address, final IIntegerCallback callback) {
-		BleLog.LOGd(TAG, "read current consumption at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_CONSUMPTION_UUID);
+		getLogger().LOGd(TAG, "read current consumption at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_CONSUMPTION_UUID);
 		read(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_CONSUMPTION_UUID, new IDataCallback() {
 			@Override
 			public void onError(int error) {
-				BleLog.LOGe(TAG, "Failed to read current consumption characteristic");
+				getLogger().LOGe(TAG, "Failed to read current consumption characteristic");
 				callback.onError(error);
 			}
 
@@ -982,7 +980,7 @@ public class BleBase extends BleCore {
 				byte[] bytes = BleCore.getValue(json);
 				// todo: check if current consumption is only 1 byte
 				int value = BleUtils.toUint8(bytes[0]);
-				BleLog.LOGd(TAG, "current consumption: %d", value);
+				getLogger().LOGd(TAG, "current consumption: %d", value);
 				callback.onSuccess(value);
 			}
 		});
@@ -995,7 +993,7 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will get the curve on success, or an error otherwise
 	 */
 	public void readPowerSamples(final String address, final IPowerSamplesCallback callback) {
-		BleLog.LOGd(TAG, "read power samples at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID);
+		getLogger().LOGd(TAG, "read power samples at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID);
 
 		subscribeMultipartSingleShot(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID,
 				new IDataCallback() {
@@ -1018,7 +1016,7 @@ public class BleBase extends BleCore {
 	}
 
 	public void subscribePowerSamples(final String address, final IIntegerCallback statusCallback, final IPowerSamplesCallback callback) {
-		BleLog.LOGd(TAG, "subscribe to power samples at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID);
+		getLogger().LOGd(TAG, "subscribe to power samples at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID);
 
 		subscribeMultipart(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID,
 				statusCallback,
@@ -1159,16 +1157,16 @@ public class BleBase extends BleCore {
 						final byte[] bytes = BleCore.getValue(json);
 						byte[] decryptedBytes;
 						if (_encryptionEnabled) {
-							decryptedBytes = _encryption.decryptCtr(bytes, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, _encryptionKeys);
+							decryptedBytes = BleBaseEncryption.decryptCtr(bytes, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, _encryptionKeys);
 						}
 						else {
 							decryptedBytes = bytes;
 						}
 
-						BleLog.LOGv(TAG, BleUtils.bytesToString(decryptedBytes));
+						getLogger().LOGv(TAG, BleUtils.bytesToString(decryptedBytes));
 
 						ConfigurationMsg configuration = new ConfigurationMsg(decryptedBytes);
-						BleLog.LOGd(TAG, "read configuration: %s", configuration.toString());
+						getLogger().LOGd(TAG, "read configuration: %s", configuration.toString());
 						callback.onSuccess(configuration);
 					}
 				}
@@ -1188,13 +1186,13 @@ public class BleBase extends BleCore {
 									final boolean verify, String serviceUuid, String characteristicUuid,
 									final IStatusCallback callback) {
 		byte[] bytes = configuration.toArray();
-		BleLog.LOGd(TAG, "configuration: write %s at service %s and characteristic %s", BleUtils.bytesToString(bytes), serviceUuid, characteristicUuid);
+		getLogger().LOGd(TAG, "configuration: write %s at service %s and characteristic %s", BleUtils.bytesToString(bytes), serviceUuid, characteristicUuid);
 		write(address, serviceUuid, characteristicUuid, bytes,
 				new IStatusCallback() {
 
 					@Override
 					public void onSuccess() {
-						BleLog.LOGd(TAG, "Successfully written to configuration characteristic");
+						getLogger().LOGd(TAG, "Successfully written to configuration characteristic");
 						// we need to give the crownstone some time to handle the config write,
 						// because it needs to access persistent memory in order to store the new
 						// config value
@@ -1210,7 +1208,7 @@ public class BleBase extends BleCore {
 											if (Arrays.equals(readConfig.getPayload(), configuration.getPayload())) {
 												callback.onSuccess();
 											} else {
-												BleLog.LOGe(TAG, "write: %s, read: %s", BleUtils.bytesToString(configuration.getPayload()), BleUtils.bytesToString(readConfig.getPayload()));
+												getLogger().LOGe(TAG, "write: %s, read: %s", BleUtils.bytesToString(configuration.getPayload()), Arrays.toString(readConfig.getPayload()));
 												callback.onError(BleErrors.ERROR_VALIDATION_FAILED);
 											}
 										}
@@ -1229,7 +1227,7 @@ public class BleBase extends BleCore {
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGe(TAG, "Failed to write to configuration characteristic");
+						getLogger().LOGe(TAG, "Failed to write to configuration characteristic");
 						callback.onError(error);
 					}
 				});
@@ -1270,19 +1268,19 @@ public class BleBase extends BleCore {
 									 String characteristicUuid, final IStatusCallback callback) {
 		ConfigurationMsg configuration = new ConfigurationMsg(configurationType, BluenetConfig.READ_VALUE, 0, new byte[]{});
 		byte[] bytes = configuration.toArray();
-		BleLog.LOGd(TAG, "select configuration: write %d at service %s and characteristic %s", configurationType, serviceUuid, characteristicUuid);
+		getLogger().LOGd(TAG, "select configuration: write %d at service %s and characteristic %s", configurationType, serviceUuid, characteristicUuid);
 		write(address, serviceUuid, characteristicUuid, bytes,
 				new IStatusCallback() {
 
 					@Override
 					public void onSuccess() {
-						BleLog.LOGd(TAG, "Successfully written to select configuration characteristic");
+						getLogger().LOGd(TAG, "Successfully written to select configuration characteristic");
 						callback.onSuccess();
 					}
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGe(TAG, "Failed to write to select configuration characteristic");
+						getLogger().LOGe(TAG, "Failed to write to select configuration characteristic");
 						callback.onError(error);
 					}
 				});
@@ -1321,11 +1319,11 @@ public class BleBase extends BleCore {
 	 */
 	private void readConfiguration(String address, String serviceUuid, String characteristicUuid,
 								   final IConfigurationCallback callback) {
-		BleLog.LOGd(TAG, "read configuration at service %s and characteristic %s", serviceUuid, characteristicUuid);
+		getLogger().LOGd(TAG, "read configuration at service %s and characteristic %s", serviceUuid, characteristicUuid);
 		read(address, serviceUuid, characteristicUuid, new IDataCallback() {
 			@Override
 			public void onError(int error) {
-				BleLog.LOGe(TAG, "Failed to read configuration characteristic");
+				getLogger().LOGe(TAG, "Failed to read configuration characteristic");
 				callback.onError(error);
 			}
 
@@ -1333,7 +1331,7 @@ public class BleBase extends BleCore {
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
 				ConfigurationMsg configuration = new ConfigurationMsg(bytes);
-				BleLog.LOGd(TAG, "read configuration: %s", configuration.toString());
+				getLogger().LOGd(TAG, "read configuration: %s", configuration.toString());
 				callback.onSuccess(configuration);
 			}
 		});
@@ -1372,19 +1370,19 @@ public class BleBase extends BleCore {
 	public void enableStateNotification(final String address, final int stateType, final IStatusCallback callback) {
 		StateMsg state = new StateMsg(stateType, BluenetConfig.NOTIFY_VALUE, 1, new byte[]{1});
 		byte[] bytes = state.toArray();
-		BleLog.LOGd(TAG, "notify state: write %d at service %s and characteristic %s", stateType, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_CONTROL_UUID);
+		getLogger().LOGd(TAG, "notify state: write %d at service %s and characteristic %s", stateType, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_CONTROL_UUID);
 		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_CONTROL_UUID, bytes,
 				new IStatusCallback() {
 
 					@Override
 					public void onSuccess() {
-						BleLog.LOGd(TAG, "Successfully written to select state characteristic");
+						getLogger().LOGd(TAG, "Successfully written to select state characteristic");
 						callback.onSuccess();
 					}
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGe(TAG, "Failed to write to select state characteristic");
+						getLogger().LOGe(TAG, "Failed to write to select state characteristic");
 						callback.onError(error);
 					}
 				});
@@ -1421,19 +1419,19 @@ public class BleBase extends BleCore {
 						final byte[] bytes = BleCore.getValue(json);
 						byte[] decryptedBytes;
 						if (_encryptionEnabled) {
-							decryptedBytes = _encryption.decryptCtr(bytes, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, _encryptionKeys);
+							decryptedBytes = BleBaseEncryption.decryptCtr(bytes, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, _encryptionKeys);
 						}
 						else {
 							decryptedBytes = bytes;
 						}
 						if (decryptedBytes == null) {
-							BleLog.LOGw(TAG, "Unable to decrypt");
+							getLogger().LOGw(TAG, "Unable to decrypt");
 							callback.onError(BleErrors.ENCRYPTION_ERROR);
 							return;
 						}
-						BleLog.LOGd(TAG, BleUtils.bytesToString(decryptedBytes));
+						getLogger().LOGd(TAG, BleUtils.bytesToString(decryptedBytes));
 						StateMsg state = new StateMsg(decryptedBytes);
-						BleLog.LOGd(TAG, "received state notification: %s", state.toString());
+						getLogger().LOGd(TAG, "received state notification: %s", state.toString());
 						callback.onSuccess(state);
 					}
 				}
@@ -1452,12 +1450,12 @@ public class BleBase extends BleCore {
 				subscriberId, new IStatusCallback() {
 					@Override
 					public void onSuccess() {
-						BleLog.LOGd(TAG, "unsubscribe state success");
+						getLogger().LOGd(TAG, "unsubscribe state success");
 					}
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGe(TAG, "unsubscribe state error: %d", error);
+						getLogger().LOGe(TAG, "unsubscribe state error: %d", error);
 					}
 				});
 	}
@@ -1499,7 +1497,7 @@ public class BleBase extends BleCore {
 
 							@Override
 							public void onSuccess() {
-								BleLog.LOGd(TAG, "notify state success");
+								getLogger().LOGd(TAG, "notify state success");
 								statusCallback.onSuccess(subscriberId[0]);
 							}
 
@@ -1512,7 +1510,7 @@ public class BleBase extends BleCore {
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGe(TAG, "notify state error: %d", error);
+						getLogger().LOGe(TAG, "notify state error: %d", error);
 						callback.onError(error);
 					}
 				},
@@ -1585,13 +1583,13 @@ public class BleBase extends BleCore {
 					unsubscribeState(address, subscriberId[0], new IStatusCallback() {
 						@Override
 						public void onSuccess() {
-							BleLog.LOGd(TAG, "unsubscribe state success");
+							getLogger().LOGd(TAG, "unsubscribe state success");
 							callback.onSuccess(state);
 						}
 
 						@Override
 						public void onError(int error) {
-							BleLog.LOGe(TAG, "unsubscribe state error: %d", error);
+							getLogger().LOGe(TAG, "unsubscribe state error: %d", error);
 							callback.onSuccess(state);
 						}
 					});
@@ -1647,19 +1645,19 @@ public class BleBase extends BleCore {
 	public void selectState(String address, int stateType, final IStatusCallback callback) {
 		StateMsg state = new StateMsg(stateType, BluenetConfig.READ_VALUE, 0, new byte[]{});
 		byte[] bytes = state.toArray();
-		BleLog.LOGd(TAG, "select state: write %d at service %s and characteristic %s", stateType, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_CONTROL_UUID);
+		getLogger().LOGd(TAG, "select state: write %d at service %s and characteristic %s", stateType, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_CONTROL_UUID);
 		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_CONTROL_UUID, bytes,
 				new IStatusCallback() {
 
 					@Override
 					public void onSuccess() {
-						BleLog.LOGd(TAG, "Successfully written to select state characteristic");
+						getLogger().LOGd(TAG, "Successfully written to select state characteristic");
 						callback.onSuccess();
 					}
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGe(TAG, "Failed to write to select state characteristic");
+						getLogger().LOGe(TAG, "Failed to write to select state characteristic");
 						callback.onError(error);
 					}
 				});
@@ -1676,11 +1674,11 @@ public class BleBase extends BleCore {
 	 * @param callback callback function to be called with the read state object
 	 */
 	public void readState(String address, final IStateCallback callback) {
-		BleLog.LOGd(TAG, "read state at service %s and characteristic %s", BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID);
+		getLogger().LOGd(TAG, "read state at service %s and characteristic %s", BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID);
 		read(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_STATE_READ_UUID, new IDataCallback() {
 			@Override
 			public void onError(int error) {
-				BleLog.LOGe(TAG, "Failed to read state characteristic");
+				getLogger().LOGe(TAG, "Failed to read state characteristic");
 				callback.onError(error);
 			}
 
@@ -1688,7 +1686,7 @@ public class BleBase extends BleCore {
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
 				StateMsg state = new StateMsg(bytes);
-				BleLog.LOGd(TAG, "read state: %s", state.toString());
+				getLogger().LOGd(TAG, "read state: %s", state.toString());
 				callback.onSuccess(state);
 			}
 		});
@@ -1697,13 +1695,13 @@ public class BleBase extends BleCore {
 	private void sendCommand(String address, CommandMsg command, String serviceUuid, String characteristicUuid,
 							 final IStatusCallback callback) {
 		byte[] bytes = command.toArray();
-		BleLog.LOGd(TAG, "control command: write %s at service %s and characteristic %s", BleUtils.bytesToString(bytes), BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONTROL_UUID);
+		getLogger().LOGd(TAG, "control command: write %s at service %s and characteristic %s", BleUtils.bytesToString(bytes), BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONTROL_UUID);
 		write(address, serviceUuid, characteristicUuid, bytes,
 				new IStatusCallback() {
 
 					@Override
 					public void onSuccess() {
-						BleLog.LOGd(TAG, "Successfully written to control characteristic");
+						getLogger().LOGd(TAG, "Successfully written to control characteristic");
 						// delay probably not needed anymore since we decoupled characteristic writes
 						// from interrupt in firmware
 						callback.onSuccess();
@@ -1718,7 +1716,7 @@ public class BleBase extends BleCore {
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGe(TAG, "Failed to write to control characteristic");
+						getLogger().LOGe(TAG, "Failed to write to control characteristic");
 						callback.onError(error);
 					}
 				});
@@ -1749,19 +1747,19 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writeMeshMessage(String address, MeshMsg message, final IStatusCallback callback) {
-		BleLog.LOGd(TAG, "mesh message: write %s at service %s and characteristic %s", message.toString(), BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_MESH_CONTROL_UUID);
+		getLogger().LOGd(TAG, "mesh message: write %s at service %s and characteristic %s", message.toString(), BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_MESH_CONTROL_UUID);
 		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_MESH_CONTROL_UUID, message.toArray(),
 				new IStatusCallback() {
 
 					@Override
 					public void onSuccess() {
-						BleLog.LOGd(TAG, "Successfully written to mesh message characteristic");
+						getLogger().LOGd(TAG, "Successfully written to mesh message characteristic");
 						callback.onSuccess();
 					}
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGe(TAG, "Failed to write to mesh message characteristic");
+						getLogger().LOGe(TAG, "Failed to write to mesh message characteristic");
 						callback.onError(error);
 					}
 				});
@@ -1773,18 +1771,18 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
 	public void readTrackedDevices(String address, final IByteArrayCallback callback) {
-		BleLog.LOGd(TAG, "read tracked devices at service %s and characteristic %s", BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_TRACKED_DEVICES_UUID);
+		getLogger().LOGd(TAG, "read tracked devices at service %s and characteristic %s", BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_TRACKED_DEVICES_UUID);
 		read(address, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_TRACKED_DEVICES_UUID, new IDataCallback() {
 			@Override
 			public void onError(int error) {
-				BleLog.LOGe(TAG, "Failed to read tracked devices characteristic");
+				getLogger().LOGe(TAG, "Failed to read tracked devices characteristic");
 				callback.onError(error);
 			}
 
 			@Override
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
-				BleLog.LOGd(TAG, "tracked devices: %s", BleUtils.bytesToString(bytes));
+				getLogger().LOGd(TAG, "tracked devices: %s", BleUtils.bytesToString(bytes));
 				callback.onSuccess(bytes);
 				// todo: add function to extended, with nice classes and list of objects, etc.
 			}
@@ -1799,19 +1797,19 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void addTrackedDevice(String address, TrackedDeviceMsg device, final IStatusCallback callback) {
-		BleLog.LOGd(TAG, "add tracked device: write %s at service %s and characteristic %s", device.toString(), BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_TRACK_CONTROL_UUID);
+		getLogger().LOGd(TAG, "add tracked device: write %s at service %s and characteristic %s", device.toString(), BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_TRACK_CONTROL_UUID);
 		write(address, BluenetConfig.INDOOR_LOCALIZATION_SERVICE_UUID, BluenetConfig.CHAR_TRACK_CONTROL_UUID, device.toArray(),
 				new IStatusCallback() {
 
 					@Override
 					public void onSuccess() {
-						BleLog.LOGd(TAG, "Successfully written to add tracked device characteristic");
+						getLogger().LOGd(TAG, "Successfully written to add tracked device characteristic");
 						callback.onSuccess();
 					}
 
 					@Override
 					public void onError(int error) {
-						BleLog.LOGe(TAG, "Failed to write to add tracked device characteristic");
+						getLogger().LOGe(TAG, "Failed to write to add tracked device characteristic");
 						callback.onError(error);
 					}
 				});
@@ -1847,20 +1845,20 @@ public class BleBase extends BleCore {
 
 						@Override
 						public void onSuccess() {
-							BleLog.LOGd(TAG, "Successfully written to reset characteristic");
+							getLogger().LOGd(TAG, "Successfully written to reset characteristic");
 							callback.onSuccess();
 						}
 
 						@Override
 						public void onError(int error) {
-							BleLog.LOGe(TAG, "Failed to write to reset characteristic");
+							getLogger().LOGe(TAG, "Failed to write to reset characteristic");
 							callback.onError(error);
 						}
 					});
 	}
 
 	public void readMeshData(String address, final IMeshDataCallback callback) {
-		BleLog.LOGd(TAG, "Reading mesh data...");
+		getLogger().LOGd(TAG, "Reading mesh data...");
 		read(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
 				new IDataCallback() {
 					@Override
@@ -1887,7 +1885,7 @@ public class BleBase extends BleCore {
 	int _meshSubscriberId = 0;
 
 	public void subscribeMeshData(final String address, final IMeshDataCallback callback) {
-		BleLog.LOGd(TAG, "subscribing to mesh data...");
+		getLogger().LOGd(TAG, "subscribing to mesh data...");
 		_hasStartMessageType = false;
 		subscribe(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
 			new IIntegerCallback() {
@@ -1944,7 +1942,7 @@ public class BleBase extends BleCore {
 								}
 							}
 						} catch (BufferOverflowException e) {
-							BleLog.LOGe(TAG, "notification buffer overflow. missed some messages?!");
+							getLogger().LOGe(TAG, "notification buffer overflow. missed some messages?!");
 							_notificationBufferValid = false;
 						}
 
@@ -1964,10 +1962,10 @@ public class BleBase extends BleCore {
 //
 //									for (int i = 0; i < notificationBytes.length; ++i) {
 //										if (notificationBytes[i] != bytes[i]) {
-//											BleLog.LOGe(TAG, "did not receive same mesh message as in notifaction");
+//											getLogger().LOGe(TAG, "did not receive same mesh message as in notifaction");
 //											final BleMeshData notificationMeshData = BleMeshDataFactory.fromBytes(notificationBytes);
-//											BleLog.LOGe(TAG, "notification was from: %s", ((BleMeshScanData)notificationMeshData).getSourceAddress());
-//											BleLog.LOGe(TAG, "read is from: %s", ((BleMeshScanData)meshData).getSourceAddress());
+//											getLogger().LOGe(TAG, "notification was from: %s", ((BleMeshScanData)notificationMeshData).getSourceAddress());
+//											getLogger().LOGe(TAG, "read is from: %s", ((BleMeshScanData)meshData).getSourceAddress());
 //											break;
 //										}
 //									}
@@ -1998,7 +1996,7 @@ public class BleBase extends BleCore {
 	}
 
 	public void unsubscribeMeshData(final String address, final IMeshDataCallback callback) {
-		BleLog.LOGd(TAG, "subscribing to mesh data...");
+		getLogger().LOGd(TAG, "subscribing to mesh data...");
 		unsubscribe(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
 				_meshSubscriberId,
 				new IStatusCallback() {
@@ -2014,7 +2012,7 @@ public class BleBase extends BleCore {
 	}
 
 	public void readSessionNonce(final String address, final IDataCallback callback) {
-		BleLog.LOGd(TAG, "readSessionNonce");
+		getLogger().LOGd(TAG, "readSessionNonce");
 		IDataCallback sessionCallback = new IDataCallback() {
 			@Override
 			public void onData(JSONObject json) {
@@ -2035,8 +2033,8 @@ public class BleBase extends BleCore {
 					callback.onError(BleErrors.ENCRYPTION_ERROR);
 					return;
 				}
-				BleLog.LOGd(TAG, "sessionNonce:" + BleUtils.bytesToString(_encryptionSessionData.sessionNonce));
-				BleLog.LOGd(TAG, "validationKey:" + BleUtils.bytesToString(_encryptionSessionData.validationKey));
+				getLogger().LOGd(TAG, "sessionNonce:" + BleUtils.bytesToString(_encryptionSessionData.sessionNonce));
+				getLogger().LOGd(TAG, "validationKey:" + BleUtils.bytesToString(_encryptionSessionData.validationKey));
 				addBytes(json, "sessionNonce", _encryptionSessionData.sessionNonce);
 				addBytes(json, "validationKey", _encryptionSessionData.validationKey);
 				callback.onData(json);
@@ -2058,19 +2056,19 @@ public class BleBase extends BleCore {
 	
 	public void readSessionKey(final String address, final IByteArrayCallback callback) {
 		if (_setupMode) {
-			BleLog.LOGd(TAG, "readSessionKey");
+			getLogger().LOGd(TAG, "readSessionKey");
 			read(address, BluenetConfig.SETUP_SERVICE_UUID, BluenetConfig.CHAR_SESSION_KEY_UUID, false, new IDataCallback() {
 
 				@Override
 				public void onData(JSONObject json) {
 					byte[] bytes = BleCore.getValue(json);
-					BleLog.LOGd(TAG, "session key: %s", BleUtils.bytesToString(bytes));
+					getLogger().LOGd(TAG, "session key: %s", BleUtils.bytesToString(bytes));
 					callback.onSuccess(bytes);
 				}
 
 				@Override
 				public void onError(int error) {
-					BleLog.LOGe(TAG, "Failed to read session key");
+					getLogger().LOGe(TAG, "Failed to read session key");
 					callback.onError(error);
 				}
 			});

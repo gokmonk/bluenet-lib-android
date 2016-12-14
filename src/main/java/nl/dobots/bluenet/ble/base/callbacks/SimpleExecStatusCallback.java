@@ -49,7 +49,7 @@ public class SimpleExecStatusCallback implements IExecStatusCallback {
 		if (_integerCallback != null) {
 			_integerCallback.onSuccess(result);
 		} else {
-			BleLog.LOGw(TAG, "Stub, Wrong usage?!");
+			BleLog.getInstance().LOGw(TAG, "Stub, Wrong usage?!");
 		}
 	}
 
@@ -58,7 +58,7 @@ public class SimpleExecStatusCallback implements IExecStatusCallback {
 		if (_booleanCallback != null) {
 			_booleanCallback.onSuccess(value);
 		} else {
-			BleLog.LOGw(TAG, "Stub, Wrong usage?!");
+			BleLog.getInstance().LOGw(TAG, "Stub, Wrong usage?!");
 		}
 	}
 
@@ -67,7 +67,7 @@ public class SimpleExecStatusCallback implements IExecStatusCallback {
 		if (_statusCallback != null) {
 			_statusCallback.onSuccess();
 		} else {
-			BleLog.LOGw(TAG, "Stub, Wrong usage?!");
+			BleLog.getInstance().LOGw(TAG, "Stub, Wrong usage?!");
 		}
 	}
 
@@ -80,7 +80,7 @@ public class SimpleExecStatusCallback implements IExecStatusCallback {
 		} else if (_booleanCallback != null) {
 			_booleanCallback.onError(error);
 		} else {
-			BleLog.LOGw(TAG, "Stub, Wrong usage?!");
+			BleLog.getInstance().LOGw(TAG, "Stub, Wrong usage?!");
 		}
 	}
 

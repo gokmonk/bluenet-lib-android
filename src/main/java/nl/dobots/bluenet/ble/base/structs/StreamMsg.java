@@ -9,6 +9,7 @@ import java.util.Arrays;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
+import nl.dobots.bluenet.utils.Logging;
 
 /**
  * Copyright (c) 2016 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -49,6 +50,12 @@ import nl.dobots.bluenet.utils.BleUtils;
  * @author Dominik Egger
  */
 public class StreamMsg {
+
+	// use BleLog.getInstance().setLogLevelPerTag(StreamMsg.class.getCanonicalName(), <NEW_LOG_LEVEL>)
+	// to change the log level
+	private static final int LOG_LEVEL = Log.WARN;
+
+	private static final String TAG = StreamMsg.class.getCanonicalName();
 
 	// the type of the stream, see @BluenetConfig for a list of possible types
 	private int type;
@@ -96,11 +103,11 @@ public class StreamMsg {
 	public StreamMsg(byte[] bytes) {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
-		BleLog.LOGv("streammsg", BleUtils.bytesToString(bytes));
+		getLogger().LOGv("streammsg", BleUtils.bytesToString(bytes));
 		type = BleUtils.toUint8(bb.get());
 		opCode = BleUtils.toUint8(bb.get());
 		length = bb.getShort();
-		BleLog.LOGd("streammsg", "type=" + type + " opCode=" + opCode + " length=" + length);
+		getLogger().LOGd("streammsg", "type=" + type + " opCode=" + opCode + " length=" + length);
 		payload = new byte[length];
 		bb.get(payload);
 	}
@@ -222,5 +229,14 @@ public class StreamMsg {
 //	public void setPayload(byte[] payload) {
 //		this.payload = payload;
 //	}
+
+	private BleLog getLogger() {
+		BleLog logger = BleLog.getInstance();
+		// update the log level to the default of this class if it hasn't been set already
+		if (logger.getLogLevel(TAG) == null) {
+			logger.setLogLevelPerTag(TAG, LOG_LEVEL);
+		}
+		return logger;
+	}
 
 }

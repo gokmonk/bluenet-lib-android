@@ -46,8 +46,8 @@ import nl.dobots.bluenet.service.callbacks.ScanDeviceListener;
  *
  * @author Bart van Vliet
  */
-public class BleLogger extends BroadcastReceiver implements ScanDeviceListener, IntervalScanListener, EventListener  {
-	private static final String TAG = BleLogger.class.getCanonicalName();
+public class SensorLogger extends BroadcastReceiver implements ScanDeviceListener, IntervalScanListener, EventListener  {
+	private static final String TAG = SensorLogger.class.getCanonicalName();
 	private static final int FLUSH_INTERVAL = 1000;
 	private static final int COMPASS_AVERAGE_WINDOW = 3;
 

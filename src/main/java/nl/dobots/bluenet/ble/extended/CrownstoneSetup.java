@@ -1,7 +1,7 @@
 package nl.dobots.bluenet.ble.extended;
 
 import nl.dobots.bluenet.ble.base.BleBase;
-import nl.dobots.bluenet.ble.base.BleBaseConfiguration;
+import nl.dobots.bluenet.ble.base.BleConfiguration;
 import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IExecStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IProgressCallback;
@@ -40,7 +40,7 @@ public class CrownstoneSetup {
 	private BleExt _bleExt;
 
 	private String _targetAddress;
-	private BleBaseConfiguration _bleBaseConfiguration;
+	private BleConfiguration _bleConfiguration;
 
 	private int _currentStep;
 
@@ -58,7 +58,7 @@ public class CrownstoneSetup {
 	public CrownstoneSetup(BleExt bleExt) {
 		_bleExt = bleExt;
 		_bleBase = bleExt.getBleBase();
-		_bleBaseConfiguration = new BleBaseConfiguration(_bleBase);
+		_bleConfiguration = new BleConfiguration(_bleBase);
 	}
 
 	IStatusCallback _defaultCallback =  new IStatusCallback() {
@@ -75,7 +75,7 @@ public class CrownstoneSetup {
 	};
 
 	private void setupError(int error) {
-		BleLog.LOGe(TAG, "setup failed at step %d with error %d", _currentStep, error);
+		_bleExt.getLogger().LOGe(TAG, "setup failed at step %d with error %d", _currentStep, error);
 		_progressCallback.onProgress(0, null);
 		_progressCallback.onError(BleErrors.ERROR_SETUP_FAILED);
 		_statusCallback.onError(BleErrors.ERROR_SETUP_FAILED);
@@ -115,35 +115,35 @@ public class CrownstoneSetup {
 			case 4: {
 				// hack, make sure step is set to 4 in case function was called with step 2 or 3
 				_currentStep = 4;
-				_bleBaseConfiguration.setCrownstoneId(_targetAddress, _crownstoneId, _defaultCallback);
+				_bleConfiguration.setCrownstoneId(_targetAddress, _crownstoneId, _defaultCallback);
 				break;
 			}
 			case 5: {
-				_bleBaseConfiguration.setAdminKey(_targetAddress, _adminKey, _defaultCallback);
+				_bleConfiguration.setAdminKey(_targetAddress, _adminKey, _defaultCallback);
 				break;
 			}
 			case 6: {
-				_bleBaseConfiguration.setMemberKey(_targetAddress, _memberKey, _defaultCallback);
+				_bleConfiguration.setMemberKey(_targetAddress, _memberKey, _defaultCallback);
 				break;
 			}
 			case 7: {
-				_bleBaseConfiguration.setGuestKey(_targetAddress, _guestKey, _defaultCallback);
+				_bleConfiguration.setGuestKey(_targetAddress, _guestKey, _defaultCallback);
 				break;
 			}
 			case 8: {
-				_bleBaseConfiguration.setMeshAccessAddress(_targetAddress, _meshAccessAddress, _defaultCallback);
+				_bleConfiguration.setMeshAccessAddress(_targetAddress, _meshAccessAddress, _defaultCallback);
 				break;
 			}
 			case 9: {
-				_bleBaseConfiguration.setBeaconProximityUuid(_targetAddress, _iBeaconUuid, _defaultCallback);
+				_bleConfiguration.setBeaconProximityUuid(_targetAddress, _iBeaconUuid, _defaultCallback);
 				break;
 			}
 			case 10: {
-				_bleBaseConfiguration.setBeaconMajor(_targetAddress, _iBeaconMajor, _defaultCallback);
+				_bleConfiguration.setBeaconMajor(_targetAddress, _iBeaconMajor, _defaultCallback);
 				break;
 			}
 			case 11: {
-				_bleBaseConfiguration.setBeaconMinor(_targetAddress, _iBeaconMinor, _defaultCallback);
+				_bleConfiguration.setBeaconMinor(_targetAddress, _iBeaconMinor, _defaultCallback);
 				break;
 			}
 			case 12: {
@@ -160,7 +160,7 @@ public class CrownstoneSetup {
 				break;
 			}
 			default: {
-				BleLog.LOGe(TAG, "wrong setup step!");
+				_bleExt.getLogger().LOGe(TAG, "wrong setup step!");
 				_statusCallback.onError(BleErrors.ERROR_WRONG_STATE);
 			}
 		}
@@ -175,7 +175,7 @@ public class CrownstoneSetup {
 							 int iBeaconMinor, IProgressCallback progressCallback, IStatusCallback statusCallback) {
 
 		if (_bleExt.isConnected(statusCallback)) {
-			BleLog.LOGd(TAG, "executeSetup");
+			_bleExt.getLogger().LOGd(TAG, "executeSetup");
 
 			_targetAddress = _bleExt.getTargetAddress();
 			_crownstoneId = crownstoneId;
@@ -200,7 +200,7 @@ public class CrownstoneSetup {
 		_bleExt.getHandler().post(new Runnable() {
 			@Override
 			public void run() {
-				BleLog.LOGd(TAG, "connect and executeSetup");
+				_bleExt.getLogger().LOGd(TAG, "connect and executeSetup");
 				_bleExt.connectAndExecute(address, new IExecuteCallback() {
 					@Override
 					public void execute(final IExecStatusCallback execCallback) {

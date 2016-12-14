@@ -54,7 +54,7 @@ public class EncryptionKeys {
 				_guestKeyBytes = BleUtils.hexStringToBytes(_guestKey);
 			}
 		} catch (java.lang.NumberFormatException e) {
-			BleLog.LOGe(TAG, "Invalid key format");
+			BleLog.getInstance().LOGe(TAG, "Invalid key format");
 			e.printStackTrace();
 		}
 	}

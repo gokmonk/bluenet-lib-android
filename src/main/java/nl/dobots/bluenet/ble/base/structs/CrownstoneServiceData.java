@@ -10,7 +10,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import nl.dobots.bluenet.ble.base.BleBaseEncryption;
-import nl.dobots.bluenet.ble.core.BleCore;
 import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
@@ -33,6 +32,10 @@ import nl.dobots.bluenet.utils.BleUtils;
  */
 public class CrownstoneServiceData extends JSONObject {
 
+	// use BleLog.getInstance().setLogLevelPerTag(CrownstoneServiceData.class.getCanonicalName(), <NEW_LOG_LEVEL>)
+	// to change the log level
+	private static final int LOG_LEVEL = Log.WARN;
+
 	private static final String TAG = CrownstoneServiceData.class.getCanonicalName();
 
 	public CrownstoneServiceData() {
@@ -47,10 +50,9 @@ public class CrownstoneServiceData extends JSONObject {
 		this(obj.toString());
 	}
 
-
 	public boolean parseBytes(byte[] bytes, boolean encrypted, byte[] key) {
 		// Includes the service UUID (first 2 bytes)
-		BleLog.LOGv(TAG, "serviceData: " + BleUtils.bytesToString(bytes));
+		getLogger().LOGv(TAG, "serviceData: " + BleUtils.bytesToString(bytes));
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 		try {
@@ -83,7 +85,7 @@ public class CrownstoneServiceData extends JSONObject {
 			}
 			return true;
 		} catch (BufferUnderflowException e) {
-			Log.v(TAG, "failed to parse");
+			getLogger().LOGv(TAG, "failed to parse");
 //			e.printStackTrace();
 			return false;
 		}
@@ -98,7 +100,7 @@ public class CrownstoneServiceData extends JSONObject {
 		byte[] test = new byte[16];
 		bb.mark();
 		bb.get(test);
-		BleLog.LOGv(TAG, "parseDecryptedData: " + BleUtils.bytesToString(test));
+		getLogger().LOGv(TAG, "parseDecryptedData: " + BleUtils.bytesToString(test));
 		bb.reset();
 
 		switch(firmwareVersion) {
@@ -148,7 +150,7 @@ public class CrownstoneServiceData extends JSONObject {
 	}
 
 	private boolean isSetupPacket() {
-		BleLog.LOGv(TAG, "setupbit=" + isSetupMode(getEventBitmask()) + " id=" + getCrownstoneId() + " switch=" + getSwitchState() + " power=" + getPowerUsage() + " energy=" + getAccumulatedEnergy());
+		getLogger().LOGv(TAG, "setupbit=" + isSetupMode(getEventBitmask()) + " id=" + getCrownstoneId() + " switch=" + getSwitchState() + " power=" + getPowerUsage() + " energy=" + getAccumulatedEnergy());
 		return (isSetupMode(getEventBitmask()) && getCrownstoneId() == 0 && getSwitchState() == 0 && getPowerUsage() == 0 && getAccumulatedEnergy() == 0);
 	}
 
@@ -157,7 +159,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			return getInt("firmwareVersion");
 		} catch (JSONException e) {
-			BleLog.LOGv(TAG, "no firmware version found");
+			getLogger().LOGv(TAG, "no firmware version found");
 			return 0;
 		}
 	}
@@ -166,7 +168,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			put("firmwareVersion", firmwareVersion);
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "failed to add firmware version");
+			getLogger().LOGv(TAG, "failed to add firmware version");
 			e.printStackTrace();
 		}
 	}
@@ -175,7 +177,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			return getInt("serviceUuid");
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "no service uuid found");
+			getLogger().LOGv(TAG, "no service uuid found");
 			return 0;
 		}
 	}
@@ -184,7 +186,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			put("serviceUuid", serviceUuid);
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "failed to add service uuid");
+			getLogger().LOGv(TAG, "failed to add service uuid");
 			e.printStackTrace();
 		}
 	}
@@ -193,7 +195,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			return getInt("crownstoneId");
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "no crownstone id found");
+			getLogger().LOGv(TAG, "no crownstone id found");
 			return 0;
 		}
 	}
@@ -202,7 +204,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			put("crownstoneId", crownstoneId);
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "failed to add crownstone id");
+			getLogger().LOGv(TAG, "failed to add crownstone id");
 			e.printStackTrace();
 		}
 	}
@@ -211,7 +213,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			return getInt("crownstoneStateId");
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "no crownstone state id found");
+			getLogger().LOGv(TAG, "no crownstone state id found");
 			return 0;
 		}
 	}
@@ -220,7 +222,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			put("crownstoneStateId", crownstoneStateId);
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "failed to add crownstone state id");
+			getLogger().LOGv(TAG, "failed to add crownstone state id");
 			e.printStackTrace();
 		}
 	}
@@ -229,7 +231,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			return getInt("switchState");
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "no switch state found");
+			getLogger().LOGv(TAG, "no switch state found");
 			return 0;
 		}
 	}
@@ -238,7 +240,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			put("switchState", switchState);
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "failed to add switch state");
+			getLogger().LOGv(TAG, "failed to add switch state");
 			e.printStackTrace();
 		}
 	}
@@ -247,7 +249,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			return getBoolean("relayState");
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "no relay state found");
+			getLogger().LOGv(TAG, "no relay state found");
 			return false;
 		}
 	}
@@ -256,7 +258,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			put("relayState", relayState);
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "failed to add relay state");
+			getLogger().LOGv(TAG, "failed to add relay state");
 			e.printStackTrace();
 		}
 	}
@@ -265,7 +267,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			return getInt("pwm");
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "no pwm found");
+			getLogger().LOGv(TAG, "no pwm found");
 			return 0;
 		}
 	}
@@ -274,7 +276,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			put("pwm", pwm);
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "failed to add pwm");
+			getLogger().LOGv(TAG, "failed to add pwm");
 			e.printStackTrace();
 		}
 	}
@@ -283,7 +285,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			return (byte)getInt("eventBitmask");
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "no event bitmask found");
+			getLogger().LOGv(TAG, "no event bitmask found");
 			return 0;
 		}
 	}
@@ -314,7 +316,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			put("eventBitmask", eventBitmask);
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "failed to add event bitmask");
+			getLogger().LOGv(TAG, "failed to add event bitmask");
 			e.printStackTrace();
 		}
 	}
@@ -323,7 +325,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			return (byte)getInt("temperature");
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "no temperature found");
+			getLogger().LOGv(TAG, "no temperature found");
 			return 0;
 		}
 	}
@@ -332,7 +334,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			put("temperature", temperature);
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "failed to add temperature");
+			getLogger().LOGv(TAG, "failed to add temperature");
 			e.printStackTrace();
 		}
 	}
@@ -341,7 +343,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			return getInt("powerUsage");
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "no power usage found");
+			getLogger().LOGv(TAG, "no power usage found");
 			return 0;
 		}
 	}
@@ -350,16 +352,16 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			put("powerUsage", powerUsage);
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "failed to add power usage");
+			getLogger().LOGv(TAG, "failed to add power usage");
 			e.printStackTrace();
 		}
-	}
+	}                                                                                                                                                                                                                                                                                                                                                                                                     
 
 	public int getAccumulatedEnergy() {
 		try {
 			return getInt("accumulatedEnergy");
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "no accumulated energy found");
+			getLogger().LOGv(TAG, "no accumulated energy found");
 			return 0;
 		}
 	}
@@ -368,7 +370,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			put("accumulatedEnergy", accumulatedEnergy);
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "failed to add accumulated energy");
+			getLogger().LOGv(TAG, "failed to add accumulated energy");
 			e.printStackTrace();
 		}
 	}
@@ -377,7 +379,7 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			return getString("randomBytes");
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "no random bytes found");
+			getLogger().LOGv(TAG, "no random bytes found");
 			return null;
 		}
 	}
@@ -386,8 +388,17 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			put("randomBytes", BleUtils.bytesToEncodedString(randomBytes));
 		} catch (JSONException e) {
-			BleLog.LOGd(TAG, "failed to add random bytes");
+			getLogger().LOGv(TAG, "failed to add random bytes");
 			e.printStackTrace();
 		}
+	}
+
+	private BleLog getLogger() {
+		BleLog logger = BleLog.getInstance();
+		// update the log level to the default of this class if it hasn't been set already
+		if (logger.getLogLevel(TAG) == null) {
+			logger.setLogLevelPerTag(TAG, LOG_LEVEL);
+		}
+		return logger;
 	}
 }

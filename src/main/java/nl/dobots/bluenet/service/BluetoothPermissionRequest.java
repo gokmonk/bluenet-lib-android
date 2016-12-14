@@ -36,7 +36,6 @@ public class BluetoothPermissionRequest extends AppCompatActivity {
 	private ServiceConnection _connection = new ServiceConnection() {
 		@Override
 		public void onServiceConnected(ComponentName name, IBinder service) {
-			BleLog.LOGi(TAG, "connected to ble scan service ...");
 			// get the service from the binder
 			BleScanService.BleScanBinder binder = (BleScanService.BleScanBinder) service;
 			// get the service and request for bluetooth permission

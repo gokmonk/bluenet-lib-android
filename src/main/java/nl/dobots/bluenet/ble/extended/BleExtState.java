@@ -1,5 +1,6 @@
 package nl.dobots.bluenet.ble.extended;
 
+import android.util.Log;
 import android.util.Pair;
 
 import java.util.ArrayList;
@@ -33,6 +34,10 @@ import nl.dobots.bluenet.utils.BleLog;
  */
 public class BleExtState {
 
+	// use BleLog.getInstance().setLogLevelPerTag(BleBaseState.class.getCanonicalName(), <NEW_LOG_LEVEL>)
+	// to change the log level
+	private static final int LOG_LEVEL = Log.WARN;
+
 	public static final String TAG = BleExtState.class.getCanonicalName();
 
 	private BleExt _bleExt;
@@ -51,7 +56,7 @@ public class BleExtState {
 
 	public void getSwitchState(final IIntegerCallback callback) {
 		if (_bleExt.isConnected(callback) && _bleExt.hasStateCharacteristics(callback)) {
-			BleLog.LOGd(TAG, "Get switch state ...");
+			getLogger().LOGd(TAG, "Get switch state ...");
 			_bleBaseState.getSwitchState(_bleExt.getTargetAddress(), callback);
 		}
 	}
@@ -71,7 +76,7 @@ public class BleExtState {
 
 	public void getAccumulatedEnergy(final IIntegerCallback callback) {
 		if (_bleExt.isConnected(callback) && _bleExt.hasStateCharacteristics(callback)) {
-			BleLog.LOGd(TAG, "Get accumulated energy ...");
+			getLogger().LOGd(TAG, "Get accumulated energy ...");
 			_bleBaseState.getAccumulatedEnergy(_bleExt.getTargetAddress(), callback);
 		}
 	}
@@ -91,7 +96,7 @@ public class BleExtState {
 
 	public void getPowerUsage(final IIntegerCallback callback) {
 		if (_bleExt.isConnected(callback) && _bleExt.hasStateCharacteristics(callback)) {
-			BleLog.LOGd(TAG, "Get power usage ...");
+			getLogger().LOGd(TAG, "Get power usage ...");
 			_bleBaseState.getPowerUsage(_bleExt.getTargetAddress(), callback);
 		}
 	}
@@ -114,7 +119,7 @@ public class BleExtState {
 			@Override
 			public void run() {
 				if (_bleExt.isConnected(callback) && _bleExt.hasStateCharacteristics(callback)) {
-					BleLog.LOGd(TAG, "Get temperature ...");
+					getLogger().LOGd(TAG, "Get temperature ...");
 					_bleBaseState.getTemperature(_bleExt.getTargetAddress(), callback);
 				}
 			}
@@ -125,7 +130,7 @@ public class BleExtState {
 		_bleExt.getHandler().post(new Runnable() {
 			@Override
 			public void run() {
-				BleLog.LOGv(TAG, "Get temperature");
+				getLogger().LOGv(TAG, "Get temperature");
 //				if (_bleExt.checkConnection(address)) {
 //					getTemperature(callback);
 //				} else {
@@ -319,4 +324,12 @@ public class BleExtState {
 //		}
 //	}
 
+	private BleLog getLogger() {
+		BleLog logger = _bleExt.getLogger();
+		// update the log level to the default of this class if it hasn't been set already
+		if (logger.getLogLevel(TAG) == null) {
+			logger.setLogLevelPerTag(TAG, LOG_LEVEL);
+		}
+		return logger;
+	}
 }

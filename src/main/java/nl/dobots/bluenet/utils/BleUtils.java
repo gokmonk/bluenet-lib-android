@@ -149,7 +149,7 @@ public class BleUtils {
 				result[ADDRESS_LENGTH-1-i] = Integer.valueOf(address.substring(3 * i, 3 * i + 2), 16).byteValue();
 			}
 		} catch (java.lang.NumberFormatException e) {
-			BleLog.LOGe(TAG, "Wrong address format: " + address);
+			BleLog.getInstance().LOGe(TAG, "Wrong address format: " + address);
 			e.printStackTrace();
 			result = null;
 		}

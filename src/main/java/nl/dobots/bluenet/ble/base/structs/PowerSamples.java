@@ -69,7 +69,7 @@ public class PowerSamples {
 			}
 
 			if (timestamps[timestamps.length - 1] != lastValue) {
-				BleLog.LOGe(TAG, "ERROR?");
+				BleLog.getInstance().LOGe(TAG, "ERROR?");
 			}
 		}
 

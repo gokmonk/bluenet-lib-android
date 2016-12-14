@@ -1,7 +1,5 @@
 package nl.dobots.bluenet.ble.extended.structs;
 
-import android.util.Log;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -9,13 +7,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 import nl.dobots.bluenet.ble.base.structs.CrownstoneServiceData;
 import nl.dobots.bluenet.ble.cfg.BleTypes;
-import nl.dobots.bluenet.ble.cfg.BluenetConfig;
+//import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
@@ -426,36 +422,36 @@ public class BleDevice {
 
 	public void validateCrownstone() {
 		// TODO: if in dfu mode: validate differently
-		BleLog.LOGv(TAG, "validateCrownstone " + getAddress());
+		LOGv(TAG, "validateCrownstone " + getAddress());
 
 		if (!isStone() || _serviceData == null) {
-			BleLog.LOGv(TAG, "no service data or no crownstone");
+			LOGv(TAG, "no service data or no crownstone");
 			return;
 		}
 		if (isSetupMode()) {
-			BleLog.LOGv(TAG, "validated crownstone in setup mode!");
+			LOGv(TAG, "validated crownstone in setup mode!");
 			_lastCrownstoneId = -1;
 			_lastRandom = null;
 			_isValidatedCrownstone = true;
 			return;
 		}
 
-		BleLog.LOGv(TAG, "_lastCrownstoneId=" + _lastCrownstoneId + " _lastRandom=" + _lastRandom);
+		LOGv(TAG, "_lastCrownstoneId=" + _lastCrownstoneId + " _lastRandom=" + _lastRandom);
 		if (_lastCrownstoneId != -1 && _lastRandom != null) {
 			// Skip check if crownstone id is external crownstone, or when advertisement didn't change.
 			if (_serviceData.isExternalData() || _lastRandom.equals(_serviceData.getRandomBytes())) {
-				BleLog.LOGv(TAG, "isExternalData or similar rand");
+				LOGv(TAG, "isExternalData or similar rand");
 				return;
 			}
-			BleLog.LOGv(TAG, "_lastCrownstoneId=" + _lastCrownstoneId + " current=" + _serviceData.getCrownstoneId());
+			LOGv(TAG, "_lastCrownstoneId=" + _lastCrownstoneId + " current=" + _serviceData.getCrownstoneId());
 			if (_lastCrownstoneId == _serviceData.getCrownstoneId()) {
 				if (!_isValidatedCrownstone) {
 //					_numSimilarCrownstoneIds += 1;
 					if (++_numSimilarCrownstoneIds >= NUM_ADVERTISEMENT_VALIDATIONS) {
-						BleLog.LOGd(TAG, "validated crownstone!");
+						LOGv(TAG, "validated crownstone!");
 						_isValidatedCrownstone = true;
 					}
-					BleLog.LOGv(TAG, "_numSimilarCrownstoneIds=" + _numSimilarCrownstoneIds);
+					LOGv(TAG, "_numSimilarCrownstoneIds=" + _numSimilarCrownstoneIds);
 				}
 			}
 			else {
@@ -465,7 +461,7 @@ public class BleDevice {
 		}
 		_lastCrownstoneId = _serviceData.getCrownstoneId();
 		_lastRandom = _serviceData.getRandomBytes();
-		BleLog.LOGv(TAG, "updated: _lastCrownstoneId=" + _lastCrownstoneId + " _lastRandom=" + _lastRandom);
+		LOGv(TAG, "updated: _lastCrownstoneId=" + _lastCrownstoneId + " _lastRandom=" + _lastRandom);
 	}
 
 	/**

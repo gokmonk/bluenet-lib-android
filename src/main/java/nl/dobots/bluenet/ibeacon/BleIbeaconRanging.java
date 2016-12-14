@@ -17,6 +17,7 @@ import java.util.UUID;
 import nl.dobots.bluenet.ble.extended.structs.BleDevice;
 import nl.dobots.bluenet.ble.extended.structs.BleDeviceMap;
 import nl.dobots.bluenet.utils.BleLog;
+import nl.dobots.bluenet.utils.Logging;
 
 /**
  * Copyright (c) 2015 Bart van Vliet <bart@dobots.nl>. All rights reserved.
@@ -36,7 +37,13 @@ import nl.dobots.bluenet.utils.BleLog;
  * @author Bart van Vliet
  */
 public class BleIbeaconRanging {
+
+	// use BleLog.getInstance().setLogLevelPerTag(BleIbeaconRanging.class.getCanonicalName(), <NEW_LOG_LEVEL>)
+	// to change the log level
+	private static final int LOG_LEVEL = Log.WARN;
+
 	private static final String TAG = BleIbeaconRanging.class.getCanonicalName();
+
 	private static final long REGION_TIMEOUT_MS = 30000L;
 	private static final long TICK_INTERVAL_MS = 1000L;
 
@@ -48,12 +55,8 @@ public class BleIbeaconRanging {
 	private Set<UUID> _inRegion;
 	private boolean _paused;
 
-
 	// handler used for delayed execution and timeouts
 	private Handler _handler;
-
-
-
 
 	public BleIbeaconRanging() {
 		_iBeaconFilter = new ArrayList<>();
@@ -80,7 +83,7 @@ public class BleIbeaconRanging {
 	public synchronized void addIbeaconFilter(BleIbeaconFilter filter) {
 		_iBeaconFilter.add(filter);
 		_lastSeen.put(filter.getUuid(), 0L);
-		BleLog.LOGv(TAG, "lastseen " + filter.getUuid() + " at " + _lastSeen.get(filter.getUuid()));
+		getLogger().LOGv(TAG, "lastseen " + filter.getUuid() + " at " + _lastSeen.get(filter.getUuid()));
 	}
 
 	public synchronized void remIbeaconFilter(BleIbeaconFilter filter) {
@@ -152,7 +155,7 @@ public class BleIbeaconRanging {
 //		} else { Log.d(TAG, "is not ibeacon"); }
 		}
 		if (iBeaconMatch) {
-			BleLog.LOGv(TAG, "matching ibeacon filter: " + device.getAddress() + " (" + device.getName() + ")");
+			getLogger().LOGv(TAG, "matching ibeacon filter: " + device.getAddress() + " (" + device.getName() + ")");
 			device = updateDevice(device);
 //			for (IBleBeaconCallback cb : _scanCallbacks) {
 //				cb.onBeaconScanned(device);
@@ -160,7 +163,7 @@ public class BleIbeaconRanging {
 
 			long currentTime = SystemClock.elapsedRealtime();
 			_lastSeen.put(device.getProximityUuid(), currentTime);
-			BleLog.LOGv(TAG, "lastseen " + device.getProximityUuid() + " at " + currentTime + "=" + _lastSeen.get(device.getProximityUuid()));
+			getLogger().LOGv(TAG, "lastseen " + device.getProximityUuid() + " at " + currentTime + "=" + _lastSeen.get(device.getProximityUuid()));
 			if (!_inRegion.contains(device.getProximityUuid())) {
 				enterRegion(device.getProximityUuid());
 			}
@@ -170,7 +173,7 @@ public class BleIbeaconRanging {
 				listener.onBeaconScanned(device);
 			}
 		} else {
-			BleLog.LOGv(TAG, "not matching any ibeacon filter:" + device.getAddress() + " (" + device.getName() + ")");
+			getLogger().LOGv(TAG, "not matching any ibeacon filter:" + device.getAddress() + " (" + device.getName() + ")");
 		}
 		return iBeaconMatch;
 	}
@@ -187,10 +190,11 @@ public class BleIbeaconRanging {
 		// TODO: this crashes on logout, because _lastSeen.get(uuid) returns null for some reason unknown
 		long curTime = SystemClock.elapsedRealtime();
 		if (_lastSeen == null) {
-			BleLog.LOGe(TAG, "lastSeen = null!");
+			getLogger().LOGe(TAG, "lastSeen = null!");
 		}
 		for (UUID uuid : _inRegion) {
-			BleLog.LOGd(TAG, "lastSeen " + uuid + ": " + _lastSeen.get(uuid));
+			getLogger().LOGv(TAG, "lastSeen " + uuid + ": " + _lastSeen.get(uuid));
+
 			if (curTime - _lastSeen.get(uuid) > REGION_TIMEOUT_MS) {
 				exitRegion(uuid);
 			}
@@ -198,7 +202,7 @@ public class BleIbeaconRanging {
 	}
 
 	private synchronized void enterRegion(UUID uuid) {
-		BleLog.LOGd(TAG, "enterRegion: " + uuid.toString());
+		getLogger().LOGd(TAG, "enterRegion: " + uuid.toString());
 		_inRegion.add(uuid);
 		for (BleBeaconRangingListener listener : _rangingListeners) {
 			listener.onRegionEnter(uuid);
@@ -206,7 +210,7 @@ public class BleIbeaconRanging {
 	}
 
 	private synchronized void exitRegion(UUID uuid) {
-		BleLog.LOGd(TAG, "exitRegion: " + uuid.toString());
+		getLogger().LOGd(TAG, "exitRegion: " + uuid.toString());
 //		_lastSeen.remove(uuid);
 		_inRegion.remove(uuid);
 		if (!_paused) {
@@ -220,4 +224,12 @@ public class BleIbeaconRanging {
 		return _devices.updateDevice(device);
 	}
 
+	private static BleLog getLogger() {
+		BleLog logger = BleLog.getInstance();
+		// update the log level to the default of this class if it hasn't been set already
+		if (logger.getLogLevel(TAG) == null) {
+			logger.setLogLevelPerTag(TAG, LOG_LEVEL);
+		}
+		return logger;
+	}
 }
