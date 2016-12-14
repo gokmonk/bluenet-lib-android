@@ -1,5 +1,7 @@
 package nl.dobots.bluenet.ble.extended.structs;
 
+import android.util.Log;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -33,6 +35,10 @@ import nl.dobots.bluenet.utils.BleUtils;
  * @author Dominik Egger
  */
 public class BleDevice {
+
+	// use BleLog.getInstance().setLogLevelPerTag(BleDevice.class.getCanonicalName(), <NEW_LOG_LEVEL>)
+	// to change the log level
+	private static final int LOG_LEVEL = Log.WARN;
 
 	private static final String TAG = BleDevice.class.getCanonicalName();
 
@@ -422,36 +428,36 @@ public class BleDevice {
 
 	public void validateCrownstone() {
 		// TODO: if in dfu mode: validate differently
-		LOGv(TAG, "validateCrownstone " + getAddress());
+		getLogger().LOGv(TAG, "validateCrownstone " + getAddress());
 
 		if (!isStone() || _serviceData == null) {
-			LOGv(TAG, "no service data or no crownstone");
+			getLogger().LOGv(TAG, "no service data or no crownstone");
 			return;
 		}
 		if (isSetupMode()) {
-			LOGv(TAG, "validated crownstone in setup mode!");
+			getLogger().LOGv(TAG, "validated crownstone in setup mode!");
 			_lastCrownstoneId = -1;
 			_lastRandom = null;
 			_isValidatedCrownstone = true;
 			return;
 		}
 
-		LOGv(TAG, "_lastCrownstoneId=" + _lastCrownstoneId + " _lastRandom=" + _lastRandom);
+		getLogger().LOGv(TAG, "_lastCrownstoneId=" + _lastCrownstoneId + " _lastRandom=" + _lastRandom);
 		if (_lastCrownstoneId != -1 && _lastRandom != null) {
 			// Skip check if crownstone id is external crownstone, or when advertisement didn't change.
 			if (_serviceData.isExternalData() || _lastRandom.equals(_serviceData.getRandomBytes())) {
-				LOGv(TAG, "isExternalData or similar rand");
+				getLogger().LOGv(TAG, "isExternalData or similar rand");
 				return;
 			}
-			LOGv(TAG, "_lastCrownstoneId=" + _lastCrownstoneId + " current=" + _serviceData.getCrownstoneId());
+			getLogger().LOGv(TAG, "_lastCrownstoneId=" + _lastCrownstoneId + " current=" + _serviceData.getCrownstoneId());
 			if (_lastCrownstoneId == _serviceData.getCrownstoneId()) {
 				if (!_isValidatedCrownstone) {
 //					_numSimilarCrownstoneIds += 1;
 					if (++_numSimilarCrownstoneIds >= NUM_ADVERTISEMENT_VALIDATIONS) {
-						LOGv(TAG, "validated crownstone!");
+						getLogger().LOGv(TAG, "validated crownstone!");
 						_isValidatedCrownstone = true;
 					}
-					LOGv(TAG, "_numSimilarCrownstoneIds=" + _numSimilarCrownstoneIds);
+					getLogger().LOGv(TAG, "_numSimilarCrownstoneIds=" + _numSimilarCrownstoneIds);
 				}
 			}
 			else {
@@ -461,7 +467,7 @@ public class BleDevice {
 		}
 		_lastCrownstoneId = _serviceData.getCrownstoneId();
 		_lastRandom = _serviceData.getRandomBytes();
-		LOGv(TAG, "updated: _lastCrownstoneId=" + _lastCrownstoneId + " _lastRandom=" + _lastRandom);
+		getLogger().LOGv(TAG, "updated: _lastCrownstoneId=" + _lastCrownstoneId + " _lastRandom=" + _lastRandom);
 	}
 
 	/**
@@ -548,4 +554,12 @@ public class BleDevice {
 		updateRssiValue(System.currentTimeMillis(), newDev.getRssi());
 	}
 
+	private BleLog getLogger() {
+		BleLog logger = BleLog.getInstance();
+		// update the log level to the default of this class if it hasn't been set already
+		if (logger.getLogLevel(TAG) == null) {
+			logger.setLogLevelPerTag(TAG, LOG_LEVEL);
+		}
+		return logger;
+	}
 }
