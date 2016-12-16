@@ -2710,17 +2710,18 @@ public class BleExt extends Logging {
 		});
 	}
 
-	public void writeKeepAliveState(final int switchState, final int timeout, final IStatusCallback callback) {
+	public void writeKeepAliveState(final int action, final int switchState, final int timeout, final IStatusCallback callback) {
 		if (isConnected(callback)) {
 			getLogger().LOGd(TAG, "write keep alive with state %d and timeout %d", switchState, timeout);
-			ByteBuffer bb = ByteBuffer.allocate(3);
+			ByteBuffer bb = ByteBuffer.allocate(4);
+			bb.put((byte)action);
 			bb.put((byte)switchState);
 			bb.putShort((short)timeout);
-			_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_KEEP_ALIVE_STATE, 3, bb.array()), callback);
+			_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_KEEP_ALIVE_STATE, 4, bb.array()), callback);
 		}
 	}
 
-	public void writeKeepAliveState(final String address, final int switchState, final int timeout, final IStatusCallback callback) {
+	public void writeKeepAliveState(final String address, final int action, final int switchState, final int timeout, final IStatusCallback callback) {
 		getHandler().post(new Runnable() {
 			@Override
 			public void run() {
@@ -2728,7 +2729,7 @@ public class BleExt extends Logging {
 				connectAndExecute(address, new IExecuteCallback() {
 					@Override
 					public void execute(final IExecStatusCallback execCallback) {
-						writeKeepAliveState(switchState, timeout, execCallback);
+						writeKeepAliveState(action, switchState, timeout, execCallback);
 					}
 				}, new SimpleExecStatusCallback(callback));
 			}
