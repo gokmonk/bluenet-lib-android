@@ -370,20 +370,20 @@ public class BleBase extends BleCore {
 		ByteBuffer bb = ByteBuffer.wrap(manufacData);
 
 		bb.order(ByteOrder.LITTLE_ENDIAN);
-		int companyId = bb.getShort();
+		int companyId = BleUtils.toUint16(bb.getShort());
 
 		// ibeacon data is in big endian format
 		bb.order(ByteOrder.BIG_ENDIAN);
-		// advertisement id is actually two seperate bits, first bit is the iBeacon type (0x02),
+		// advertisement id is actually two separate bits, first bit is the iBeacon type (0x02),
 		// the second is the iBeacon length (0x15), but they are fixed to these values, so we can
 		// compare them together
-		int advertisementId = bb.getShort();
+		int advertisementId = BleUtils.toUint16(bb.getShort());
 
 		if (companyId == BluenetConfig.APPLE_COMPANY_ID && advertisementId == BluenetConfig.IBEACON_ADVERTISEMENT_ID) {
 			BleCore.addProperty(scanResult, BleTypes.PROPERTY_IS_IBEACON, true);
 			BleCore.addProperty(scanResult, BleTypes.PROPERTY_PROXIMITY_UUID, new UUID(bb.getLong(), bb.getLong()));
-			BleCore.addProperty(scanResult, BleTypes.PROPERTY_MAJOR, bb.getShort());
-			BleCore.addProperty(scanResult, BleTypes.PROPERTY_MINOR, bb.getShort());
+			BleCore.addProperty(scanResult, BleTypes.PROPERTY_MAJOR, BleUtils.toUint16(bb.getShort()));
+			BleCore.addProperty(scanResult, BleTypes.PROPERTY_MINOR, BleUtils.toUint16(bb.getShort()));
 			BleCore.addProperty(scanResult, BleTypes.PROPERTY_CALIBRATED_RSSI, bb.get());
 		} else {
 			BleCore.addProperty(scanResult, BleTypes.PROPERTY_IS_IBEACON, false);
