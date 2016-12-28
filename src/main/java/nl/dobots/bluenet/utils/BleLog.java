@@ -73,7 +73,8 @@ public class BleLog {
 		if (logLevel == null) {
 			return _logLevel <= checkLevel;
 		} else {
-			return Math.max(logLevel, _logLevel) <= checkLevel;
+//			return Math.max(logLevel, _logLevel) <= checkLevel;
+			return logLevel <= checkLevel;
 		}
 	}
 
