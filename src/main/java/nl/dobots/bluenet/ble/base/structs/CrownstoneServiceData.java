@@ -72,7 +72,7 @@ public class CrownstoneServiceData extends JSONObject {
 			}
 
 			if (encrypted) {
-				firmwareVersion = BleUtils.toUint8(bytes[0]);
+				firmwareVersion = BleUtils.toUint8(bytes[2]);
 				//byte[] decryptedBytes = BleBaseEncryption.decryptEcb(bytes, bb.position(), key);
 				byte[] decryptedBytes = BleBaseEncryption.decryptEcb(bytes, 3, key);
 				if (decryptedBytes == null) {
