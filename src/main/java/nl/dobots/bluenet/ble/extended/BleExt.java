@@ -66,12 +66,12 @@ public class BleExt extends Logging {
 	private static final int LOG_LEVEL = Log.VERBOSE;
 
 	// default timeout for connection attempt
-	private static final int CONNECT_TIMEOUT = 10; // 10 seconds
+	private int _connectTimeout = 10000; // 10 seconds
 
 	// default time used for delayed disconnects
 	public static final int DELAYED_DISCONNECT_TIME = 5000; // 5 seconds
 
-	private static final int MAX_RETRIES = 3;
+	private int _numRetries = 3;
 
 	private BleBase _bleBase;
 
@@ -199,6 +199,14 @@ public class BleExt extends Logging {
 	 */
 	public String getTargetAddress() {
 		return _targetAddress;
+	}
+
+	public void setNumRetries(int numRetries) {
+		_numRetries = numRetries;
+	}
+
+	public void setConnectTimeout(int timeoutMs) {
+		_connectTimeout = timeoutMs;
 	}
 
 	/**
@@ -555,11 +563,11 @@ public class BleExt extends Logging {
 			};
 
 //			if (_bleBase.isClosed(_targetAddress)) {
-//				_bleBase.connectDevice(_targetAddress, CONNECT_TIMEOUT, dataCallback);
+//				_bleBase.connectDevice(_targetAddress, _connectTimeout, dataCallback);
 //			} else if (_bleBase.isDisconnected(_targetAddress)) {
 //				_bleBase.reconnectDevice(_targetAddress, 30, dataCallback);
 			if (_bleBase.isClosed(_targetAddress) || _bleBase.isDisconnected(_targetAddress)) {
-				_bleBase.connectDevice(_targetAddress, CONNECT_TIMEOUT, dataCallback);
+				_bleBase.connectDevice(_targetAddress, _connectTimeout, dataCallback);
 			}
 		} else if (checkConnectionState(BleDeviceConnectionState.connected, null)) {
 			if (_targetAddress.equals(address)) {
@@ -1052,9 +1060,9 @@ public class BleExt extends Logging {
 		switch (error) {
 			case BleErrors.ERROR_CHARACTERISTIC_READ_FAILED:
 			case BleErrors.ERROR_CHARACTERISTIC_WRITE_FAILED:
-			case BleErrors.ERROR_CONNECT_FAILED:
+//			case BleErrors.ERROR_CONNECT_FAILED:
 			case 133: {
-				if (_retries < MAX_RETRIES) {
+				if (_retries < _numRetries) {
 					_retries++;
 					getLogger().LOGw(TAG, "retry: %d (error=%d)", _retries, error);
 					return true;
@@ -1074,7 +1082,7 @@ public class BleExt extends Logging {
 
 //	private boolean retry(final String address, final IExecuteCallback function, final IStatusCallback callback) {
 //
-//		if (_retries < MAX_RETRIES) {
+//		if (_retries < _numRetries) {
 //			_retries++;
 //			getLogger().LOGw(TAG, "retry: %d", _retries);
 //			connectAndExecute(address, function, callback);

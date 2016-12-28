@@ -452,7 +452,7 @@ public class BleCore extends Logging {
 			}
 		};
 
-		_timeoutHandler.postDelayed(_connectTimeout, timeout * 1000);
+		_timeoutHandler.postDelayed(_connectTimeout, timeout);
 	}
 
 	private void clearConnectTimeout() {
@@ -461,7 +461,7 @@ public class BleCore extends Logging {
 	}
 
 	public void connectDevice(String address, int timeout, IDataCallback callback) {
-		getLogger().LOGd(TAG, "Connecting to %s with %d second timeout ...", address, timeout);
+		getLogger().LOGd(TAG, "Connecting to %s with %d ms timeout ...", address, timeout);
 		_connectionCallback = callback;
 
 		if (!isInitialized()) {
