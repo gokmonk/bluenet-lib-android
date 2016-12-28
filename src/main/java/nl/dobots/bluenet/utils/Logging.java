@@ -31,7 +31,7 @@ public abstract class Logging {
 			_logger = BleLog.getInstance();
 		}
 		if (!_logLevelUpdated) {
-			_logger.setLogLevelPerTag(getTag(), getLogLevel());
+//			_logger.setLogLevelPerTag(getTag(), getLogLevel());
 			_logLevelUpdated = true;
 		}
 		return _logger;
