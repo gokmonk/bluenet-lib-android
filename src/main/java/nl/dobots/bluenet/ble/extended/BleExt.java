@@ -10,6 +10,7 @@ import android.util.Log;
 import org.json.JSONObject;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -2725,6 +2726,7 @@ public class BleExt extends Logging {
 		if (isConnected(callback)) {
 			getLogger().LOGd(TAG, "write keep alive with state %d and timeout %d", switchState, timeout);
 			ByteBuffer bb = ByteBuffer.allocate(4);
+			bb.order(ByteOrder.LITTLE_ENDIAN);
 			bb.put((byte)action);
 			bb.put((byte)switchState);
 			bb.putShort((short)timeout);
