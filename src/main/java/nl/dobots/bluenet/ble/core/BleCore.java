@@ -1085,7 +1085,13 @@ public class BleCore extends Logging {
 //				callback.onError(error);
 				// also try to close even if disconnect fails, but don't report
 				// the error if it fails
-				close(true);
+				if (error != BleErrors.ERROR_NEVER_CONNECTED) {
+					close(true);
+				} else {
+					// [03.01.17] if never connected, we also don't need to close otherwise it
+					//   the close will just throw another never connected error
+					callback.onError(error);
+				}
 			}
 		});
 	}
@@ -1435,7 +1441,9 @@ public class BleCore extends Logging {
 				getLogger().LOGe(TAG, "BluetoothGatt Error, status: %d", status);
 				clearConnectTimeout();
 
-				gatt.close();
+				// [03.01.17] do not call gatt.close() here, it seems to lead to more gatt error 133
+				//   and BluetoothGatt calls close by itself
+//				gatt.close();
 				connection.setConnectionState(ConnectionState.DISCONNECTED);
 
 				if (_connectionCallback != null) {

@@ -853,9 +853,12 @@ public class BleExt extends Logging {
 				 *   If the delay is really necessary, we need to find a better solution
 				 */
 				// TODO: is this delay necessary?
-				_handler.postDelayed(new Runnable() {
-					@Override
-					public void run() {
+				/* [03.01.17] taking out the delay because it adds delay to the consumer app since that
+				 *   is connecting / disconnecting for every write
+				 */
+//				_handler.postDelayed(new Runnable() {
+//					@Override
+//					public void run() {
 						discoverServices(new IDiscoveryCallback() {
 							@Override
 							public void onDiscovery(String serviceUuid, String characteristicUuid) {
@@ -880,8 +883,8 @@ public class BleExt extends Logging {
 								}
 							}
 						}, readSessionNonce);
-					}
-				}, 500);
+//					}
+//				}, 500);
 //				discoverServices(callback);
 			}
 
