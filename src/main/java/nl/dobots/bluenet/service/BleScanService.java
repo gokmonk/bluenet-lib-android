@@ -756,6 +756,15 @@ public class BleScanService extends Service {
 	}
 
 	/**
+	 * Set the scan mode
+	 * @param scanMode the scan mode, see class ScanSettings
+	 */
+	public void setScanMode(int scanMode) {
+		_ble.getBleBase().setScanMode(scanMode);
+	}
+
+
+	/**
 	 * Return the list of devices which have been scanned so far (or since the last clear)
 	 * @return list of scanned devices
 	 */
