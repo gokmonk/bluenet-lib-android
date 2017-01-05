@@ -2022,6 +2022,7 @@ public class BleBase extends BleCore {
 				}
 				else {
 					if (_encryptionKeys == null) {
+						getLogger().LOGe(TAG, "no keys set!");
 						callback.onError(BleErrors.ENCRYPTION_ERROR);
 						return;
 					}
@@ -2030,6 +2031,7 @@ public class BleBase extends BleCore {
 				}
 
 				if (_encryptionSessionData == null) {
+					getLogger().LOGe(TAG, "no keys set!");
 					callback.onError(BleErrors.ENCRYPTION_ERROR);
 					return;
 				}
