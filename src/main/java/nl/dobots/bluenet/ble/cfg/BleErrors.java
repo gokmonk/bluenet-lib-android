@@ -9,7 +9,6 @@ package nl.dobots.bluenet.ble.cfg;
 public class BleErrors {
 
 	// BleCore
-
 	public static final int ERROR_DISCOVERY_FAILED = 200;
 	public static final int ERROR_CHARACTERISTIC_READ_FAILED = 201;
 	public static final int ERROR_CHARACTERISTIC_WRITE_FAILED = 202;

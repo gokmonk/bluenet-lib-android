@@ -68,7 +68,7 @@ public class BleDevice {
 		dfu,
 	}
 
-	private static long expirationTime = 5000;
+	private static long expirationTime = 1000;
 
 	private String _address;
 	private String _name;

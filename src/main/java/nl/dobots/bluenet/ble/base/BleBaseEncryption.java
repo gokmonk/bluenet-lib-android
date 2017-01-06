@@ -272,16 +272,19 @@ public class BleBaseEncryption {
 		// When the data was encrypted, the first 4 bytes should be CAFEBABE, to check if encryption succeeded.
 		if (wasEncrypted) {
 			if (decryptedData.length < VALIDATION_KEY_LENGTH + SESSION_NONCE_LENGTH) {
+				getLogger().LOGe(TAG, "invalid session data length: " + BleUtils.bytesToString(decryptedData));
 				return null;
 			}
 			// Bytes 0-3 (validation key) should be CAFEBABE
 			if (BleUtils.byteArrayToInt(decryptedData) != BluenetConfig.CAFEBABE) {
+				getLogger().LOGe(TAG, "validation failed: " + BleUtils.bytesToString(decryptedData));
 				return null;
 			}
 			return _getSessionData(decryptedData, VALIDATION_KEY_LENGTH);
 		}
 		else {
 			if (decryptedData.length < SESSION_NONCE_LENGTH) {
+				getLogger().LOGe(TAG, "invalid session data length: " + BleUtils.bytesToString(decryptedData));
 				return null;
 			}
 			return _getSessionData(decryptedData, 0);
