@@ -24,6 +24,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -65,7 +66,8 @@ public class BleCore extends Logging {
 	private static final int LOG_LEVEL = Log.VERBOSE;
 
 	// Timeout for a bluetooth enable request. If timeout expires, an error is created
-	private static final int BLUETOOTH_ENABLE_TIMEOUT = 15000;
+	private static final int BLUETOOTH_ENABLE_TIMEOUT = 30000;
+	private static final int LOCATION_SERVICE_ENABLE_TIMEOUT = 30000;
 
 	private static final int PERMISSIONS_REQUEST_LOCATION = 101;
 
@@ -84,9 +86,14 @@ public class BleCore extends Logging {
 
 	// flags to keep track of state
 	private boolean _initialized = false;
+	private boolean _bluetoothReady = false;
+	private boolean _locationServicesReady;
+
 	private boolean _receiverRegistered = false;
 
 	private boolean _resettingBle = false;
+
+	static private boolean bleDialogShowing = false;
 
 	// enum to keep track of device connection state
 	private enum ConnectionState {
@@ -213,25 +220,29 @@ public class BleCore extends Logging {
 			if (_btStateCallback == null) return;
 
 			if (intent.getAction().equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+				bleDialogShowing = false;
 				switch (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
 					case BluetoothAdapter.STATE_OFF:
+						// if bluetooth state turns off because of a reset, enable it again
 						if (_resettingBle) {
 							_bluetoothAdapter.enable();
 						} else {
 							_connections = new HashMap<>();
-//						_scanCallback = null;
+//							_scanCallback = null;
 							_initialized = false;
 							_scanning = false;
+							_bluetoothReady = false;
 
 							// if bluetooth is turned off, call onError on the bt state callback
 							_btStateCallback.onError(BleErrors.ERROR_BLUETOOTH_TURNED_OFF);
 						}
 						break;
 					case BluetoothAdapter.STATE_ON:
+						// if bluetooth state turns on because of a reset, then reset was completed
 						if (_resettingBle) {
 							_resettingBle = false;
 						} else {
-							_initialized = true;
+							_bluetoothReady = true;
 							if (Build.VERSION.SDK_INT >= 21) {
 								// create the ble scanner object used for API > 21
 								_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
@@ -240,12 +251,43 @@ public class BleCore extends Logging {
 										.build();
 								_scanFilters = new ArrayList<>();
 							}
-							// inform the callback about the enabled bluetooth
-							_btStateCallback.onSuccess();
+							// if location services are ready, notify success
+							if (_locationServicesReady) {
+								_initialized = true;
+								// inform the callback about the enabled bluetooth
+								_btStateCallback.onSuccess();
+							} else {
+								// otherwise, request to enable location services
+								checkLocationServices();
+							}
 							// bluetooth was successfully enabled, cancel the timeout
 							_timeoutHandler.removeCallbacksAndMessages(null);
 						}
 						break;
+				}
+			} else if (intent.getAction().equals(LocationManager.PROVIDERS_CHANGED_ACTION)) {
+
+				// PROVIDERS_CHANGED_ACTION  are also triggered if mode is changed, so only
+				// create events if the _locationsServicesReady flag changes
+
+				if (isLocationServicesEnabled()) {
+					if (!_locationServicesReady) {
+						// if bluetooth is ready, notify success
+						if (_bluetoothReady) {
+							_initialized = true;
+							_btStateCallback.onSuccess();
+						} else {
+							// otherwise, request to enable bluetooth
+							checkBluetooth();
+						}
+					}
+					_locationServicesReady = true;
+				} else {
+					_initialized = false;
+					if (_locationServicesReady) {
+						_btStateCallback.onError(BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF);
+					}
+					_locationServicesReady = false;
 				}
 			}
 		}
@@ -348,12 +390,73 @@ public class BleCore extends Logging {
 		BluetoothManager bluetoothManager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
 		_bluetoothAdapter = bluetoothManager.getAdapter();
 
+		if (Build.VERSION.SDK_INT >= 21) {
+			_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
+			_scanSettings = new ScanSettings.Builder()
+					.setScanMode(_scanMode)
+					.build();
+			_scanFilters = new ArrayList<>();
+		}
+
 		if (!_receiverRegistered) {
 			_context.registerReceiver(_receiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
+			_context.registerReceiver(_receiver, new IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION));
 			_receiverRegistered = true;
 		}
 
+		// check if bluetooth is enabled, otherwise ask to enable
+		checkBluetooth();
+
+		// if bluetooth is ready, check if location services are enabled, otherwise ask to enable
+		if (_bluetoothReady) {
+			checkLocationServices();
+		}
+
+		// initialize is done if both bluetooth and location services are ready
+		if (_bluetoothReady && _locationServicesReady) {
+			_initialized = true;
+			callback.onSuccess();
+		}
+
+	}
+
+	private void checkLocationServices() {
+
+		if (Build.VERSION.SDK_INT < 23) {
+			_locationServicesReady = true;
+			return;
+		}
+		_locationServicesReady = false;
+
+		if (!isLocationServicesEnabled()) {
+//			_initialized = false;
+			Intent intent = new Intent(_context, LocationRequest.class);
+			intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			_context.startActivity(intent);
+
+			_timeoutHandler.postDelayed(new Runnable() {
+				@Override
+				public void run() {
+					if (!isLocationServicesEnabled()) {
+						_initialized = false;
+						if (_btStateCallback != null) {
+							_btStateCallback.onError(BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF);
+						}
+					}
+				}
+			}, LOCATION_SERVICE_ENABLE_TIMEOUT);
+		} else {
+			_locationServicesReady = true;
+		}
+	}
+
+	private void checkBluetooth() {
+
+		_bluetoothReady = false;
+		if (bleDialogShowing) return;
+
 		if (_bluetoothAdapter == null || !_bluetoothAdapter.isEnabled()) {
+			bleDialogShowing = true;
 			Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
 			enableBtIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 			_context.startActivity(enableBtIntent);
@@ -364,6 +467,7 @@ public class BleCore extends Logging {
 				@Override
 				public void run() {
 					if (!_bluetoothAdapter.isEnabled()) {
+						bleDialogShowing = false;
 						_initialized = false;
 						if (_btStateCallback != null) {
 							_btStateCallback.onError(BleErrors.ERROR_BLUETOOTH_NOT_ENABLED);
@@ -372,17 +476,22 @@ public class BleCore extends Logging {
 				}
 			}, BLUETOOTH_ENABLE_TIMEOUT);
 		} else {
-			getLogger().LOGd(TAG, "Bluetooth successfully initialized");
-			_initialized = true;
-			if (Build.VERSION.SDK_INT >= 21) {
-				_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
-				_scanSettings = new ScanSettings.Builder()
-						.setScanMode(_scanMode)
-						.build();
-				_scanFilters = new ArrayList<>();
-			}
-			callback.onSuccess();
+			getLogger().LOGd(TAG, "Bluetooth already enabled");
+//			_initialized = true;
+//			callback.onSuccess();
+			_bluetoothReady = true;
 		}
+	}
+
+
+	public boolean isLocationServicesEnabled() {
+
+		LocationManager locationManager = (LocationManager) _context.getSystemService(Context.LOCATION_SERVICE);
+		boolean isGpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+		boolean isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+
+		//Start your Activity if location was enabled:
+		return isGpsEnabled || isNetworkEnabled;
 	}
 
 	/**
@@ -394,6 +503,8 @@ public class BleCore extends Logging {
 			_receiverRegistered = false;
 		}
 
+		_bluetoothReady = false;
+		_locationServicesReady = false;
 		_initialized = false;
 		_connectionCallback = null;
 		_discoveryCallback = null;

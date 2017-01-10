@@ -375,6 +375,20 @@ public class BleScanService extends Service {
 					onPermissionsMissing();
 					break;
 				}
+				case BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF: {
+					getLogger().LOGe(TAG, "Location Services turned off!!");
+
+					if (_running) {
+						onEvent(EventListener.Event.LOCATION_SERVICES_TURNED_OFF);
+						_wasRunning = true;
+
+						_intervalScanHandler.removeCallbacksAndMessages(null);
+						_running = false;
+					} else {
+						_wasRunning = false;
+					}
+					break;
+				}
 				default:
 					getLogger().LOGe(TAG, "Ble Error: " + error);
 			}
