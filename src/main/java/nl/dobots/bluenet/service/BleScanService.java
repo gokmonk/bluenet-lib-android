@@ -205,6 +205,8 @@ public class BleScanService extends Service {
 		_ble = new BleExt();
 		_ble.setLogger(_logger);
 
+		getLogger().LOGi(TAG, "starting up scan service");
+
 		HandlerThread handlerThread = new HandlerThread("IntervalScanHandler");
 		handlerThread.start();
 		_intervalScanHandler = new Handler(handlerThread.getLooper());
@@ -478,7 +480,10 @@ public class BleScanService extends Service {
 				public void onSuccess() {
 					onIntervalScanEnd();
 					if (_running) {
+						getLogger().LOGi(TAG, "running");
 						_intervalScanHandler.postDelayed(_startScanRunnable, _scanPause);
+					} else {
+						getLogger().LOGi(TAG, "not running");
 					}
 				}
 
