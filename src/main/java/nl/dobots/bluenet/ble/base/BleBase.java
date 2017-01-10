@@ -506,14 +506,16 @@ public class BleBase extends BleCore {
 
 		IDataCallback callback;
 
-		MultiPartNotificationCallback(IDataCallback callback) {
+		MultiPartNotificationCallback(IDataCallback callback, boolean decrypt) {
 			this.callback = callback;
+			_decrypt = decrypt;
 		}
 
 		ByteBuffer buffer = ByteBuffer.allocate(BluenetConfig.BLE_MAX_MULTIPART_NOTIFICATION_LENGTH);
 		int messageNr = 0;
 
 		long timeStart;
+		boolean _decrypt = true;
 
 		@Override
 		public void onData(JSONObject json) {
@@ -545,9 +547,21 @@ public class BleBase extends BleCore {
 				buffer.rewind();
 				buffer.get(result);
 
+				byte[] decryptedBytes;
+				if (_decrypt) {
+					decryptedBytes = BleBaseEncryption.decryptCtr(result, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, _encryptionKeys);
+					if (decryptedBytes == null) {
+						getLogger().LOGw(TAG, "Unable to decrypt");
+						callback.onError(BleErrors.ENCRYPTION_ERROR);
+						messageNr = 0;
+						buffer.clear();
+						return;
+					}
+					result = decryptedBytes;
+				}
+
 				BleCore.setValue(combinedJson, result);
 				callback.onData(combinedJson);
-
 				messageNr = 0;
 				buffer.clear();
 			} else {
@@ -577,12 +591,17 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will be triggered every time a gatt notification arrives
 	 */
 	public void subscribeMultipart(String address, String serviceUuid, String characteristicUuid,
+	                               final IIntegerCallback statusCallback, final IDataCallback callback) {
+		subscribeMultipart(address, serviceUuid, characteristicUuid, _encryptionEnabled, statusCallback, callback);
+	}
+
+	public void subscribeMultipart(String address, String serviceUuid, String characteristicUuid, boolean decrypt,
 						  final IIntegerCallback statusCallback, final IDataCallback callback) {
 
 		UUID uuid = BleUtils.stringToUuid(characteristicUuid);
 		final ArrayList<IDataCallback> subscribers = getSubscribers(uuid);
 
-		final MultiPartNotificationCallback notificationCB = new MultiPartNotificationCallback(callback);
+		final MultiPartNotificationCallback notificationCB = new MultiPartNotificationCallback(callback, decrypt);
 
 		if (subscribers.isEmpty()) {
 			subscribers.add(notificationCB);
@@ -654,11 +673,12 @@ public class BleBase extends BleCore {
 	 */
 	private void subscribeMultipartSingleShot(final String address, final String serviceUuid,
 											  final String characteristicUuid,
+											  boolean decrypt,
 											  final IDataCallback callback) {
 
 		final int[] subscribeId = {0};
 
-		subscribeMultipart(address, serviceUuid, characteristicUuid,
+		subscribeMultipart(address, serviceUuid, characteristicUuid, decrypt,
 				new IIntegerCallback() {
 					@Override
 					public void onSuccess(int result) {
@@ -995,7 +1015,7 @@ public class BleBase extends BleCore {
 	public void readPowerSamples(final String address, final IPowerSamplesCallback callback) {
 		getLogger().LOGd(TAG, "read power samples at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID);
 
-		subscribeMultipartSingleShot(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID,
+		subscribeMultipartSingleShot(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID, false,
 				new IDataCallback() {
 					@Override
 					public void onData(JSONObject json) {
@@ -1018,7 +1038,7 @@ public class BleBase extends BleCore {
 	public void subscribePowerSamples(final String address, final IIntegerCallback statusCallback, final IPowerSamplesCallback callback) {
 		getLogger().LOGd(TAG, "subscribe to power samples at service %s and characteristic %s", BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID);
 
-		subscribeMultipart(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID,
+		subscribeMultipart(address, BluenetConfig.POWER_SERVICE_UUID, BluenetConfig.CHAR_POWER_SAMPLES_UUID, false,
 				statusCallback,
 				new IDataCallback() {
 					@Override
@@ -1154,14 +1174,7 @@ public class BleBase extends BleCore {
 
 					@Override
 					public void onData(JSONObject json) {
-						final byte[] bytes = BleCore.getValue(json);
-						byte[] decryptedBytes;
-						if (_encryptionEnabled) {
-							decryptedBytes = BleBaseEncryption.decryptCtr(bytes, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, _encryptionKeys);
-						}
-						else {
-							decryptedBytes = bytes;
-						}
+						final byte[] decryptedBytes = BleCore.getValue(json);
 
 						getLogger().LOGv(TAG, BleUtils.bytesToString(decryptedBytes));
 
@@ -1416,19 +1429,8 @@ public class BleBase extends BleCore {
 
 					@Override
 					public void onData(JSONObject json) {
-						final byte[] bytes = BleCore.getValue(json);
-						byte[] decryptedBytes;
-						if (_encryptionEnabled) {
-							decryptedBytes = BleBaseEncryption.decryptCtr(bytes, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, _encryptionKeys);
-						}
-						else {
-							decryptedBytes = bytes;
-						}
-						if (decryptedBytes == null) {
-							getLogger().LOGw(TAG, "Unable to decrypt");
-							callback.onError(BleErrors.ENCRYPTION_ERROR);
-							return;
-						}
+						final byte[] decryptedBytes = BleCore.getValue(json);
+
 						getLogger().LOGd(TAG, BleUtils.bytesToString(decryptedBytes));
 						StateMsg state = new StateMsg(decryptedBytes);
 						getLogger().LOGd(TAG, "received state notification: %s", state.toString());
