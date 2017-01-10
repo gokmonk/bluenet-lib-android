@@ -729,13 +729,13 @@ public class BleCore extends Logging {
 
 
 		if (!isInitialized()) {
-			getLogger().LOGd(TAG, "startEndlessScan ... error: not initialized");
+			getLogger().LOGe(TAG, "startEndlessScan ... error: not initialized");
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return false;
 		}
 
 		if (isScanning()) {
-			getLogger().LOGd(TAG, "startEndlessScan ... error: already scanning");
+			getLogger().LOGe(TAG, "startEndlessScan ... error: already scanning");
 			callback.onError(BleErrors.ERROR_ALREADY_SCANNING);
 			return false;
 		}
