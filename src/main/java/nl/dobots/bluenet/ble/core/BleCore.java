@@ -1448,7 +1448,9 @@ public class BleCore extends Logging {
 
 				// [03.01.17] do not call gatt.close() here, it seems to lead to more gatt error 133
 				//   and BluetoothGatt calls close by itself
-//				gatt.close();
+				// [09.01.17] This seems to lead to staying connected.
+				//   We have to figure out which errors automatically disconnect and which don't.
+				gatt.close();
 				connection.setConnectionState(ConnectionState.DISCONNECTED);
 
 				if (_connectionCallback != null) {
