@@ -2100,50 +2100,57 @@ public class BleExt extends Logging {
 		_bleBase.write(_targetAddress, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_RECOVERY_UUID, code, BleBaseEncryption.ACCESS_LEVEL_ENCRYPTION_DISABLED, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
-				getLogger().LOGd(TAG, "Read recovery characteristic");
-				_bleBase.read(_targetAddress, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_RECOVERY_UUID, false, new IDataCallback() {
+				// We have to delay the read a bit until the result is written to the characteristic
+				// TODO: use notifications instead of a read
+				getHandler().postDelayed(new Runnable() {
 					@Override
-					public void onData(JSONObject json) {
+					public void run() {
+						getLogger().LOGd(TAG, "Read recovery characteristic");
+						_bleBase.read(_targetAddress, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_RECOVERY_UUID, false, new IDataCallback() {
+							@Override
+							public void onData(JSONObject json) {
 
-						// Verify that the crownstone accepted the recover command
-						byte[] data = BleCore.getValue(json);
-						getLogger().LOGd(TAG, "Read recover data: " + BleUtils.bytesToString(data));
-//						if (data == null || data.length != 1) {
-						if (data == null || data.length < 1) {
-							callback.onError(BleErrors.ERROR_RETURN_VALUE_PARSING);
-							return;
-						}
-						switch (BleUtils.toUint8(data[0])) {
-							case 1: {
-								// Success!
-								disconnectAndClose(true, new IStatusCallback() {
-									@Override
-									public void onSuccess() {
-										callback.onSuccess();
+								// Verify that the crownstone accepted the recover command
+								byte[] data = BleCore.getValue(json);
+								getLogger().LOGd(TAG, "Read recover data: " + BleUtils.bytesToString(data));
+								//						if (data == null || data.length != 1) {
+								if (data == null || data.length < 1) {
+									callback.onError(BleErrors.ERROR_RETURN_VALUE_PARSING);
+									return;
+								}
+								switch (BleUtils.toUint8(data[0])) {
+									case 1: {
+										// Success!
+										disconnectAndClose(true, new IStatusCallback() {
+											@Override
+											public void onSuccess() {
+												callback.onSuccess();
+											}
+
+											@Override
+											public void onError(int error) {
+												callback.onSuccess();
+											}
+										});
+										break;
 									}
-
-									@Override
-									public void onError(int error) {
-										callback.onSuccess();
+									case 2: {
+										callback.onError(BleErrors.ERROR_RECOVER_MODE_DISABLED);
+										break;
 									}
-								});
-								break;
+									default: {
+										callback.onError(BleErrors.ERROR_NOT_IN_RECOVERY_MODE);
+									}
+								}
 							}
-							case 2: {
-								callback.onError(BleErrors.ERROR_RECOVER_MODE_DISABLED);
-								break;
-							}
-							default: {
-								callback.onError(BleErrors.ERROR_NOT_IN_RECOVERY_MODE);
-							}
-						}
-					}
 
-					@Override
-					public void onError(int error) {
-						callback.onError(error);
+							@Override
+							public void onError(int error) {
+								callback.onError(error);
+							}
+						});
 					}
-				});
+				}, 100);
 			}
 			@Override
 			public void onError(int error) {
