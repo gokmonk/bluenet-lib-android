@@ -86,6 +86,8 @@ public class BleCore extends Logging {
 	private boolean _initialized = false;
 	private boolean _receiverRegistered = false;
 
+	private boolean _resettingBle = false;
+
 	// enum to keep track of device connection state
 	private enum ConnectionState {
 		DISCONNECTED,
@@ -213,29 +215,36 @@ public class BleCore extends Logging {
 			if (intent.getAction().equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
 				switch (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
 					case BluetoothAdapter.STATE_OFF:
-						_connections = new HashMap<>();
+						if (_resettingBle) {
+							_bluetoothAdapter.enable();
+						} else {
+							_connections = new HashMap<>();
 //						_scanCallback = null;
-						_initialized = false;
-						_scanning = false;
+							_initialized = false;
+							_scanning = false;
 
-						// if bluetooth is turned off, call onError on the bt state callback
-						_btStateCallback.onError(BleErrors.ERROR_BLUETOOTH_TURNED_OFF);
+							// if bluetooth is turned off, call onError on the bt state callback
+							_btStateCallback.onError(BleErrors.ERROR_BLUETOOTH_TURNED_OFF);
+						}
 						break;
 					case BluetoothAdapter.STATE_ON:
-
-						_initialized = true;
-						if (Build.VERSION.SDK_INT >= 21) {
-							// create the ble scanner object used for API > 21
-							_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
-							_scanSettings = new ScanSettings.Builder()
-									.setScanMode(_scanMode)
-									.build();
-							_scanFilters = new ArrayList<>();
+						if (_resettingBle) {
+							_resettingBle = false;
+						} else {
+							_initialized = true;
+							if (Build.VERSION.SDK_INT >= 21) {
+								// create the ble scanner object used for API > 21
+								_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
+								_scanSettings = new ScanSettings.Builder()
+										.setScanMode(_scanMode)
+										.build();
+								_scanFilters = new ArrayList<>();
+							}
+							// inform the callback about the enabled bluetooth
+							_btStateCallback.onSuccess();
+							// bluetooth was successfully enabled, cancel the timeout
+							_timeoutHandler.removeCallbacksAndMessages(null);
 						}
-						// inform the callback about the enabled bluetooth
-						_btStateCallback.onSuccess();
-						// bluetooth was successfully enabled, cancel the timeout
-						_timeoutHandler.removeCallbacksAndMessages(null);
 						break;
 				}
 			}
@@ -392,6 +401,13 @@ public class BleCore extends Logging {
 		_scanCallback = null;
 		_characteristicsReadCallback = null;
 		_characteristicsWriteCallback = null;
+	}
+
+	public void resetBle() {
+		if (_bluetoothAdapter.isEnabled()) {
+			_resettingBle = true;
+			_bluetoothAdapter.disable();
+		}
 	}
 
 	public boolean isDeviceConnected(String address) {
