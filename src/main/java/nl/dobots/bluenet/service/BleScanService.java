@@ -2,6 +2,7 @@ package nl.dobots.bluenet.service;
 
 import android.app.Activity;
 import android.app.Service;
+import android.bluetooth.le.ScanCallback;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Binder;
@@ -12,6 +13,7 @@ import android.os.IBinder;
 import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.Locale;
 
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.extended.BleDeviceFilter;
@@ -28,7 +30,6 @@ import nl.dobots.bluenet.service.callbacks.IScanListCallback;
 import nl.dobots.bluenet.utils.BleLog;
 
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
-import static android.content.Intent.getIntent;
 
 /**
  * Defines a Ble Scan Service which provides the functionality to do interval scanning. This means
@@ -75,7 +76,7 @@ import static android.content.Intent.getIntent;
  */
 public class BleScanService extends Service {
 
-	private static final int LOG_LEVEL = Log.WARN;
+	private static final int LOG_LEVEL = Log.INFO;
 
 	private static final String TAG = BleScanService.class.getCanonicalName();
 
@@ -101,6 +102,8 @@ public class BleScanService extends Service {
 	 */
 	private static final int STOP_SCAN_NUM_RETRIES = 5;
 	private static final int STOP_SCAN_RETRY_DELAY = 100;
+	private static final int START_SCAN_NUM_RETRIES = 5;
+	private static final int START_SCAN_RETRY_DELAY = 100;
 
 	/**
 	 * Set auto start to true if the service should start scanning directly on start.
@@ -187,6 +190,7 @@ public class BleScanService extends Service {
 	private boolean _scanning = false;
 
 	private int _stopScanRetryNum = 0;
+	private int _startScanRetryNum = 0;
 
 	private BleLog _logger;
 
@@ -216,6 +220,7 @@ public class BleScanService extends Service {
 
 	@Override
 	public IBinder onBind(Intent intent) {
+		getLogger().LOGi(TAG, "onBind");
 		parseParameters(intent);
 		return _binder;
 	}
@@ -283,7 +288,7 @@ public class BleScanService extends Service {
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
 
-		getLogger().LOGd(TAG, "onStartcommand");
+		getLogger().LOGi(TAG, "onStartcommand");
 
 		// get the parameters from the intent
 		parseParameters(intent);
@@ -301,7 +306,7 @@ public class BleScanService extends Service {
 	@Override
 	public void onDestroy() {
 		super.onDestroy();
-		getLogger().LOGd(TAG, "onDestroy");
+		getLogger().LOGi(TAG, "onDestroy");
 		if (_running) {
 			_ble.stopScan(null); // don' t care if it worked or not, so don' t need a callback
 		}
@@ -323,7 +328,7 @@ public class BleScanService extends Service {
 		public void onSuccess() {
 			// will be called whenever bluetooth is enabled
 
-			getLogger().LOGd(TAG, "successfully initialized BLE");
+			getLogger().LOGi(TAG, "successfully initialized BLE");
 			_initialized = true;
 
 			// if scanning enabled, resume scanning
@@ -401,38 +406,45 @@ public class BleScanService extends Service {
 				@Override
 				public void onError(int error) {
 					_running = false;
-					getLogger().LOGe(TAG, "... scan interval error: " + error);
-					onEvent(EventListener.Event.BLUETOOTH_START_SCAN_ERROR);
+					getLogger().LOGe(TAG, "... scan interval start error: " + error);
+					boolean sendError = true;
 
 					if (error == BleErrors.ERROR_ALREADY_SCANNING) {
+						// TODO: quickly stop AND start, righ now it can take a long time to start again.
 						// Retry to stop scan
 						if (_stopScanRetryNum++ < STOP_SCAN_NUM_RETRIES) {
+							// Cancel the stopScanRunnable that was posted after the line onIntervalScanStart() below.
+							_intervalScanHandler.removeCallbacks(_stopScanRunnable);
 							_intervalScanHandler.postDelayed(_stopScanRunnable, STOP_SCAN_RETRY_DELAY);
+							sendError = false;
 						}
+					}
+					if (error == ScanCallback.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED) {
+						if (_startScanRetryNum++ < START_SCAN_NUM_RETRIES) {
+							getLogger().LOGd(TAG, "Retrying to start ...");
+							// Cancel the stopScanRunnable that was posted after the line onIntervalScanStart() below.
+							_intervalScanHandler.removeCallbacks(_stopScanRunnable);
+							_intervalScanHandler.postDelayed(_startScanRunnable, START_SCAN_RETRY_DELAY);
+							sendError = false;
+						}
+					}
+
+					if (sendError) {
+						onEvent(EventListener.Event.BLUETOOTH_START_SCAN_ERROR);
 					}
 				}
 			}))
-//			}, new IBleBeaconCallback() {
-//				@Override
-//				public void onBeaconScanned(BleDevice device) {
-//					for (ScanBeaconListener listener : _scanBeaconListeners) {
-//						listener.onBeaconScanned(device);
-//					}
-//				}
-//
-//				@Override
-//				public void onError(int error) {
-//
-//				}
-//			}))
 			{
 				getLogger().LOGd(TAG, "... scan interval started");
 				_scanning = true;
 				_stopScanRetryNum = 0;
+				_startScanRetryNum = 0;
+
 				onIntervalScanStart();
 				_intervalScanHandler.postDelayed(_stopScanRunnable, _scanInterval);
 			}
 			else {
+				getLogger().LOGe(TAG, "... scan interval start error");
 				_running = false;
 				onEvent(EventListener.Event.BLUETOOTH_START_SCAN_ERROR);
 			}
@@ -444,7 +456,7 @@ public class BleScanService extends Service {
 	 * @param device the scanned device
 	 */
 	private void notifyDeviceScanned(BleDevice device) {
-		getLogger().LOGv(TAG, String.format("scanned device: %s [%d] (%d)", device.getName(), device.getRssi(), device.getOccurrences()));
+		getLogger().LOGv(TAG, String.format(Locale.US, "scanned device: %s [%d] (%d)", device.getName(), device.getRssi(), device.getOccurrences()));
 
 		for (ScanDeviceListener listener : _scanDeviceListeners) {
 			listener.onDeviceScanned(device);
@@ -472,6 +484,7 @@ public class BleScanService extends Service {
 
 				@Override
 				public void onError(int error) {
+					getLogger().LOGe(TAG, "... scan interval pause error: " + error);
 					_intervalScanHandler.postDelayed(_startScanRunnable, _scanPause);
 					onEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
 				}
@@ -480,6 +493,7 @@ public class BleScanService extends Service {
 				_scanning = false;
 			}
 			else {
+				getLogger().LOGe(TAG, "... scan interval pause error");
 				onEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
 			}
 		}
