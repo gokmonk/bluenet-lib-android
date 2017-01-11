@@ -351,13 +351,14 @@ public class BleScanService extends Service {
 				case BleErrors.ERROR_BLUETOOTH_TURNED_OFF: {
 					getLogger().LOGe(TAG, "Bluetooth turned off!!");
 
+					// Make sure we don't have any pending start or stop scans.
+					_intervalScanHandler.removeCallbacksAndMessages(null);
+					onEvent(EventListener.Event.BLUETOOTH_TURNED_OFF);
+
 					// if bluetooth was turned off and scanning is enabled, issue a notification that present
 					// detection won't work without BLE ...
 					if (_running) {
-						onEvent(EventListener.Event.BLUETOOTH_TURNED_OFF);
 						_wasRunning = true;
-
-						_intervalScanHandler.removeCallbacksAndMessages(null);
 						_running = false;
 //						stopIntervalScan();
 					} else {
