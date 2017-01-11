@@ -58,8 +58,22 @@ public class BleErrors {
 	public static final int ENCRYPTION_ERROR = 400;
 
 	// BleExt
-
 	public static final int ERROR_WRONG_STATE = 500;
 	public static final int ERROR_JSON_PARSING = 501;
 
+
+	// BluetoothGatt errors (see https://android.googlesource.com/platform/external/bluetooth/bluedroid/+/master/stack/include/gatt_api.h)
+	// 8    GATT_CONN_TIMEOUT
+	//      [01.11.17] (Bart @ oneplus 3) When I get this error, it continuously fails.
+	// 133  GATT_ERROR
+	//      [01.11.17] This error seems rather common, retry usually helps.
+	// 257  ??
+	//      [01.11.17] (Bart @ oneplus 3) When I get this error, not long after i will get scan error 2
+	//                                  And scanning completely stops working.
+
+	// ScanCallback errors
+	// 1    SCAN_FAILED_ALREADY_STARTED
+	//      [01.11.17] (Bart @ nexus 4, CM) Scan stop failed, so retrying to stop helps here.
+	// 2    SCAN_FAILED_APPLICATION_REGISTRATION_FAILED
+	//      [01.11.17] (Bart @ oneplus 3) When i get this error, scanning completely fails. Retry may help to start scanning again, but no results come in anymore.
 }
