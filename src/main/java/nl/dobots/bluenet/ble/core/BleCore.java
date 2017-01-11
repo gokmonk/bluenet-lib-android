@@ -241,6 +241,15 @@ public class BleCore extends Logging {
 
 						_bluetoothReady = true;
 
+						if (Build.VERSION.SDK_INT >= 21) {
+							// create the ble scanner object used for API > 21
+							_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
+							_scanSettings = new ScanSettings.Builder()
+									.setScanMode(_scanMode)
+									.build();
+							_scanFilters = new ArrayList<>();
+						}
+
 						// if bluetooth state turns on because of a reset, then reset was completed
 						if (_resettingBle) {
 							_resettingBle = false;
