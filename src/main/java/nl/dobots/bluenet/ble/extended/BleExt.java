@@ -5,6 +5,7 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
+import android.support.annotation.Nullable;
 import android.util.Log;
 
 import org.json.JSONObject;
@@ -17,6 +18,7 @@ import java.util.HashMap;
 
 import nl.dobots.bluenet.ble.base.BleBase;
 import nl.dobots.bluenet.ble.base.BleBaseEncryption;
+import nl.dobots.bluenet.ble.extended.callbacks.EventListener;
 import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
@@ -86,7 +88,7 @@ public class BleExt extends Logging {
 	// only report guidestone devices
 	private BleDeviceFilter _scanFilter = BleDeviceFilter.all;
 
-//	private ArrayList<BleIbeaconFilter> _iBeaconFilter = new ArrayList<>();
+	//	private ArrayList<BleIbeaconFilter> _iBeaconFilter = new ArrayList<>();
 	private BleIbeaconRanging _iBeaconRanger = new BleIbeaconRanging();
 
 	// current connection state
@@ -251,24 +253,58 @@ public class BleExt extends Logging {
 	 * will be triggered. If the user denies enabling bluetooth, then onError will be called after
 	 * a timeout expires
 	 *
-	 * @param context  the context used to enable bluetooth, this can be a service or an activity
-	 * @param callback callback, used to report back if bluetooth is enabled / disabled
+	 * @param context       the context used to enable bluetooth, this can be a service or an activity
+	 * @param callback      callback, used to report back success / error of the initialization
+	 * @param eventCallback event callback to inform changes like bluetooth on / off, location services
+	 *                      on / off
 	 */
-	public void init(Context context, final IStatusCallback callback) {
-		// wrap the callback to update the connection state
+	public void init(Context context, final IStatusCallback callback, @Nullable final EventListener eventCallback) {
 		_bleBase.init(context, new IStatusCallback() {
-			@Override
-			public void onSuccess() {
-				_connectionState = BleDeviceConnectionState.initialized;
-				callback.onSuccess();
-			}
+					@Override
+					public void onSuccess() {
+						_connectionState = BleDeviceConnectionState.initialized;
+						callback.onSuccess();
+					}
 
-			@Override
-			public void onError(int error) {
-				_connectionState = BleDeviceConnectionState.uninitialized;
-				callback.onError(error);
-			}
-		});
+					@Override
+					public void onError(int error) {
+						_connectionState = BleDeviceConnectionState.uninitialized;
+						callback.onError(error);
+					}
+				}, new IDataCallback() {
+					@Override
+					public void onData(JSONObject json) {
+						if (eventCallback == null) return;
+
+						String state = BleCore.getStatus(json);
+						if (state != null) {
+							switch (state) {
+								case "BLUETOOTH_ON": {
+									eventCallback.onEvent(EventListener.Event.BLUETOOTH_TURNED_ON);
+									break;
+								}
+								case "BLUETOOTH_OFF": {
+									eventCallback.onEvent(EventListener.Event.BLUETOOTH_TURNED_OFF);
+									break;
+								}
+								case "LOCATION_SERVICES_ON": {
+									eventCallback.onEvent(EventListener.Event.LOCATION_SERVICES_TURNED_ON);
+									break;
+								}
+								case "LOCATION_SERVICES_OFF": {
+									eventCallback.onEvent(EventListener.Event.LOCATION_SERVICES_TURNED_OFF);
+									break;
+								}
+							}
+						}
+					}
+
+					@Override
+					public void onError(int error) {
+
+					}
+				}
+		);
 	}
 
 	/**
@@ -440,7 +476,6 @@ public class BleExt extends Logging {
 						// return any device that was detected
 						break;
 				}
-
 
 
 				// Update the device list, this triggers recalculation of the average RSSI (and
@@ -687,6 +722,7 @@ public class BleExt extends Logging {
 	 * Note: if you get wrong services and characteristics returned, try to clear the cache by calling
 	 * close with parameter clearCache set to true. this makes sure that next discover will really
 	 * read the services and characteristics from the device and not the cache
+	 *
 	 * @param callback the callback used to report discovered services and characteristics
 	 */
 	public void discoverServices(final IDiscoveryCallback callback) {
@@ -698,10 +734,11 @@ public class BleExt extends Logging {
 	 * onDiscovery function will be called with service UUID and characteristic UUID for each
 	 * discovered characteristic. Once the discovery completes, the onSuccess is called or the onError
 	 * if an error occurs
-	 *
+	 * <p>
 	 * Note: if you get wrong services and characteristics returned, try to clear the cache by calling
 	 * close with parameter clearCache set to true. this makes sure that next discover will really
 	 * read the services and characteristics from the device and not the cache
+	 *
 	 * @param callback the callback used to report discovered services and characteristics
 	 */
 	public void discoverServices(final IDiscoveryCallback callback, final boolean readSessionNonce) {
@@ -730,8 +767,7 @@ public class BleExt extends Logging {
 							callback.onError(error);
 						}
 					});
-				}
-				else {
+				} else {
 					callback.onSuccess();
 				}
 			}
@@ -837,9 +873,10 @@ public class BleExt extends Logging {
 	 * Connect to the given device, once connection is established, discover the available
 	 * services and characteristics. The connection will be kept open. Need to disconnect and
 	 * close manually afterwards.
-	 * @param address the MAC address of the device for which we want to discover the services
-	 * @param callback the callback which will be notified about discovered services and
-	 *                 characteristics
+	 *
+	 * @param address          the MAC address of the device for which we want to discover the services
+	 * @param callback         the callback which will be notified about discovered services and
+	 *                         characteristics
 	 * @param readSessionNonce whether to read the session nonce after discovery
 	 */
 	public void connectAndDiscover(final String address, final IDiscoveryCallback callback, final boolean readSessionNonce) {
@@ -860,30 +897,30 @@ public class BleExt extends Logging {
 //				_handler.postDelayed(new Runnable() {
 //					@Override
 //					public void run() {
-						discoverServices(new IDiscoveryCallback() {
-							@Override
-							public void onDiscovery(String serviceUuid, String characteristicUuid) {
-								callback.onDiscovery(serviceUuid, characteristicUuid);
-							}
+				discoverServices(new IDiscoveryCallback() {
+					@Override
+					public void onDiscovery(String serviceUuid, String characteristicUuid) {
+						callback.onDiscovery(serviceUuid, characteristicUuid);
+					}
 
-							@Override
-							public void onSuccess() {
-								callback.onSuccess();
-							}
+					@Override
+					public void onSuccess() {
+						callback.onSuccess();
+					}
 
-							@Override
-							public void onError(int error) {
-								switch (error) {
-									case BleErrors.ERROR_NOT_CONNECTED:
+					@Override
+					public void onError(int error) {
+						switch (error) {
+							case BleErrors.ERROR_NOT_CONNECTED:
 										/* [18 nov 2016] When there was a successful connect, but a disconnect shortly after,
 										 * the callback.onError() was called twice. This avoids that behaviour.
 										 */
-										break;
-									default:
-										callback.onError(error);
-								}
-							}
-						}, readSessionNonce);
+								break;
+							default:
+								callback.onError(error);
+						}
+					}
+				}, readSessionNonce);
 //					}
 //				}, 500);
 //				discoverServices(callback);
@@ -1122,17 +1159,18 @@ public class BleExt extends Logging {
 	 * callbacks onSuccess function is called.
 	 * Note: the disconnect and close will be delayed, so consequent calls (within the timeout) to
 	 * connectAndExecute functions will keep the connection alive until the last call expires
-	 * @param address the MAC address of the device on which the function should be executed
-	 * @param function the function to be executed, i.e. the object providing the execute function
-	 *                 which should be executed
-	 * @param callback the callback which should be notified once the connectAndExecute function
-	 *                 completed (after closing the device, or if an error occurs)
+	 *
+	 * @param address          the MAC address of the device on which the function should be executed
+	 * @param function         the function to be executed, i.e. the object providing the execute function
+	 *                         which should be executed
+	 * @param callback         the callback which should be notified once the connectAndExecute function
+	 *                         completed (after closing the device, or if an error occurs)
 	 * @param readSessionNonce whether to read the session nonce after discovery
 	 */
 	public void connectAndExecute(final String address, final IExecuteCallback function, final IExecStatusCallback callback, final boolean readSessionNonce) {
 
-		final boolean resumeDelayedDisconnect[] = new boolean[] { clearDelayedDisconnect() };
-		final boolean executeSuccess[] = new boolean[] { false };
+		final boolean resumeDelayedDisconnect[] = new boolean[]{clearDelayedDisconnect()};
+		final boolean executeSuccess[] = new boolean[]{false};
 
 		// TODO: if function.execute was successful ignore the connect errors. Need a class variable for that.
 
@@ -1388,7 +1426,7 @@ public class BleExt extends Logging {
 				_bleExtState.getSwitchState(_targetAddress, new IIntegerCallback() {
 					@Override
 					public void onSuccess(int result) {
-						callback.onSuccess(BleUtils.isBitSet(result,7));
+						callback.onSuccess(BleUtils.isBitSet(result, 7));
 					}
 
 					@Override
@@ -1528,7 +1566,7 @@ public class BleExt extends Logging {
 	 *
 	 * @param address  the MAC address of the device
 	 * @param callback callback which will be informed about success or failure.
-	 *                    In case of success, the value is true when the relay was switched on, false for off.
+	 *                 In case of success, the value is true when the relay was switched on, false for off.
 	 */
 	public void togglePwm(final String address, final IBooleanCallback callback) {
 		getHandler().post(new Runnable() {
@@ -1599,7 +1637,7 @@ public class BleExt extends Logging {
 	 * with address otherwise
 	 *
 	 * @param callback callback which will be informed about success or failure.
-	 *                    In case of success, the value is true when the relay was switched on, false for off.
+	 *                 In case of success, the value is true when the relay was switched on, false for off.
 	 */
 	public void toggleRelay(final IBooleanCallback callback) {
 		readRelay(new IBooleanCallback() {
@@ -1644,9 +1682,10 @@ public class BleExt extends Logging {
 	 * Reads first the current relay value from the device, then switches the relay value accordingly.
 	 * <p>
 	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
+	 *
 	 * @param address  the MAC address of the device
 	 * @param callback callback which will be informed about success or failure.
-	 *                    In case of success, the value is true when the relay was switched on, false for off.
+	 *                 In case of success, the value is true when the relay was switched on, false for off.
 	 */
 	public void toggleRelay(final String address, final IBooleanCallback callback) {
 		getHandler().post(new Runnable() {
@@ -1982,9 +2021,10 @@ public class BleExt extends Logging {
 
 	/**
 	 * Function to make the device disconnect you.
-	 *
+	 * <p>
 	 * Note: needs to be already connected or an error is created! Use overloaded function
 	 * with address otherwise
+	 *
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writeDisconnectCommand(final IStatusCallback callback) {
@@ -2152,6 +2192,7 @@ public class BleExt extends Logging {
 					}
 				}, 100);
 			}
+
 			@Override
 			public void onError(int error) {
 				callback.onError(error);
@@ -2700,7 +2741,7 @@ public class BleExt extends Logging {
 	public void writeLed(final int led, boolean enable, final IStatusCallback callback) {
 		if (isConnected(callback)) {
 			getLogger().LOGd(TAG, "%s led %d", enable ? "Enable" : "Disable", led);
-			_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_SET_LED, 2, new byte[]{(byte) led, (byte)(enable ? 1 : 0) }), callback);
+			_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_SET_LED, 2, new byte[]{(byte) led, (byte) (enable ? 1 : 0)}), callback);
 		}
 	}
 
@@ -2734,9 +2775,9 @@ public class BleExt extends Logging {
 			getLogger().LOGd(TAG, "write keep alive with state %d and timeout %d", switchState, timeout);
 			ByteBuffer bb = ByteBuffer.allocate(4);
 			bb.order(ByteOrder.LITTLE_ENDIAN);
-			bb.put((byte)action);
-			bb.put((byte)switchState);
-			bb.putShort((short)timeout);
+			bb.put((byte) action);
+			bb.put((byte) switchState);
+			bb.putShort((short) timeout);
 			_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_KEEP_ALIVE_STATE, 4, bb.array()), callback);
 		}
 	}

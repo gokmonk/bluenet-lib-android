@@ -1,4 +1,4 @@
-package nl.dobots.bluenet.service.callbacks;
+package nl.dobots.bluenet.ble.extended.callbacks;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -20,13 +20,14 @@ package nl.dobots.bluenet.service.callbacks;
 public interface EventListener {
 
 	enum Event {
+		BLUETOOTH_TURNED_ON,
 		BLUETOOTH_TURNED_OFF,
 		BLUETOOTH_NOT_ENABLED,
-		BLUETOOTH_INITIALIZED,
 		BLUETOOTH_START_SCAN_ERROR,
 		BLUETOOTH_STOP_SCAN_ERROR,
 		BLE_PERMISSIONS_MISSING,
 		BLE_PERMISSIONS_GRANTED,
+		LOCATION_SERVICES_TURNED_ON,
 		LOCATION_SERVICES_TURNED_OFF,
 		LOCATION_SERVICES_NOT_ENABLED,
 	}

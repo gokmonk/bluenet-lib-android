@@ -25,7 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import nl.dobots.bluenet.ble.extended.structs.BleDevice;
-import nl.dobots.bluenet.service.callbacks.EventListener;
+import nl.dobots.bluenet.ble.extended.callbacks.EventListener;
 import nl.dobots.bluenet.service.callbacks.IntervalScanListener;
 import nl.dobots.bluenet.service.callbacks.ScanDeviceListener;
 
@@ -381,7 +381,7 @@ public class SensorLogger extends BroadcastReceiver implements ScanDeviceListene
 	public void onEvent(Event event) {
 		switch (event) {
 			case BLUETOOTH_TURNED_OFF:
-			case BLUETOOTH_INITIALIZED:
+			case BLUETOOTH_TURNED_ON:
 			case BLUETOOTH_NOT_ENABLED:
 				logLine(BleLogEvent.bluetoothState, event.toString());
 				break;

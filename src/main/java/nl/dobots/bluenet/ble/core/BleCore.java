@@ -175,7 +175,8 @@ public class BleCore extends Logging {
 
 	// callbacks used to notify events
 	private IDataCallback _scanCallback;
-	private IStatusCallback _btStateCallback;
+	private IStatusCallback _initializeCallback;
+	private IDataCallback _stateCallback;
 
 	// timeout handler to check for function timeouts, e.g. bluetooth enable, connect, reconnect, etc.
 	private Handler _timeoutHandler;
@@ -217,32 +218,41 @@ public class BleCore extends Logging {
 	private BroadcastReceiver _receiver = new BroadcastReceiver() {
 		@Override
 		public void onReceive(Context context, Intent intent) {
-			if (_btStateCallback == null) return;
+//			if (_initializeCallback == null) return;
 
 			if (intent.getAction().equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
 				bleDialogShowing = false;
 				switch (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
-					case BluetoothAdapter.STATE_OFF:
+					case BluetoothAdapter.STATE_OFF: {
+						_bluetoothReady = false;
+
+						JSONObject status = new JSONObject();
+						setStatus(status, "BLUETOOTH_OFF");
+						_stateCallback.onData(status);
+
 						// if bluetooth state turns off because of a reset, enable it again
 						_connections = new HashMap<>();
 						_scanning = false;
 //							_scanCallback = null;
 //						_initialized = false;
-						_bluetoothReady = false;
 
 						if (_resettingBle) {
 							_bluetoothAdapter.enable();
 						} else {
 							// if bluetooth is turned off, call onError on the bt state callback
-							_btStateCallback.onError(BleErrors.ERROR_BLUETOOTH_TURNED_OFF);
+//							_initializeCallback.onError(BleErrors.ERROR_BLUETOOTH_TURNED_OFF);
 						}
-						break;
-					case BluetoothAdapter.STATE_ON:
 
+						break;
+					}
+					case BluetoothAdapter.STATE_ON: {
 						_bluetoothReady = true;
 
+						JSONObject status = new JSONObject();
+						setStatus(status, "BLUETOOTH_ON");
+						_stateCallback.onData(status);
+
 						if (Build.VERSION.SDK_INT >= 21) {
-							// create the ble scanner object used for API > 21
 							_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
 							_scanSettings = new ScanSettings.Builder()
 									.setScanMode(_scanMode)
@@ -259,7 +269,10 @@ public class BleCore extends Logging {
 							if (_locationServicesReady) {
 //								_initialized = true;
 								// inform the callback about the enabled bluetooth
-								_btStateCallback.onSuccess();
+								if (_initializeCallback != null) {
+									_initializeCallback.onSuccess();
+									_initializeCallback = null;
+								}
 							} else {
 								// otherwise, request to enable location services
 								checkLocationServices();
@@ -267,7 +280,9 @@ public class BleCore extends Logging {
 						}
 						// bluetooth was successfully enabled, cancel the timeout
 						_timeoutHandler.removeCallbacksAndMessages(null);
+
 						break;
+					}
 				}
 			} else if (intent.getAction().equals(LocationManager.PROVIDERS_CHANGED_ACTION)) {
 
@@ -279,19 +294,30 @@ public class BleCore extends Logging {
 						// if bluetooth is ready, notify success
 						if (_bluetoothReady) {
 //							_initialized = true;
-							_btStateCallback.onSuccess();
+							if (_initializeCallback != null) {
+								_initializeCallback.onSuccess();
+								_initializeCallback = null;
+							}
 						} else {
 							// otherwise, request to enable bluetooth
 							checkBluetooth();
 						}
 					}
 					_locationServicesReady = true;
+
+					JSONObject status = new JSONObject();
+					setStatus(status, "LOCATION_SERVICES_ON");
+					_stateCallback.onData(status);
 				} else {
 //					_initialized = false;
 					if (_locationServicesReady) {
-						_btStateCallback.onError(BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF);
+//						_initializeCallback.onError(BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF);
 					}
 					_locationServicesReady = false;
+
+					JSONObject status = new JSONObject();
+					setStatus(status, "LOCATION_SERVICES_OFF");
+					_stateCallback.onData(status);
 				}
 			}
 		}
@@ -329,8 +355,8 @@ public class BleCore extends Logging {
 		switch (requestCode) {
 			case PERMISSIONS_REQUEST_LOCATION: {
 				if (grantResults.length > 0 &&	grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-					init(_context, callback);
-//					callback.onSuccess();
+					init(_context, _initializeCallback, _stateCallback);
+					callback.onSuccess();
 				} else {
 					callback.onError(BleErrors.ERROR_BLE_PERMISSION_MISSING);
 				}
@@ -367,8 +393,11 @@ public class BleCore extends Logging {
 	 * @param callback callback, used to report back if bluetooth is enabled / disabled
 	 */
 	@SuppressLint("NewApi")
-	public void init(Context context, IStatusCallback callback) {
+	public void init(Context context, IStatusCallback callback, IDataCallback stateCallback) {
 		_context = context;
+
+		_initializeCallback = callback;
+		_stateCallback = stateCallback;
 
 		getLogger().LOGd(TAG, "Initialize BLE hardware");
 		if (!context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE) ||
@@ -389,18 +418,8 @@ public class BleCore extends Logging {
 			}
 		}
 
-		_btStateCallback = callback;
-
 		BluetoothManager bluetoothManager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
 		_bluetoothAdapter = bluetoothManager.getAdapter();
-
-		if (Build.VERSION.SDK_INT >= 21) {
-			_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
-			_scanSettings = new ScanSettings.Builder()
-					.setScanMode(_scanMode)
-					.build();
-			_scanFilters = new ArrayList<>();
-		}
 
 		if (!_receiverRegistered) {
 			_context.registerReceiver(_receiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
@@ -419,7 +438,8 @@ public class BleCore extends Logging {
 		// initialize is done if both bluetooth and location services are ready
 		if (_bluetoothReady && _locationServicesReady) {
 //			_initialized = true;
-			callback.onSuccess();
+			_initializeCallback.onSuccess();
+			_initializeCallback = null;
 		}
 
 	}
@@ -443,8 +463,8 @@ public class BleCore extends Logging {
 				public void run() {
 					if (!isLocationServicesEnabled()) {
 //						_initialized = false;
-						if (_btStateCallback != null) {
-							_btStateCallback.onError(BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF);
+						if (_initializeCallback != null) {
+							_initializeCallback.onError(BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF);
 						}
 					}
 				}
@@ -473,14 +493,23 @@ public class BleCore extends Logging {
 					if (!_bluetoothAdapter.isEnabled()) {
 						bleDialogShowing = false;
 //						_initialized = false;
-						if (_btStateCallback != null) {
-							_btStateCallback.onError(BleErrors.ERROR_BLUETOOTH_NOT_ENABLED);
+						if (_initializeCallback != null) {
+							_initializeCallback.onError(BleErrors.ERROR_BLUETOOTH_NOT_ENABLED);
 						}
 					}
 				}
 			}, BLUETOOTH_ENABLE_TIMEOUT);
 		} else {
 			getLogger().LOGd(TAG, "Bluetooth already enabled");
+
+			if (Build.VERSION.SDK_INT >= 21) {
+				_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
+				_scanSettings = new ScanSettings.Builder()
+						.setScanMode(_scanMode)
+						.build();
+				_scanFilters = new ArrayList<>();
+			}
+
 //			_initialized = true;
 //			callback.onSuccess();
 			_bluetoothReady = true;
@@ -512,7 +541,7 @@ public class BleCore extends Logging {
 //		_initialized = false;
 		_connectionCallback = null;
 		_discoveryCallback = null;
-		_btStateCallback = null;
+		_initializeCallback = null;
 		_scanCallback = null;
 		_characteristicsReadCallback = null;
 		_characteristicsWriteCallback = null;
@@ -667,8 +696,12 @@ public class BleCore extends Logging {
 	}
 
 	private boolean isInitialized() {
-		if (_bluetoothReady && _locationServicesReady) {
-			return _bluetoothAdapter.isEnabled();
+		return _bluetoothReady && _locationServicesReady;
+	}
+
+	public boolean isReady() {
+		if (isInitialized()) {
+			return _bluetoothAdapter.isEnabled() && isLocationServicesEnabled();
 		} else {
 			return false;
 		}
@@ -856,13 +889,27 @@ public class BleCore extends Logging {
 
 	public synchronized boolean startEndlessScan(String[] uuids, IDataCallback callback) {
 
-		getLogger().LOGd(TAG, "startEndlessScan ...");
+		getLogger().LOGv(TAG, "startEndlessScan ...");
 
 
 		if (!isInitialized()) {
 			getLogger().LOGe(TAG, "startEndlessScan ... error: not initialized");
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return false;
+		}
+
+		if (!_bluetoothAdapter.isEnabled()) {
+			getLogger().LOGe(TAG, "startEndlessScan ... error: ble disabled");
+			callback.onError(BleErrors.ERROR_BLUETOOTH_NOT_ENABLED);
+			return false;
+		}
+
+		if (Build.VERSION.SDK_INT >= 23) {
+			if (!isLocationServicesEnabled()) {
+				getLogger().LOGe(TAG, "startEndlessScan ... error: location services disabled");
+				callback.onError(BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF);
+				return false;
+			}
 		}
 
 		if (isScanning()) {
@@ -890,10 +937,10 @@ public class BleCore extends Logging {
 					_scanFilters.add(filter);
 				}
 			}
-			getLogger().LOGd(TAG, "BluetoothLeScanner.startScan");
+			getLogger().LOGv(TAG, "BluetoothLeScanner.startScan");
 			_leScanner.startScan(_scanFilters, _scanSettings, _coreScanCallback);
 		} else {
-			getLogger().LOGd(TAG, "BluetoothAdapter.startLeScan");
+			getLogger().LOGv(TAG, "BluetoothAdapter.startLeScan");
 			if (uuids.length == 0) {
 				_scanning = _bluetoothAdapter.startLeScan(_coreLeScanCallback);
 			} else {
@@ -902,13 +949,13 @@ public class BleCore extends Logging {
 			}
 
 			if (!_scanning) {
-				getLogger().LOGd(TAG, "startEndlessScan ... error: failed to start LeScan");
+				getLogger().LOGe(TAG, "startEndlessScan ... error: failed to start LeScan");
 				callback.onError(BleErrors.ERROR_SCAN_FAILED);
 				return false;
 			}
 		}
 
-		getLogger().LOGd(TAG, "startEndlessScan ... done");
+		getLogger().LOGv(TAG, "startEndlessScan ... done");
 		return true;
 	}
 
@@ -943,10 +990,15 @@ public class BleCore extends Logging {
 
 	public synchronized boolean stopEndlessScan(IStatusCallback callback) {
 
-		getLogger().LOGd(TAG, "stopEndlessScan ...");
+		getLogger().LOGv(TAG, "stopEndlessScan ...");
 
 		if (!isInitialized()) {
 			if (callback != null) callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
+			return false;
+		}
+
+		if (!_bluetoothAdapter.isEnabled()) {
+			if (callback != null) callback.onError(BleErrors.ERROR_BLUETOOTH_NOT_ENABLED);
 			return false;
 		}
 
@@ -965,7 +1017,7 @@ public class BleCore extends Logging {
 
 		if (callback != null) callback.onSuccess();
 
-		getLogger().LOGd(TAG, "stopEndlessScan ... done");
+		getLogger().LOGv(TAG, "stopEndlessScan ... done");
 		return true;
 	}
 

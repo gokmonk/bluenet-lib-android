@@ -22,7 +22,7 @@ import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.extended.BleExt;
 import nl.dobots.bluenet.ble.extended.structs.BleDevice;
 import nl.dobots.bluenet.ble.extended.structs.BleDeviceMap;
-import nl.dobots.bluenet.service.callbacks.EventListener;
+import nl.dobots.bluenet.ble.extended.callbacks.EventListener;
 import nl.dobots.bluenet.service.callbacks.IntervalScanListener;
 import nl.dobots.bluenet.service.callbacks.ScanBeaconListener;
 import nl.dobots.bluenet.service.callbacks.ScanDeviceListener;
@@ -254,8 +254,121 @@ public class BleScanService extends Service {
 	}
 
 	private void initBluetooth() {
-		_ble.init(this, _btStateCallback);
+		_ble.init(this, new IStatusCallback() {
+			@Override
+			public void onSuccess() {
+				getLogger().LOGi(TAG, "successfully initialized BLE");
+				_initialized = true;
+
+				// if scanning enabled, resume scanning
+				if (_running || _wasRunning) {
+					_running = true;
+					_intervalScanHandler.removeCallbacksAndMessages(null);
+					_intervalScanHandler.postDelayed(_startScanRunnable, 100);
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+				switch (error) {
+					case BleErrors.ERROR_BLE_PERMISSION_MISSING: {
+						onPermissionsMissing();
+						break;
+					}
+					case BleErrors.ERROR_BLUETOOTH_NOT_ENABLED: {
+						getLogger().LOGe(TAG, "Failed to enable bluetooth!!");
+						_running = false;
+						sendEvent(EventListener.Event.BLUETOOTH_NOT_ENABLED);
+						break;
+					}
+					default:
+						getLogger().LOGe(TAG, "Init Error: " + error);
+				}
+				_initialized = false;
+			}
+		}, _btStateCallback);
 	}
+
+	/**
+	 * Callback handling bluetooth connection state changes. If bluetooth is turned
+	 * off, an event BLUETOOTH_TURNED_OFF is sent to all EventListeners, if bluetooth is turned on
+	 * an event BLUETOOTH_TURNED_ON is sent to all EventListeners.
+	 * The service will also automatically pause scanning if bluetooth is turned off, and
+	 * resume scanning if bluetooth is turned on again (only if it was scanning before it was turned off)
+	 */
+	private EventListener _btStateCallback = new EventListener() {
+
+		@Override
+		public void onEvent(Event event) {
+			// will (also) be called whenever bluetooth is disabled
+
+			switch (event) {
+				case BLUETOOTH_TURNED_ON: {
+					getLogger().LOGd(TAG, "Bluetooth turned on");
+
+					if (_ble.getBleBase().isReady()) {
+						_initialized = true;
+
+						if (_running || _wasRunning) {
+							_running = true;
+							_intervalScanHandler.removeCallbacksAndMessages(null);
+							_intervalScanHandler.postDelayed(_startScanRunnable, 100);
+						}
+					}
+					break;
+				}
+				case BLUETOOTH_TURNED_OFF: {
+					getLogger().LOGe(TAG, "Bluetooth turned off!!");
+
+					_initialized = false;
+					_scanning = false;
+					_intervalScanHandler.removeCallbacksAndMessages(null);
+
+					// if bluetooth was turned off and scanning is enabled, issue a notification that present
+					// detection won't work without BLE ...
+					if (_running) {
+						_wasRunning = true;
+
+						_running = false;
+//						stopIntervalScan();
+					} else {
+						_wasRunning = false;
+					}
+					break;
+				}
+				case LOCATION_SERVICES_TURNED_ON: {
+					getLogger().LOGd(TAG, "Location Services turned on");
+
+					if (_ble.getBleBase().isReady()) {
+						_initialized = true;
+
+						if (_running || _wasRunning) {
+							_running = true;
+							_intervalScanHandler.removeCallbacksAndMessages(null);
+							_intervalScanHandler.postDelayed(_startScanRunnable, 100);
+						}
+					}
+					break;
+				}
+				case LOCATION_SERVICES_TURNED_OFF: {
+					getLogger().LOGe(TAG, "Location Services turned off!!");
+
+					_initialized = false;
+					_scanning = false;
+					_intervalScanHandler.removeCallbacksAndMessages(null);
+
+					if (_running) {
+						_wasRunning = true;
+						_running = false;
+					} else {
+						_wasRunning = false;
+					}
+					break;
+				}
+			}
+			sendEvent(event);
+		}
+	};
 
 	/**
 	 * Return the Ble Extended object used by this service to access lower level functions
@@ -319,85 +432,6 @@ public class BleScanService extends Service {
 	}
 
 	/**
-	 * Callback handling bluetooth connection state changes. If bluetooth is turned
-	 * off, an event BLUETOOTH_TURNED_OFF is sent to all EventListeners, if bluetooth is turned on
-	 * an event BLUETOOTH_INITIALIZED is sent to all EventListeners.
-	 * The service will also automatically pause scanning if bluetooth is turned off, and
-	 * resume scanning if bluetooth is turned on again (only if it was scanning before it was turned off)
-	 */
-	private IStatusCallback _btStateCallback = new IStatusCallback() {
-		@Override
-		public void onSuccess() {
-			// will be called whenever bluetooth is enabled
-
-			getLogger().LOGi(TAG, "successfully initialized BLE");
-			_initialized = true;
-
-			// if scanning enabled, resume scanning
-			if (_running || _wasRunning) {
-				_running = true;
-				_intervalScanHandler.removeCallbacksAndMessages(null);
-				_intervalScanHandler.postDelayed(_startScanRunnable, 100);
-			}
-
-			onEvent(EventListener.Event.BLUETOOTH_INITIALIZED);
-		}
-
-		@Override
-		public void onError(int error) {
-			// will (also) be called whenever bluetooth is disabled
-
-			switch (error) {
-				case BleErrors.ERROR_BLUETOOTH_TURNED_OFF: {
-					getLogger().LOGe(TAG, "Bluetooth turned off!!");
-
-					// Make sure we don't have any pending start or stop scans.
-					_intervalScanHandler.removeCallbacksAndMessages(null);
-					onEvent(EventListener.Event.BLUETOOTH_TURNED_OFF);
-
-					// if bluetooth was turned off and scanning is enabled, issue a notification that present
-					// detection won't work without BLE ...
-					if (_running) {
-						_wasRunning = true;
-						_running = false;
-//						stopIntervalScan();
-					} else {
-						_wasRunning = false;
-					}
-					break;
-				}
-				case BleErrors.ERROR_BLUETOOTH_NOT_ENABLED: {
-					getLogger().LOGe(TAG, "Failed to enable bluetooth!!");
-					_running = false;
-					onEvent(EventListener.Event.BLUETOOTH_NOT_ENABLED);
-					break;
-				}
-				case BleErrors.ERROR_BLE_PERMISSION_MISSING: {
-					onPermissionsMissing();
-					break;
-				}
-				case BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF: {
-					getLogger().LOGe(TAG, "Location Services turned off!!");
-
-					if (_running) {
-						onEvent(EventListener.Event.LOCATION_SERVICES_TURNED_OFF);
-						_wasRunning = true;
-
-						_intervalScanHandler.removeCallbacksAndMessages(null);
-						_running = false;
-					} else {
-						_wasRunning = false;
-					}
-					break;
-				}
-				default:
-					getLogger().LOGe(TAG, "Ble Error: " + error);
-			}
-			_initialized = false;
-		}
-	};
-
-	/**
 	 * The runnable executed when a scan interval starts. It calls startIntervalScan
 	 * on the library, and posts the stopScanRunnable, to stop the scan at the end of the scan
 	 * interval. If a device was detected, all ScanDeviceListeners will be informed with the
@@ -410,9 +444,14 @@ public class BleScanService extends Service {
 		public void run() {
 
 			// wait until service is resumed before starting the next interval
-			while (_paused) {}
+			while (_paused) { }
 
-			getLogger().LOGd(TAG, "starting scan interval ...");
+			if (isScanActive()) {
+				getLogger().LOGw(TAG, "already scanning ...");
+				return;
+			}
+
+			getLogger().LOGv(TAG, "starting scan interval ...");
 			if (_ble.startScan(false, new IBleDeviceCallback() {
 
 				@Override
@@ -447,12 +486,12 @@ public class BleScanService extends Service {
 					}
 
 					if (sendError) {
-						onEvent(EventListener.Event.BLUETOOTH_START_SCAN_ERROR);
+						sendEvent(EventListener.Event.BLUETOOTH_START_SCAN_ERROR);
 					}
 				}
 			}))
 			{
-				getLogger().LOGd(TAG, "... scan interval started");
+				getLogger().LOGv(TAG, "... scan interval started");
 				_scanning = true;
 				_stopScanRetryNum = 0;
 				_startScanRetryNum = 0;
@@ -460,11 +499,11 @@ public class BleScanService extends Service {
 				onIntervalScanStart();
 				_intervalScanHandler.postDelayed(_stopScanRunnable, _scanInterval);
 			}
-			else {
-				getLogger().LOGe(TAG, "... scan interval start error");
-				_running = false;
-				onEvent(EventListener.Event.BLUETOOTH_START_SCAN_ERROR);
-			}
+//			else {
+//				getLogger().LOGe(TAG, "... scan interval start error");
+//				_running = false;
+//				sendEvent(EventListener.Event.BLUETOOTH_START_SCAN_ERROR);
+//			}
 		}
 	};
 
@@ -489,7 +528,13 @@ public class BleScanService extends Service {
 	private Runnable _stopScanRunnable = new Runnable() {
 		@Override
 		public void run() {
-			getLogger().LOGd(TAG, "pausing scan interval ...");
+
+			if (!isScanActive()) {
+				getLogger().LOGw(TAG, "already stopped ...");
+				return;
+			}
+
+			getLogger().LOGv(TAG, "pausing scan interval ...");
 			if (_ble.stopScan(new IStatusCallback() {
 				@Override
 				public void onSuccess() {
@@ -506,15 +551,15 @@ public class BleScanService extends Service {
 				public void onError(int error) {
 					getLogger().LOGe(TAG, "... scan interval pause error: " + error);
 					_intervalScanHandler.postDelayed(_startScanRunnable, _scanPause);
-					onEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
+					sendEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
 				}
 			})) {
-				getLogger().LOGd(TAG, "... scan interval paused");
+				getLogger().LOGv(TAG, "... scan interval paused");
 				_scanning = false;
 			}
 			else {
 				getLogger().LOGe(TAG, "... scan interval pause error");
-				onEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
+				sendEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
 			}
 		}
 	};
@@ -579,6 +624,7 @@ public class BleScanService extends Service {
 			getLogger().LOGi(TAG, "Stop scan");
 			_intervalScanHandler.removeCallbacksAndMessages(null);
 			_running = false;
+			_scanning = false;
 			setScanningState(false);
 			_ble.stopScan(new IStatusCallback() {
 				@Override
@@ -589,7 +635,7 @@ public class BleScanService extends Service {
 				@Override
 				public void onError(int error) {
 					getLogger().LOGe(TAG, "Failed to stop scan: " + error);
-					onEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
+					sendEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
 				}
 			});
 		}
@@ -743,7 +789,7 @@ public class BleScanService extends Service {
 	 * Helper function to notify EventListeners
 	 * @param event
 	 */
-	private void onEvent(EventListener.Event event) {
+	private void sendEvent(EventListener.Event event) {
 		for (EventListener listener : _eventListeners) {
 			listener.onEvent(event);
 		}
@@ -842,7 +888,7 @@ public class BleScanService extends Service {
 	}
 
 	public void onPermissionGranted() {
-		onEvent(EventListener.Event.BLE_PERMISSIONS_GRANTED);
+		sendEvent(EventListener.Event.BLE_PERMISSIONS_GRANTED);
 	}
 
 	int permissionRetryCount = 0;
@@ -852,7 +898,7 @@ public class BleScanService extends Service {
 		if (++permissionRetryCount < 3) {
 			onPermissionsMissing();
 		} else {
-			onEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
+			sendEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
 		}
 	}
 
