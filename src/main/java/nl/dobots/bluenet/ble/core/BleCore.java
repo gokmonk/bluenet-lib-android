@@ -256,13 +256,13 @@ public class BleCore extends Logging {
 //							_initialized = true;
 						} else {
 							// if location services are ready, notify success
-							if (_locationServicesReady) {
-//								_initialized = true;
-								// inform the callback about the enabled bluetooth
-								_btStateCallback.onSuccess();
-							} else {
+							if (!_locationServicesReady) {
 								// otherwise, request to enable location services
 								checkLocationServices();
+							}
+
+							if (isInitialized()) {
+								_btStateCallback.onSuccess();
 							}
 						}
 						// bluetooth was successfully enabled, cancel the timeout
@@ -277,12 +277,13 @@ public class BleCore extends Logging {
 				if (isLocationServicesEnabled()) {
 					if (!_locationServicesReady) {
 						// if bluetooth is ready, notify success
-						if (_bluetoothReady) {
-//							_initialized = true;
-							_btStateCallback.onSuccess();
-						} else {
+						if (!_bluetoothReady) {
 							// otherwise, request to enable bluetooth
 							checkBluetooth();
+						}
+
+						if (isInitialized()) {
+							_btStateCallback.onSuccess();
 						}
 					}
 					_locationServicesReady = true;
@@ -568,7 +569,10 @@ public class BleCore extends Logging {
 					connection.setConnectionState(ConnectionState.DISCONNECTED);
 					BluetoothGatt gatt = connection.getGatt();
 					if (gatt != null) {
-						connection.getGatt().close();
+						// [17.01.17] call gatt.disconnect(), just in case the connection stays open
+						//   even after calling gatt.close()
+						gatt.disconnect();
+						gatt.close();
 					} else {
 						getLogger().LOGe(TAG, "gatt == null");
 					}
@@ -579,6 +583,8 @@ public class BleCore extends Logging {
 					} else {
 						getLogger().LOGe(TAG, "_connectionCallback == null");
 					}
+				} else {
+					getLogger().LOGe(TAG, "connection == null");
 				}
 			}
 		};
@@ -1581,6 +1587,9 @@ public class BleCore extends Logging {
 				//   and BluetoothGatt calls close by itself
 				// [09.01.17] This seems to lead to staying connected.
 				//   We have to figure out which errors automatically disconnect and which don't.
+				// [17.01.17] call gatt.disconnect(), just in case the connection stays open
+				//   even after calling gatt.close()
+				gatt.disconnect();
 				gatt.close();
 				connection.setConnectionState(ConnectionState.DISCONNECTED);
 
