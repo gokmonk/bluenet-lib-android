@@ -534,6 +534,15 @@ public class BleDevice {
 		_numSimilarCrownstoneIds = old._numSimilarCrownstoneIds;
 		_rssiHistory             = old._rssiHistory;
 
+		// If we didn't get any service data, we probably received an advertisement with no scan response
+		// In this case, use the old service data
+		if (_serviceData == null) {
+			_serviceData    = old._serviceData;
+			_type           = old._type;
+			_crownstoneMode = old._crownstoneMode;
+			_name           = old._name;
+		}
+
 		updateRssiValue(System.currentTimeMillis(), getRssi());
 	}
 

@@ -107,6 +107,9 @@ public class BleIbeaconRanging {
 		return _iBeaconFilter;
 	}
 
+	public BleDeviceMap getDeviceMap() {
+		return _devices;
+	}
 
 //	public boolean subscribe(IBleBeaconCallback callback) {
 //		return _scanCallbacks.add(callback);
@@ -138,22 +141,22 @@ public class BleIbeaconRanging {
 		return _inRegion;
 	}
 
-
-	public synchronized boolean onScannedDevice(BleDevice device, @Nullable IBleBeaconCallback callback) {
-
-		boolean iBeaconMatch = false;
+	public boolean isMatch(BleDevice device) {
 		if (_iBeaconFilter.isEmpty() || _paused) return false;
-//		if (callback == null && _scanCallbacks.isEmpty()) return false;
-		if (callback == null && _rangingListeners.isEmpty()) return false;
 		if (device.isIBeacon()) {
 			for (BleIbeaconFilter iBeaconFilter : _iBeaconFilter) {
 				if (iBeaconFilter.matches(device.getProximityUuid(), device.getMajor(), device.getMinor())) {
-					iBeaconMatch = true;
-					break;
+					return true;
 				}
 			}
 //		} else { Log.d(TAG, "is not ibeacon"); }
 		}
+		return false;
+	}
+
+
+	public synchronized boolean onScannedDevice(BleDevice device, @Nullable IBleBeaconCallback callback) {
+		boolean iBeaconMatch = isMatch(device);
 		if (iBeaconMatch) {
 			getLogger().LOGv(TAG, "matching ibeacon filter: " + device.getAddress() + " (" + device.getName() + ")");
 			device = updateDevice(device);

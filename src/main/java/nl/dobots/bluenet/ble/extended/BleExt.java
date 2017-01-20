@@ -145,6 +145,9 @@ public class BleExt extends Logging {
 	 * @param filter the filter to be used
 	 */
 	public void setScanFilter(BleDeviceFilter filter) {
+		if (_scanFilter != filter) {
+			_devices.clear();
+		}
 		_scanFilter = filter;
 	}
 
@@ -417,28 +420,35 @@ public class BleExt extends Logging {
 //					}
 //				}
 
-				switch (_scanFilter) {
-					case iBeacon:
-						if (!device.isIBeacon()) return;
-						break;
-					case anyStone:
-						if (!device.isStone()) return;
-						break;
-					case crownstonePlug:
-						if (!device.isCrownstonePlug()) return;
-						break;
-					case crownstoneBuiltin:
-						if (!device.isCrownstoneBuiltin()) return;
-						break;
-					case guidestone:
-						if (!device.isGuidestone()) return;
-						break;
-					case setupStone:
-						if (!device.isSetupMode()) return;
-						break;
-					case all:
-						// return any device that was detected
-						break;
+				// If we didn't get any service data, we probably received an advertisement with no scan response
+				// So if the device is already in the list, let's assume that it still passes the filter.
+				if (_devices.contains(device) && device.getServiceData() == null) {
+					// Just update rssi
+				}
+				else {
+					switch (_scanFilter) {
+						case iBeacon:
+							if (!device.isIBeacon()) return;
+							break;
+						case anyStone:
+							if (!device.isStone()) return;
+							break;
+						case crownstonePlug:
+							if (!device.isCrownstonePlug()) return;
+							break;
+						case crownstoneBuiltin:
+							if (!device.isCrownstoneBuiltin()) return;
+							break;
+						case guidestone:
+							if (!device.isGuidestone()) return;
+							break;
+						case setupStone:
+							if (!device.isSetupMode()) return;
+							break;
+						case all:
+							// return any device that was detected
+							break;
+					}
 				}
 
 
@@ -446,9 +456,10 @@ public class BleExt extends Logging {
 				// Update the device list, this triggers recalculation of the average RSSI (and
 				// distance estimation if it is a beacon).
 				// If there was an iBeacon match, it was already updated before.
-				if (!iBeaconMatch) {
-					device = updateDevice(device);
-				}
+				// [20-01-2017] Bart: since the ibeacon ranging has its own device map now, it should always update here.
+//				if (!iBeaconMatch) {
+				device = updateDevice(device);
+//				}
 
 				// report the updated device
 				if (callback != null) {
