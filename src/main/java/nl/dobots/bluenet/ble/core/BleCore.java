@@ -265,7 +265,7 @@ public class BleCore extends Logging {
 								_btStateCallback.onSuccess();
 							}
 						}
-						// bluetooth was successfully enabled, cancel the timeout
+						// bluetooth was successfully enabled, cancel any timeout
 						_timeoutHandler.removeCallbacksAndMessages(null);
 						break;
 				}
@@ -523,6 +523,16 @@ public class BleCore extends Logging {
 		if (_bluetoothAdapter.isEnabled()) {
 			_resettingBle = true;
 			_bluetoothAdapter.disable();
+			_timeoutHandler.postDelayed(new Runnable() {
+				@Override
+				public void run() {
+					if (!_bluetoothAdapter.isEnabled()) {
+						if (_btStateCallback != null) {
+							_btStateCallback.onError(BleErrors.ERROR_BLUETOOTH_NOT_ENABLED);
+						}
+					}
+				}
+			}, BLUETOOTH_ENABLE_TIMEOUT);
 		}
 	}
 
