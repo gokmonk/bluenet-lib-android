@@ -1,8 +1,25 @@
 package nl.dobots.bluenet.utils;
 
+import android.Manifest;
+import android.app.Activity;
+import android.content.pm.PackageManager;
+import android.os.Build;
+import android.os.Environment;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.concurrent.Semaphore;
+
+import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -23,9 +40,13 @@ import java.util.HashMap;
  */
 public class BleLog {
 
+	public static final String TAG = "BleLog";
+
 	private int _logLevel = Log.VERBOSE;
 
 	private static BleLog _instance;
+
+	private static FileLogger _fileLogger = null;
 
 	public BleLog(int logLevel) {
 		_logLevel = logLevel;
@@ -41,6 +62,16 @@ public class BleLog {
 		}
 		return _instance;
 	}
+
+	public static boolean addFileLogger(FileLogger logger) {
+		if (!logger.hasRequestedPermissions()) {
+			getInstance().LOGe(TAG, "file logger didn't request write permissions!!");
+			return false;
+		} else {
+			_fileLogger = logger;
+			return true;
+		}
+	};
 
 	private HashMap<String, Integer> _logLevels = new HashMap<>();
 
@@ -80,7 +111,13 @@ public class BleLog {
 
 	private void log(int level, String tag, String message) {
 		if (checkLogLevel(tag, level)) {
-			Log.println(level, tag, String.format("[%d] %s", getLineNumber(), message));
+
+			String line = String.format("[%d] %s", getLineNumber(), message);
+			Log.println(level, tag, line);
+
+			if (_fileLogger != null) {
+				_fileLogger.logToFile(level, tag, line);
+			}
 		}
 	}
 
@@ -129,5 +166,9 @@ public class BleLog {
 	public void LOGw(String tag, String fmt, Object ... args) {
 		log(Log.WARN, tag, String.format(fmt, args));
 	}
+
+	//***********************************************
+	//* LOG TO FILE
+	//***********************************************
 
 }
