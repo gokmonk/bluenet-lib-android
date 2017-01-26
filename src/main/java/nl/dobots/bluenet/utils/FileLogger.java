@@ -2,20 +2,26 @@ package nl.dobots.bluenet.utils;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
 
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 import java.util.concurrent.Semaphore;
 
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
@@ -63,22 +69,36 @@ public class FileLogger {
 
 	private static final long MIN_FREE_SPACE = 10 * 1024 * 1024; // 10 MB
 	private static final long MAX_LOG_FILE_SIZE = 500 * 1024 * 1024; // 500 MB
+	private static final int  MAX_LOG_DAYS = 3; // Only keep up logs of the last 3 days
+
+	private static final long CLEANUP_INTERVAL_MS = 60*1000; // Clean up every minute
 
 	// log level identifier used by android log in logcat, first two are not used
 	private static final char LOG_LEVELS_STR[] = { ' ', ' ', 'V', 'D', 'I', 'W', 'E' };
 
-	private static final SimpleDateFormat _logTimestampFormat = new SimpleDateFormat("yyyy-MM-dd' 'HH:mm:ss");
-	private static final SimpleDateFormat _fileNameTimestampFormat = new SimpleDateFormat("yyMMdd_HHmmss");
+	private static final SimpleDateFormat _logTimestampFormat = new SimpleDateFormat("yyyy-MM-dd' 'HH:mm:ss.SSS", Locale.ENGLISH);
+	private static final SimpleDateFormat _fileNameTimestampFormat = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ENGLISH);
+	private static final String _filenamePrefix = "log_";
+	private static final String _filenamePostfix = ".txt";
+
 
 	private boolean _hasWritePermissions;
 	private DataOutputStream _logFileDos;
 	private Date _logFileDate;
 	private File _logFile;
-	private String _logDir;
+	private File _logDir;
 	private boolean _enabled = true;
 
-	public FileLogger(String dir) {
-		_logDir = dir;
+	private Handler _handler;
+
+	public FileLogger(Context context) {
+		_logDir = context.getExternalFilesDir(null);
+		_hasWritePermissions = true;
+
+		HandlerThread handlerThread = new HandlerThread("FileLogger");
+		handlerThread.start();
+		_handler = new Handler(handlerThread.getLooper());
+		_handler.postDelayed(_cleanupRunnable, CLEANUP_INTERVAL_MS);
 	}
 
 	public boolean checkPermissions(Activity context) {
@@ -116,6 +136,14 @@ public class FileLogger {
 		return false;
 	}
 
+	public void enable(boolean enable) {
+		_enabled = enable;
+	}
+
+	public boolean isEnabled() {
+		return _enabled;
+	}
+
 
 	public void logToFile(int level, String tag, String line) {
 		if (_enabled && checkFile()) {
@@ -136,12 +164,12 @@ public class FileLogger {
 	private boolean createLogFile() {
 
 		_logFileDate = new Date();
-		String fileName = "log_" + _fileNameTimestampFormat.format(_logFileDate) + ".txt";
+		String fileName = _filenamePrefix + _fileNameTimestampFormat.format(_logFileDate) + _filenamePostfix;
 
-		File path = new File(Environment.getExternalStorageDirectory().getPath() + "/" + _logDir);
-		_logFile = new File(path, fileName);
+//		File path = new File(Environment.getExternalStorageDirectory().getPath() + "/" + _logDir);
+		_logFile = new File(_logDir, fileName);
 
-		path.mkdirs();
+//		path.mkdirs();
 		try {
 			_logFileDos = new DataOutputStream(new FileOutputStream(_logFile));
 		} catch (FileNotFoundException e) {
@@ -159,41 +187,113 @@ public class FileLogger {
 		try {
 			_semaphore.acquire();
 
+			boolean result = true;
+
 			if (_logFileDos == null) {
-				createLogFile();
+				result = createLogFile();
 			} else {
 				try {
 					if (_logFileDate.getDay() != new Date().getDay()) {
 						_logFileDos.close();
-						createLogFile();
+						result = createLogFile();
 					}
 
 					if (_logFile.length() > MAX_LOG_FILE_SIZE) {
 						_logFileDos.close();
-						createLogFile();
+						result = createLogFile();
 					}
 
 					if (_logFile.getFreeSpace() < MIN_FREE_SPACE) {
 						_logFileDos.close();
 						_enabled = false;
+						result = false;
 					}
 				} catch (IOException e) {
 					Log.e("BleLog", "Error closing logfile", e);
+					result = false;
 				}
 			}
 
 			_semaphore.release();
 
-			return true;
+			return result;
 
 		} catch (InterruptedException e) {
-			Log.e("BleLog", "Failed to aquire semaphore", e);
+			Log.e("BleLog", "Failed to acquire semaphore", e);
 
 			return false;
 		}
 
 	}
 
+	private Runnable _cleanupRunnable = new Runnable() {
+		@Override
+		public void run() {
+			cleanupFiles();
+			_handler.postDelayed(_cleanupRunnable, CLEANUP_INTERVAL_MS);
+		}
+	};
 
+	private File[] getLogFiles() {
+		return _logDir.listFiles(new FilenameFilter() {
+			@Override
+			public boolean accept(File dir, String filename) {
+				if (!filename.startsWith(_filenamePrefix) || !filename.endsWith(_filenamePostfix)) {
+					return false;
+				}
+				return true;
+			}
+		});
+	}
+
+	private boolean cleanupFiles() {
+//		File[] files = _logDir.listFiles(new FilenameFilter() {
+//			@Override
+//			public boolean accept(File dir, String filename) {
+//				if (!filename.startsWith(_filenamePrefix) || !filename.endsWith(_filenamePostfix)) {
+//					return false;
+//				}
+//				String timestampString = filename.substring(_filenamePrefix.length(), filename.length() - _filenamePostfix.length());
+//				try {
+//					Date currentDate = new Date();
+//					Date fileDate = _fileNameTimestampFormat.parse(timestampString);
+//					if ((currentDate.getTime() - fileDate.getTime()) > 24*3600*1000*MAX_LOG_DAYS) {
+//						return true;
+//					}
+//				} catch (java.text.ParseException e) {
+//					return false;
+//				}
+//				return false;
+//			}
+//		});
+
+		File[] files = getLogFiles();
+		long currentTime = new Date().getTime();
+		for (File file : files) {
+			if (currentTime - file.lastModified() > 24*3600*1000*MAX_LOG_DAYS) {
+				if (!file.delete()) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	public boolean clearLogFiles() {
+		try {
+			_logFileDos.close();
+		} catch (IOException e) {
+			Log.e("BleLog", "Error closing logfile", e);
+			return false;
+		}
+
+		File[] files = getLogFiles();
+		for (File file : files) {
+			if (!file.delete()) {
+				return false;
+			}
+		}
+		return true;
+	}
 
 }
