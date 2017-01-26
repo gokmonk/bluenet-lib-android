@@ -43,6 +43,10 @@ public class BleLog {
 	public static final String TAG = "BleLog";
 
 	private int _logLevel = Log.VERBOSE;
+	private int _fileLogLevel = _logLevel;
+
+	private HashMap<String, Integer> _logLevels = new HashMap<>();
+	private HashMap<String, Integer> _fileLogLevels = new HashMap<>();
 
 	private static BleLog _instance;
 
@@ -73,10 +77,13 @@ public class BleLog {
 		}
 	};
 
-	private HashMap<String, Integer> _logLevels = new HashMap<>();
-
 	public void setLogLevelPerTag(String tag, int logLevel) {
+		setLogLevelPerTag(tag, logLevel, logLevel);
+	}
+
+	public void setLogLevelPerTag(String tag, int logLevel, int fileLogLevel) {
 		_logLevels.put(tag, logLevel);
+		_fileLogLevels.put(tag, fileLogLevel);
 	}
 
 	public Integer getLogLevel(String tag) {
@@ -88,12 +95,21 @@ public class BleLog {
 	 * @param level the log level to be set
 	 */
 	public void setLogLevel(int level) {
-		_logLevel = level;
+		setLogLevel(level, level);
+	}
+
+	public void setLogLevel(int logLevel, int fileLogLevel) {
+		_logLevel = logLevel;
+		_fileLogLevel = fileLogLevel;
 	}
 
 	public int getLogLevel() {
 		return _logLevel;
 	}
+
+	public int getFileLogLevel() { return _fileLogLevel; }
+
+
 
 	private int getLineNumber() {
 		return Thread.currentThread().getStackTrace()[5].getLineNumber();
@@ -109,15 +125,23 @@ public class BleLog {
 		}
 	}
 
+	private boolean checkFileLogLevel(String tag, int checkLevel) {
+		Integer logLevel = _fileLogLevels.get(tag);
+		if (logLevel == null) {
+			return _fileLogLevel <= checkLevel;
+		} else {
+			return logLevel <= checkLevel;
+		}
+	}
+
 	private void log(int level, String tag, String message) {
 		if (checkLogLevel(tag, level)) {
-
 			String line = String.format("[%d] %s", getLineNumber(), message);
 			Log.println(level, tag, line);
-
-			if (_fileLogger != null) {
-				_fileLogger.logToFile(level, tag, line);
-			}
+		}
+		if (_fileLogger != null && _fileLogger.isEnabled() && checkFileLogLevel(tag, level)) {
+			String line = String.format("[%d] %s", getLineNumber(), message);
+			_fileLogger.logToFile(level, tag, line);
 		}
 	}
 

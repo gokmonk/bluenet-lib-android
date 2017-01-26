@@ -126,6 +126,11 @@ public class BleScanService extends Service {
 	public static final String EXTRA_LOG_LEVEL = "logLevel";
 
 	/**
+	 * Set the default log level to file of the scan service and the ble library that the service is using
+	 */
+	public static final String EXTRA_FILE_LOG_LEVEL = "fileLogLevel";
+
+	/**
 	 * values for EXTRA_SCAN_FILTER:
 	 *   FILTER_ALL: return all scanned BLE devices
 	 *   FILTER_CROWNSTONE: return only scanned crownstones
@@ -277,7 +282,8 @@ public class BleScanService extends Service {
 				_autoStart = bundle.getBoolean(EXTRA_AUTO_START, DEFAULT_AUTO_START);
 				_scanFilter = getFilterFromExtra(bundle);
 				int logLevel = bundle.getInt(EXTRA_LOG_LEVEL, LOG_LEVEL);
-				getLogger().setLogLevel(logLevel);
+				int fileLogLevel = bundle.getInt(EXTRA_FILE_LOG_LEVEL, LOG_LEVEL);
+				getLogger().setLogLevel(logLevel, fileLogLevel);
 			}
 		}
 	}
@@ -334,6 +340,7 @@ public class BleScanService extends Service {
 			_initialized = true;
 
 			// if scanning enabled, resume scanning
+			getLogger().LOGi(TAG, "running=" + _running + " wasRunning=" + _wasRunning);
 			if (_running || _wasRunning) {
 				_running = true;
 				_intervalScanHandler.removeCallbacksAndMessages(null);
@@ -545,7 +552,7 @@ public class BleScanService extends Service {
 	public void startIntervalScan(BleDeviceFilter filter) {
 		_ble.setScanFilter(filter);
 		setScanningState(true);
-		getLogger().LOGi(TAG, "startIntervalScan");
+		getLogger().LOGi(TAG, "startIntervalScan with interval=" + _scanInterval + " pause=" + _scanPause);
 
 		if (!_initialized) {
 			getLogger().LOGi(TAG, "Start scan");
