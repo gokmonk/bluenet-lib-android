@@ -445,7 +445,7 @@ public class BleScanService extends Service {
 					}
 					if (error == ScanCallback.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED) {
 						if (_startScanRetryNum++ < START_SCAN_NUM_RETRIES) {
-							getLogger().LOGd(TAG, "Retrying to start ...");
+							getLogger().LOGi(TAG, "Retrying to start ...");
 							// Cancel the stopScanRunnable that was posted after the line onIntervalScanStart() below.
 							_intervalScanHandler.removeCallbacks(_stopScanRunnable);
 							_intervalScanHandler.postDelayed(_startScanRunnable, START_SCAN_RETRY_DELAY);
@@ -465,7 +465,9 @@ public class BleScanService extends Service {
 				_startScanRetryNum = 0;
 
 				onIntervalScanStart();
-				_intervalScanHandler.postDelayed(_stopScanRunnable, _scanInterval);
+				if (_scanPause > 0) {
+					_intervalScanHandler.postDelayed(_stopScanRunnable, _scanInterval);
+				}
 			}
 			else {
 				getLogger().LOGe(TAG, "... scan interval start error");
@@ -480,7 +482,7 @@ public class BleScanService extends Service {
 	 * @param device the scanned device
 	 */
 	private void notifyDeviceScanned(BleDevice device) {
-		getLogger().LOGv(TAG, String.format(Locale.US, "scanned device: %s [%d] (%d)", device.getName(), device.getRssi(), device.getOccurrences()));
+		getLogger().LOGv(TAG, String.format(Locale.US, "scanned device: %s [%d] (%d) %s", device.getAddress(), device.getRssi(), device.getOccurrences(), device.getName()));
 
 		for (ScanDeviceListener listener : _scanDeviceListeners) {
 			listener.onDeviceScanned(device);
