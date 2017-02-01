@@ -516,7 +516,7 @@ public class BleDevice {
 		return _distance;
 	}
 
-	public void refresh() {
+	public synchronized void refresh() {
 //		if (refreshHistory()) {
 		refreshHistory();
 
