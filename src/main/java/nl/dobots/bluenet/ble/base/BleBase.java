@@ -1235,7 +1235,7 @@ public class BleBase extends BleCore {
 									callback.onSuccess();
 								}
 							}
-						}, 200);
+						}, 1000);
 					}
 
 					@Override
