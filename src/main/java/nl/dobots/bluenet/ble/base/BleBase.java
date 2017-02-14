@@ -1221,7 +1221,7 @@ public class BleBase extends BleCore {
 											if (Arrays.equals(readConfig.getPayload(), configuration.getPayload())) {
 												callback.onSuccess();
 											} else {
-												getLogger().LOGe(TAG, "write: %s, read: %s", BleUtils.bytesToString(configuration.getPayload()), Arrays.toString(readConfig.getPayload()));
+												getLogger().LOGe(TAG, "write: %s, read: %s", BleUtils.bytesToString(configuration.getPayload()), BleUtils.bytesToString(readConfig.getPayload()));
 												callback.onError(BleErrors.ERROR_VALIDATION_FAILED);
 											}
 										}
