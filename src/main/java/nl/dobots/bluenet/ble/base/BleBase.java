@@ -56,8 +56,8 @@ public class BleBase extends BleCore {
 	// handler used for delayed execution, e.g. a to get the configuration we need to write first
 	// to the select configuration characteristic, then wait for a moment for the device to process
 	// the request before reading from the get configuration characteristic
-//	private Handler _timeoutHandler = new Handler();
-	private Handler _timeoutHandler;
+//	private Handler _handler = new Handler();
+	private Handler _handler;
 
 	private boolean _encryptionEnabled = false;
 	private EncryptionKeys _encryptionKeys = null;
@@ -92,7 +92,7 @@ public class BleBase extends BleCore {
 		// create handler with its own thread
 		HandlerThread handlerThread = new HandlerThread("BleBaseHandler");
 		handlerThread.start();
-		_timeoutHandler = new Handler(handlerThread.getLooper());
+		_handler = new Handler(handlerThread.getLooper());
 	}
 
 	IStatusCallback _silentStatusCallback = new IStatusCallback() {
@@ -1209,7 +1209,7 @@ public class BleBase extends BleCore {
 						// we need to give the crownstone some time to handle the config write,
 						// because it needs to access persistent memory in order to store the new
 						// config value
-						_timeoutHandler.postDelayed(new Runnable() {
+						_handler.postDelayed(new Runnable() {
 							@Override
 							public void run() {
 								// if verify is set, get the configuration value from the crownstone
@@ -1235,7 +1235,7 @@ public class BleBase extends BleCore {
 									callback.onSuccess();
 								}
 							}
-						}, 200);
+						}, 1000);
 					}
 
 					@Override
@@ -1560,7 +1560,7 @@ public class BleBase extends BleCore {
 							// select failed, unsubscribe again
 							unsubscribeState(address, subscriberId[0]);
 							callback.onError(error);
-//							_timeoutHandler.postDelayed(new Runnable() {
+//							_handler.postDelayed(new Runnable() {
 //								@Override
 //								public void run() {
 //									unsubscribeState(address, subscriberId[0]);
@@ -1595,7 +1595,7 @@ public class BleBase extends BleCore {
 							callback.onSuccess(state);
 						}
 					});
-//					_timeoutHandler.postDelayed(new Runnable() {
+//					_handler.postDelayed(new Runnable() {
 //						@Override
 //						public void run() {
 //							unsubscribeState(address, subscriberId[0]);
@@ -1607,7 +1607,7 @@ public class BleBase extends BleCore {
 				public void onError(int error) {
 					unsubscribeState(address, subscriberId[0]);
 					callback.onError(error);
-//					_timeoutHandler.postDelayed(new Runnable() {
+//					_handler.postDelayed(new Runnable() {
 //						@Override
 //						public void run() {
 //							unsubscribeState(address, subscriberId[0]);
@@ -1621,7 +1621,7 @@ public class BleBase extends BleCore {
 //			@Override
 //			public void onSuccess() {
 //				// todo: do we need a timeout here?
-////				_timeoutHandler.postDelayed(new Runnable() {
+////				_handler.postDelayed(new Runnable() {
 ////					@Override
 ////					public void run() {
 //						readState(address, callback);
@@ -1708,7 +1708,7 @@ public class BleBase extends BleCore {
 						// from interrupt in firmware
 						callback.onSuccess();
 //						// we need to give the crownstone some time to handle the control command
-//						_timeoutHandler.postDelayed(new Runnable() {
+//						_handler.postDelayed(new Runnable() {
 //							@Override
 //							public void run() {
 //								callback.onSuccess();

@@ -66,6 +66,8 @@ public class BleExt extends Logging {
 	private static final String TAG = BleExt.class.getCanonicalName();
 	private static final int LOG_LEVEL = Log.VERBOSE;
 
+	public static final long CONNECTION_ALIVE_INTERVAL = 10000; // 10 seconds (for 15 seconds timeout on device)
+
 	// default timeout for connection attempt
 	private int _connectTimeout = 10000; // 10 seconds
 
@@ -601,7 +603,41 @@ public class BleExt extends Logging {
 		// todo: timeout?
 		_connectionState = BleDeviceConnectionState.connected;
 		_subscriberIds.clear();
+
+		_handler.postDelayed(_connectionKeepAlive, CONNECTION_ALIVE_INTERVAL);
 	}
+
+	/**
+	 * Keeps the connection alive by sending NOP commands to the device.
+	 * Could be improved by taking advantage of other writes and only send a NOP if no other
+	 * write was sent.
+	 */
+	private Runnable _connectionKeepAlive = new Runnable() {
+
+		private void reSchedule() {
+			_handler.postDelayed(this, CONNECTION_ALIVE_INTERVAL);
+		}
+
+		@Override
+		public void run() {
+			if (isConnected(null)) {
+				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_NOP),
+					new IStatusCallback() {
+						@Override
+						public void onSuccess() {
+							getLogger().LOGd(TAG, "keep connection alive success");
+							reSchedule();
+						}
+
+						@Override
+						public void onError(int error) {
+							getLogger().LOGd(TAG, "keep connection alive error: %d", error);
+							reSchedule();
+						}
+					});
+			}
+		}
+	};
 
 	/**
 	 * Disconnect from the currently connected device. use the callback to report back
@@ -646,6 +682,8 @@ public class BleExt extends Logging {
 		clearDelayedDisconnect();
 		_subscriberIds.clear();
 //		_detectedCharacteristics.clear();
+
+		_handler.removeCallbacks(_connectionKeepAlive);
 	}
 
 	/**
