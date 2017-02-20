@@ -1,6 +1,6 @@
 package nl.dobots.bluenet.ble.base;
 
-import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshHubData;
+//import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshHubData;
 import nl.dobots.bluenet.ble.mesh.structs.MeshScanResultPacket;
 
 /**
@@ -22,16 +22,16 @@ import nl.dobots.bluenet.ble.mesh.structs.MeshScanResultPacket;
  */
 public class BleMeshDataFactory {
 
-	public static BleMeshHubData fromBytes(byte[] bytes) {
-
-		BleMeshHubData data = new BleMeshHubData(bytes);
-		switch (data.getMessageType()) {
-			case BleMeshHubData.SCAN_MESSAGE: {
-				return new MeshScanResultPacket(bytes);
-			}
-		}
-
-		return null;
-	}
+//	public static BleMeshHubData fromBytes(byte[] bytes) {
+//
+//		BleMeshHubData data = new BleMeshHubData(bytes);
+//		switch (data.getMessageType()) {
+//			case BleMeshHubData.SCAN_MESSAGE: {
+//				return new MeshScanResultPacket(bytes);
+//			}
+//		}
+//
+//		return null;
+//	}
 
 }

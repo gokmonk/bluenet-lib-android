@@ -24,7 +24,6 @@ import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDiscoveryCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IExecStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IPowerSamplesCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.SimpleExecStatusCallback;
@@ -621,7 +620,7 @@ public class BleExt extends Logging {
 		@Override
 		public void run() {
 			if (isConnected(null)) {
-				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_NOP),
+				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_NOP),
 					new IStatusCallback() {
 						@Override
 						public void onSuccess() {
@@ -2731,26 +2730,26 @@ public class BleExt extends Logging {
 		}
 	}
 
-	public void readMeshData(final IMeshDataCallback callback) {
-		if (isConnected(callback) && hasCharacteristic(BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID, callback)) {
-			getLogger().LOGd(TAG, "subscribe to mesh data");
-			_bleBase.readMeshData(getTargetAddress(), callback);
-		}
-	}
-
-	public void subscribeMeshData(final IMeshDataCallback callback) {
-		if (isConnected(callback) && hasCharacteristic(BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID, callback)) {
-			getLogger().LOGd(TAG, "subscribe to mesh data");
-			_bleBase.subscribeMeshData(getTargetAddress(), callback);
-		}
-	}
-
-	public void unsubscribeMeshData(final IMeshDataCallback callback) {
-		if (isConnected(callback) && hasCharacteristic(BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID, callback)) {
-			getLogger().LOGd(TAG, "unsubscribe from mesh data");
-			_bleBase.unsubscribeMeshData(getTargetAddress(), callback);
-		}
-	}
+//	public void readMeshData(final IMeshDataCallback callback) {
+//		if (isConnected(callback) && hasCharacteristic(BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID, callback)) {
+//			getLogger().LOGd(TAG, "subscribe to mesh data");
+//			_bleBase.readMeshData(getTargetAddress(), callback);
+//		}
+//	}
+//
+//	public void subscribeMeshData(final IMeshDataCallback callback) {
+//		if (isConnected(callback) && hasCharacteristic(BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID, callback)) {
+//			getLogger().LOGd(TAG, "subscribe to mesh data");
+//			_bleBase.subscribeMeshData(getTargetAddress(), callback);
+//		}
+//	}
+//
+//	public void unsubscribeMeshData(final IMeshDataCallback callback) {
+//		if (isConnected(callback) && hasCharacteristic(BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID, callback)) {
+//			getLogger().LOGd(TAG, "unsubscribe from mesh data");
+//			_bleBase.unsubscribeMeshData(getTargetAddress(), callback);
+//		}
+//	}
 
 	/**
 	 * Function to write the given PWM value to the device.

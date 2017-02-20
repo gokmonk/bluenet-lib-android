@@ -22,7 +22,6 @@ import nl.dobots.bluenet.ble.base.callbacks.IConfigurationCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDiscoveryCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IPowerSamplesCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
@@ -37,7 +36,6 @@ import nl.dobots.bluenet.ble.base.structs.PowerSamples;
 import nl.dobots.bluenet.ble.base.structs.StateMsg;
 import nl.dobots.bluenet.ble.base.structs.TrackedDeviceMsg;
 import nl.dobots.bluenet.ble.mesh.structs.MeshNotificationPacket;
-import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshHubData;
 import nl.dobots.bluenet.ble.cfg.BleTypes;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
@@ -1858,159 +1856,159 @@ public class BleBase extends BleCore {
 					});
 	}
 
-	public void readMeshData(String address, final IMeshDataCallback callback) {
-		getLogger().LOGd(TAG, "Reading mesh data...");
-		read(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
-				new IDataCallback() {
-					@Override
-					public void onData(JSONObject json) {
-						byte[] bytes = BleCore.getValue(json);
-						MeshNotificationPacket meshData = new MeshNotificationPacket(bytes);
-						BleMeshHubData meshHubData = BleMeshDataFactory.fromBytes(meshData.getData());
-						callback.onData(meshHubData);
-					}
-
-					@Override
-					public void onError(int error) {
-						callback.onError(error);
-					}
-				});
-	}
-
-	ByteBuffer _notificationBuffer = ByteBuffer.allocate(100);
-	// set flag to false in case of buffer overflow. no other way to detect invalid messages
-	// if needed, could add message number?
-	boolean _notificationBufferValid = true;
-	// for backwards compatibility
-	boolean _hasStartMessageType = false;
-	int _meshSubscriberId = 0;
-
-	public void subscribeMeshData(final String address, final IMeshDataCallback callback) {
-		getLogger().LOGd(TAG, "subscribing to mesh data...");
-		_hasStartMessageType = false;
-		subscribe(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
-			new IIntegerCallback() {
-				@Override
-				public void onSuccess(int result) {
-					_meshSubscriberId = result;
-				}
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-			},
-			new IDataCallback() {
-				@Override
-				public void onData(JSONObject json) {
-					if (BleCore.getStatus(json) == BleCoreTypes.CHARACTERISTIC_PROP_NOTIFY) {
-
-						final byte[] notificationBytes = BleCore.getValue(json);
-
-						BleMeshHubData meshData;
-						MeshNotificationPacket meshDataPart = new MeshNotificationPacket(notificationBytes);
-						try {
-							switch (meshDataPart.getOpCode()) {
-								case 0x0: {
-//								meshData = BleMeshDataFactory.fromBytes(notificationBytes);
-//								meshData = BleMeshDataFactory.fromBytes(meshDataPart.getData());
-									break;
-								}
-								case 0x20: {
-									_hasStartMessageType = true;
-									_notificationBuffer.clear();
-									_notificationBufferValid = true;
-									_notificationBuffer.put(meshDataPart.getData());
-									break;
-								}
-								case 0x21: {
-									if (_notificationBufferValid) {
-										_notificationBuffer.put(meshDataPart.getData());
-									}
-									break;
-								}
-								case 0x22: {
-									if (_notificationBufferValid) {
-										_notificationBuffer.put(meshDataPart.getData());
-										meshData = BleMeshDataFactory.fromBytes(_notificationBuffer.array());
-										callback.onData((BleMeshHubData) meshData);
-									}
-									if (!_hasStartMessageType) {
-										_notificationBuffer.clear();
-										_notificationBufferValid = true;
-									}
-									break;
-								}
-							}
-						} catch (BufferOverflowException e) {
-							getLogger().LOGe(TAG, "notification buffer overflow. missed some messages?!");
-							_notificationBufferValid = false;
-						}
-
-
-						// unfortunately notifications only report up to 23 bytes, so we can't use
-						// the value provided in the notification directly. however, we can now
-						// read the characteristic to get the full content
-
-//						readMeshData(address, callback);
-//						read(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
-//							new IDataCallback() {
-//								@Override
-//								public void onData(JSONObject json) {
-//									byte[] bytes = BleCore.getValue(json);
-//
-//									MeshNotificationPacket meshData = BleMeshDataFactory.fromBytes(bytes);
-//
-//									for (int i = 0; i < notificationBytes.length; ++i) {
-//										if (notificationBytes[i] != bytes[i]) {
-//											getLogger().LOGe(TAG, "did not receive same mesh message as in notifaction");
-//											final MeshNotificationPacket notificationMeshData = BleMeshDataFactory.fromBytes(notificationBytes);
-//											getLogger().LOGe(TAG, "notification was from: %s", ((MeshScanResultPacket)notificationMeshData).getSourceAddress());
-//											getLogger().LOGe(TAG, "read is from: %s", ((MeshScanResultPacket)meshData).getSourceAddress());
-//											break;
-//										}
-//									}
-//
-//									callback.onData(meshData);
-//								}
-//
-//								@Override
-//								public void onError(int error) {
-//									callback.onError(error);
-//								}
-//							});
-
-
-
-
+//	public void readMeshData(String address, final IMeshDataCallback callback) {
+//		getLogger().LOGd(TAG, "Reading mesh data...");
+//		read(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
+//				new IDataCallback() {
+//					@Override
+//					public void onData(JSONObject json) {
 //						byte[] bytes = BleCore.getValue(json);
-//						MeshNotificationPacket meshData = BleMeshDataFactory.fromBytes(bytes);
-//						callback.onData(meshData);
-					}
-				}
-
-				@Override
-				public void onError(int error) {
-					callback.onError(error);
-				}
-		});
-	}
-
-	public void unsubscribeMeshData(final String address, final IMeshDataCallback callback) {
-		getLogger().LOGd(TAG, "subscribing to mesh data...");
-		unsubscribe(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
-				_meshSubscriberId,
-				new IStatusCallback() {
-					@Override
-					public void onSuccess() {
-					}
-
-					@Override
-					public void onError(int error) {
-						callback.onError(error);
-					}
-				});
-	}
+//						MeshNotificationPacket meshData = new MeshNotificationPacket(bytes);
+//						BleMeshHubData meshHubData = BleMeshDataFactory.fromBytes(meshData.getData());
+//						callback.onData(meshHubData);
+//					}
+//
+//					@Override
+//					public void onError(int error) {
+//						callback.onError(error);
+//					}
+//				});
+//	}
+//
+//	ByteBuffer _notificationBuffer = ByteBuffer.allocate(100);
+//	// set flag to false in case of buffer overflow. no other way to detect invalid messages
+//	// if needed, could add message number?
+//	boolean _notificationBufferValid = true;
+//	// for backwards compatibility
+//	boolean _hasStartMessageType = false;
+//	int _meshSubscriberId = 0;
+//
+//	public void subscribeMeshData(final String address, final IMeshDataCallback callback) {
+//		getLogger().LOGd(TAG, "subscribing to mesh data...");
+//		_hasStartMessageType = false;
+//		subscribe(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
+//			new IIntegerCallback() {
+//				@Override
+//				public void onSuccess(int result) {
+//					_meshSubscriberId = result;
+//				}
+//
+//				@Override
+//				public void onError(int error) {
+//					callback.onError(error);
+//				}
+//			},
+//			new IDataCallback() {
+//				@Override
+//				public void onData(JSONObject json) {
+//					if (BleCore.getStatus(json) == BleCoreTypes.CHARACTERISTIC_PROP_NOTIFY) {
+//
+//						final byte[] notificationBytes = BleCore.getValue(json);
+//
+//						BleMeshHubData meshData;
+//						MeshNotificationPacket meshDataPart = new MeshNotificationPacket(notificationBytes);
+//						try {
+//							switch (meshDataPart.getOpCode()) {
+//								case 0x0: {
+////								meshData = BleMeshDataFactory.fromBytes(notificationBytes);
+////								meshData = BleMeshDataFactory.fromBytes(meshDataPart.getData());
+//									break;
+//								}
+//								case 0x20: {
+//									_hasStartMessageType = true;
+//									_notificationBuffer.clear();
+//									_notificationBufferValid = true;
+//									_notificationBuffer.put(meshDataPart.getData());
+//									break;
+//								}
+//								case 0x21: {
+//									if (_notificationBufferValid) {
+//										_notificationBuffer.put(meshDataPart.getData());
+//									}
+//									break;
+//								}
+//								case 0x22: {
+//									if (_notificationBufferValid) {
+//										_notificationBuffer.put(meshDataPart.getData());
+//										meshData = BleMeshDataFactory.fromBytes(_notificationBuffer.array());
+//										callback.onData((BleMeshHubData) meshData);
+//									}
+//									if (!_hasStartMessageType) {
+//										_notificationBuffer.clear();
+//										_notificationBufferValid = true;
+//									}
+//									break;
+//								}
+//							}
+//						} catch (BufferOverflowException e) {
+//							getLogger().LOGe(TAG, "notification buffer overflow. missed some messages?!");
+//							_notificationBufferValid = false;
+//						}
+//
+//
+//						// unfortunately notifications only report up to 23 bytes, so we can't use
+//						// the value provided in the notification directly. however, we can now
+//						// read the characteristic to get the full content
+//
+////						readMeshData(address, callback);
+////						read(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
+////							new IDataCallback() {
+////								@Override
+////								public void onData(JSONObject json) {
+////									byte[] bytes = BleCore.getValue(json);
+////
+////									MeshNotificationPacket meshData = BleMeshDataFactory.fromBytes(bytes);
+////
+////									for (int i = 0; i < notificationBytes.length; ++i) {
+////										if (notificationBytes[i] != bytes[i]) {
+////											getLogger().LOGe(TAG, "did not receive same mesh message as in notifaction");
+////											final MeshNotificationPacket notificationMeshData = BleMeshDataFactory.fromBytes(notificationBytes);
+////											getLogger().LOGe(TAG, "notification was from: %s", ((MeshScanResultPacket)notificationMeshData).getSourceAddress());
+////											getLogger().LOGe(TAG, "read is from: %s", ((MeshScanResultPacket)meshData).getSourceAddress());
+////											break;
+////										}
+////									}
+////
+////									callback.onData(meshData);
+////								}
+////
+////								@Override
+////								public void onError(int error) {
+////									callback.onError(error);
+////								}
+////							});
+//
+//
+//
+//
+////						byte[] bytes = BleCore.getValue(json);
+////						MeshNotificationPacket meshData = BleMeshDataFactory.fromBytes(bytes);
+////						callback.onData(meshData);
+//					}
+//				}
+//
+//				@Override
+//				public void onError(int error) {
+//					callback.onError(error);
+//				}
+//		});
+//	}
+//
+//	public void unsubscribeMeshData(final String address, final IMeshDataCallback callback) {
+//		getLogger().LOGd(TAG, "subscribing to mesh data...");
+//		unsubscribe(address, BluenetConfig.MESH_SERVICE_UUID, BluenetConfig.MESH_DATA_CHARACTERISTIC_UUID,
+//				_meshSubscriberId,
+//				new IStatusCallback() {
+//					@Override
+//					public void onSuccess() {
+//					}
+//
+//					@Override
+//					public void onError(int error) {
+//						callback.onError(error);
+//					}
+//				});
+//	}
 
 	public void readSessionNonce(final String address, final IDataCallback callback) {
 		getLogger().LOGd(TAG, "readSessionNonce");

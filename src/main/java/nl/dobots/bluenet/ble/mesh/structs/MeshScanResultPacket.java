@@ -4,13 +4,12 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 
-import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshHubData;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.utils.BleUtils;
+
+//import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshHubData;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -81,10 +80,8 @@ public class MeshScanResultPacket implements MeshPayload {
 	 * @param bytes byte array containing the
 	 */
 	public MeshScanResultPacket(byte[] bytes) {
-		super(bytes);
-
 		try {
-			ByteBuffer bb = ByteBuffer.wrap(payload);
+			ByteBuffer bb = ByteBuffer.wrap(bytes);
 			bb.order(ByteOrder.LITTLE_ENDIAN);
 
 			timeStamp = new Date();
@@ -133,9 +130,7 @@ public class MeshScanResultPacket implements MeshPayload {
 			bb.putShort((short) device.occurrences);
 		}
 
-		payload = bb.array();
-
-		return super.toArray();
+		return bb.array();
 	}
 
 	public int getNumDevices() {
@@ -151,8 +146,6 @@ public class MeshScanResultPacket implements MeshPayload {
 	@Override
 	public String toString() {
 		return "MeshScanResultPacket{" +
-				"sourceAddress=" + BleUtils.bytesToAddress(sourceAddress) +
-				", messageType=" + messageType +
 				", numDevices=" + numDevices +
 				", devices=" + Arrays.toString(getDevices()) +
 				'}';
