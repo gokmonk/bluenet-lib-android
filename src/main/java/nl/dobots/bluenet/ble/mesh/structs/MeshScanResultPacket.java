@@ -1,4 +1,4 @@
-package nl.dobots.bluenet.ble.base.structs.mesh;
+package nl.dobots.bluenet.ble.mesh.structs;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 
+import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshHubData;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.utils.BleUtils;
 
@@ -28,7 +29,7 @@ import nl.dobots.bluenet.utils.BleUtils;
  *
  * @author Dominik Egger
  */
-public class BleMeshScanData extends BleMeshHubData {
+public class MeshScanResultPacket implements MeshPayload {
 
 	public class ScannedDevice {
 		private byte[] address;
@@ -79,7 +80,7 @@ public class BleMeshScanData extends BleMeshHubData {
 	 * Parses the given byte array into a
 	 * @param bytes byte array containing the
 	 */
-	public BleMeshScanData(byte[] bytes) {
+	public MeshScanResultPacket(byte[] bytes) {
 		super(bytes);
 
 		try {
@@ -149,7 +150,7 @@ public class BleMeshScanData extends BleMeshHubData {
 
 	@Override
 	public String toString() {
-		return "BleMeshScanData{" +
+		return "MeshScanResultPacket{" +
 				"sourceAddress=" + BleUtils.bytesToAddress(sourceAddress) +
 				", messageType=" + messageType +
 				", numDevices=" + numDevices +

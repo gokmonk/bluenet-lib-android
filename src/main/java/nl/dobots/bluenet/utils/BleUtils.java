@@ -47,8 +47,10 @@ public class BleUtils {
 	}
 
 	public static byte[] uuidToBytes(String uuidStr) {
-		UUID uuid = stringToUuid(uuidStr);
+		return uuidToBytes(stringToUuid(uuidStr));
+	}
 
+	public static byte[] uuidToBytes(UUID uuid) {
 		ByteBuffer bb = ByteBuffer.allocate(16);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 		bb.putLong(uuid.getLeastSignificantBits());

@@ -8,6 +8,7 @@ package nl.dobots.bluenet.ble.cfg;
  *
  * Created on 15-7-15
  * Updated on 9-6-16 for Protocol version 0.4.0
+ * Updated on 27-1-17 for Protocol version 0.8.0
  * @author Dominik Egger
  */
 public class BluenetConfig {
@@ -89,7 +90,7 @@ public class BluenetConfig {
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// CommandMsg types
+	// ControlMsg types
 	public static final char CMD_SWITCH =                               0;    // 0x00
 	public static final char CMD_PWM =                                  1;    // 0x01
 	public static final char CMD_SET_TIME =                             2;    // 0x02
@@ -164,9 +165,8 @@ public class BluenetConfig {
 	public static final char CONFIG_VOLTAGE_ZERO =                      45;   //! 0x2D
 	public static final char CONFIG_CURRENT_ZERO =                      46;   //! 0x2E
 	public static final char CONFIG_POWER_ZERO =                        47;   //! 0x2F
-	public static final char CONFIG_POWER_ZERO_AVG_WINDOW =             48;   //! 0x30
+	public static final char CONFIG_POWER_AVG_WINDOW =                  48;   //! 0x30
 	public static final char CONFIG_MESH_ACCESS_ADDRESS =               49;   //! 0x31
-	public static final char CONFIG_KEEP_ALIVE_INTERVAL =               50;   //! 0x32
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -179,6 +179,7 @@ public class BluenetConfig {
 	public static final char STATE_SCHEDULE =                           133;  // 0x85
 	public static final char STATE_OPERATION_MODE =                     134;  // 0x86
 	public static final char STATE_TEMPERATURE =                        135;  // 0x87
+	public static final char STATE_TIME =                               136;  // 0x88
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -196,19 +197,33 @@ public class BluenetConfig {
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Mesh handles (channel)
-	public static final char CHANNEL_HUB =                              1;    // 0x01
-	public static final char CHANNEL_DATA =                             2;    // 0x02
+	public static final char CHANNEL_KEEP_ALIVE =                       1;    // 0x01
+	public static final char CHANNEL_STATE_BROADCAST =                  2;    // 0x02
+	public static final char CHANNEL_STATE_CHANGE =                     3;    // 0x03
+	public static final char CHANNEL_COMMAND =                          4;    // 0x04
+	public static final char CHANNEL_COMMAND_REPLY =                    5;    // 0x05
+	public static final char CHANNEL_SCAN_RESULT =                      6;    // 0x06
+	public static final char CHANNEL_BIG_DATA =                         7;    // 0x07
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Mesh messages types
-	public static final char MESH_CONTROL =                             0;    // 0x00;
-	public static final char MESH_BEACON =                              1;    // 0x01;
-	public static final char MESH_CONFIG =                              2;    // 0x02;
-	public static final char MESH_STATE =                               3;    // 0x03;
-	public static final char MESH_SCAN =                                101;  // 0x65;
-	public static final char MESH_POWER_SAMPLES =                       102;  // 0x66;
-	public static final char MESH_EVENT =                               103;  // 0x67;
+	// Mesh command types
+	public static final int MESH_MAX_PAYLOAD_SIZE =                     92; // bytes
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Mesh command types
+	public static final char MESH_CMD_CONTROL =                         0;    // 0x00;
+	public static final char MESH_CMD_BEACON =                          1;    // 0x01;
+	public static final char MESH_CMD_CONFIG =                          2;    // 0x02;
+	public static final char MESH_CMD_STATE =                           3;    // 0x03;
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Mesh reply types
+	public static final char MESH_REPLY_STATUS =                        0;    // 0x00;
+	public static final char MESH_REPLY_CONFIG =                        1;    // 0x01;
+	public static final char MESH_REPLY_STATE =                         2;    // 0x02;
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -239,7 +254,7 @@ public class BluenetConfig {
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Verification code for ECB encryption
-	public static final int CAFEBABE = 0xCAFEBABE;
+	public static final int CAFEBABE =                                  0xCAFEBABE;
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -28,8 +28,8 @@ import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IPowerSamplesCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.SimpleExecStatusCallback;
-import nl.dobots.bluenet.ble.base.structs.CommandMsg;
-import nl.dobots.bluenet.ble.base.structs.MeshMsg;
+import nl.dobots.bluenet.ble.base.structs.ControlMsg;
+import nl.dobots.bluenet.ble.mesh.structs.MeshControlMsg;
 import nl.dobots.bluenet.ble.base.structs.PowerSamples;
 import nl.dobots.bluenet.ble.base.structs.TrackedDeviceMsg;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
@@ -776,7 +776,21 @@ public class BleExt extends Logging {
 
 						@Override
 						public void onError(int error) {
-							callback.onError(error);
+							if (error == BleErrors.ERROR_SERVICE_NOT_FOUND) {
+								disconnectAndClose(true, new IStatusCallback() {
+									@Override
+									public void onSuccess() {
+										connectAndDiscover(_targetAddress, callback, true);
+									}
+
+									@Override
+									public void onError(int error) {
+										callback.onError(error);
+									}
+								});
+							} else {
+								callback.onError(error);
+							}
 						}
 					});
 				}
@@ -1388,7 +1402,7 @@ public class BleExt extends Logging {
 			getLogger().LOGd(TAG, "Set PWM to %d", value);
 			if (hasControlCharacteristic(null)) {
 				getLogger().LOGd(TAG, "use control characteristic");
-				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_PWM, 1, new byte[]{(byte) value}), callback);
+				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_PWM, 1, new byte[]{(byte) value}), callback);
 			} else if (hasCharacteristic(BluenetConfig.CHAR_PWM_UUID, callback)) {
 				_bleBase.writePWM(_targetAddress, value, callback);
 			}
@@ -1489,7 +1503,7 @@ public class BleExt extends Logging {
 			if (hasControlCharacteristic(null)) {
 				getLogger().LOGd(TAG, "use control characteristic");
 				int value = relayOn ? BluenetConfig.RELAY_ON : BluenetConfig.RELAY_OFF;
-				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_RELAY, 1, new byte[]{(byte) value}), callback);
+				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_RELAY, 1, new byte[]{(byte) value}), callback);
 			} else if (hasCharacteristic(BluenetConfig.CHAR_RELAY_UUID, callback)) {
 				_bleBase.writeRelay(_targetAddress, relayOn, callback);
 			}
@@ -1909,7 +1923,7 @@ public class BleExt extends Logging {
 			getLogger().LOGd(TAG, "Set Reset to %d", value);
 			if (hasControlCharacteristic(null)) {
 				getLogger().LOGd(TAG, "use control characteristic");
-				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_RESET, 1, new byte[]{(byte) value}), callback);
+				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_RESET, 1, new byte[]{(byte) value}), callback);
 			} else if (hasCharacteristic(BluenetConfig.CHAR_RESET_UUID, callback)) {
 				_bleBase.writeReset(_targetAddress, value, callback);
 			}
@@ -1958,7 +1972,7 @@ public class BleExt extends Logging {
 			getLogger().LOGd(TAG, "Write factory reset with %d", value);
 			if (hasControlCharacteristic(callback)) {
 				getLogger().LOGd(TAG, "use control characteristic");
-				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_FACTORY_RESET, 4, BleUtils.intToByteArray(value)), new IStatusCallback() {
+				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_FACTORY_RESET, 4, BleUtils.intToByteArray(value)), new IStatusCallback() {
 					@Override
 					public void onSuccess() {
 						disconnectAndClose(true, new IStatusCallback() {
@@ -2041,7 +2055,7 @@ public class BleExt extends Logging {
 			getLogger().LOGd(TAG, "Write disconnect command");
 			if (hasControlCharacteristic(callback)) {
 				getLogger().LOGd(TAG, "use control characteristic");
-				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_DISCONNECT, 0, new byte[0]), new IStatusCallback() {
+				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_DISCONNECT, 0, new byte[0]), new IStatusCallback() {
 					@Override
 					public void onSuccess() {
 						disconnectAndClose(true, new IStatusCallback() {
@@ -2104,7 +2118,7 @@ public class BleExt extends Logging {
 		if (isConnected(callback)) {
 			getLogger().LOGd(TAG, "Reset to bootloader");
 			if (hasControlCharacteristic(null)) {
-				_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_GOTO_DFU), callback);
+				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_GOTO_DFU), callback);
 			} else if (hasCharacteristic(BluenetConfig.CHAR_RESET_UUID, null)) {
 				_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, callback);
 			} else if (isSetupMode() && hasCharacteristic(BluenetConfig.CHAR_SETUP_GOTO_DFU_UUID, null)) {
@@ -2328,7 +2342,7 @@ public class BleExt extends Logging {
 	 * @param value    the message to be sent to the mesh (through the device)
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void writeMeshMessage(MeshMsg value, IStatusCallback callback) {
+	public void writeMeshMessage(MeshControlMsg value, IStatusCallback callback) {
 		if (isConnected(callback) && hasCharacteristic(BluenetConfig.CHAR_MESH_CONTROL_UUID, callback)) {
 			getLogger().LOGd(TAG, "Set MeshMessage to %s", value.toString());
 			_bleBase.writeMeshMessage(_targetAddress, value, callback);
@@ -2345,7 +2359,7 @@ public class BleExt extends Logging {
 	 * @param value    the message to be sent to the mesh (through the device)
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void writeMeshMessage(final String address, final MeshMsg value, final IStatusCallback callback) {
+	public void writeMeshMessage(final String address, final MeshControlMsg value, final IStatusCallback callback) {
 		getHandler().post(new Runnable() {
 			@Override
 			public void run() {
@@ -2536,7 +2550,7 @@ public class BleExt extends Logging {
 			if (hasControlCharacteristic(null)) {
 				getLogger().LOGd(TAG, "use control characteristic");
 				int scan = (value ? 1 : 0);
-				_bleBase.sendCommand(getTargetAddress(), new CommandMsg(BluenetConfig.CMD_SCAN_DEVICES, 1, new byte[]{(byte) scan}), callback);
+				_bleBase.sendCommand(getTargetAddress(), new ControlMsg(BluenetConfig.CMD_SCAN_DEVICES, 1, new byte[]{(byte) scan}), callback);
 			} else if (hasCharacteristic(BluenetConfig.CHAR_SCAN_CONTROL_UUID, callback)) {
 				_bleBase.scanDevices(getTargetAddress(), value, callback);
 			}
@@ -2749,7 +2763,7 @@ public class BleExt extends Logging {
 	public void writeLed(final int led, boolean enable, final IStatusCallback callback) {
 		if (isConnected(callback)) {
 			getLogger().LOGd(TAG, "%s led %d", enable ? "Enable" : "Disable", led);
-			_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_SET_LED, 2, new byte[]{(byte) led, (byte)(enable ? 1 : 0) }), callback);
+			_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_SET_LED, 2, new byte[]{(byte) led, (byte)(enable ? 1 : 0) }), callback);
 		}
 	}
 
@@ -2786,7 +2800,7 @@ public class BleExt extends Logging {
 			bb.put((byte)action);
 			bb.put((byte)switchState);
 			bb.putShort((short)timeout);
-			_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_KEEP_ALIVE_STATE, 4, bb.array()), callback);
+			_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_KEEP_ALIVE_STATE, 4, bb.array()), callback);
 		}
 	}
 
@@ -2808,7 +2822,7 @@ public class BleExt extends Logging {
 	public void writeKeepAlive(final IStatusCallback callback) {
 		if (isConnected(callback)) {
 			getLogger().LOGd(TAG, "write keep alive");
-			_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_KEEP_ALIVE), callback);
+			_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_KEEP_ALIVE), callback);
 		}
 	}
 

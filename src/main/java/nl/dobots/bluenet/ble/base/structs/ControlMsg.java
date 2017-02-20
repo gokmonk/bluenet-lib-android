@@ -36,17 +36,17 @@ package nl.dobots.bluenet.ble.base.structs;
  *
  * @author Dominik Egger
  */
-public class CommandMsg extends StreamMsg {
+public class ControlMsg extends StreamMsg {
 
-	public CommandMsg(int type, int length, byte[] payload) {
+	public ControlMsg(int type, int length, byte[] payload) {
 		super(type, length, payload);
 	}
 
-	public CommandMsg(int type) {
+	public ControlMsg(int type) {
 		super(type, 0, new byte[]{});
 	}
 
-	public CommandMsg(byte[] bytes) {
+	public ControlMsg(byte[] bytes) {
 		super(bytes);
 	}
 }

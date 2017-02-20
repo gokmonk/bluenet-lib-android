@@ -1,4 +1,4 @@
-package nl.dobots.bluenet.ble.base.structs.mesh;
+package nl.dobots.bluenet.ble.mesh.structs;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -23,7 +23,7 @@ import nl.dobots.bluenet.ble.cfg.BluenetConfig;
  *
  * @author Dominik Egger
  */
-public class BleMeshData {
+public class MeshNotificationPacket {
 
 	private static final int SIZE_WITHOUT_DATA = 4;
 
@@ -37,7 +37,7 @@ public class BleMeshData {
 	 * Parses the given byte array into a
 	 * @param bytes byte array containing the
 	 */
-	public BleMeshData(byte[] bytes) {
+	public MeshNotificationPacket(byte[] bytes) {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
@@ -65,7 +65,7 @@ public class BleMeshData {
 
 	@Override
 	public String toString() {
-		return "BleMeshData{" +
+		return "MeshNotificationPacket{" +
 				"opCode=" + opCode +
 				", handle=" + handle +
 				", dataLength=" + dataLength +

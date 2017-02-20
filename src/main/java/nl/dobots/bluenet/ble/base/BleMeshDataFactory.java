@@ -1,8 +1,7 @@
 package nl.dobots.bluenet.ble.base;
 
-import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshData;
 import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshHubData;
-import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshScanData;
+import nl.dobots.bluenet.ble.mesh.structs.MeshScanResultPacket;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -28,7 +27,7 @@ public class BleMeshDataFactory {
 		BleMeshHubData data = new BleMeshHubData(bytes);
 		switch (data.getMessageType()) {
 			case BleMeshHubData.SCAN_MESSAGE: {
-				return new BleMeshScanData(bytes);
+				return new MeshScanResultPacket(bytes);
 			}
 		}
 

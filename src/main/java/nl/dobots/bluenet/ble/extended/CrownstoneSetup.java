@@ -7,13 +7,12 @@ import nl.dobots.bluenet.ble.base.callbacks.IExecStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IProgressCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.SimpleExecStatusCallback;
-import nl.dobots.bluenet.ble.base.structs.CommandMsg;
+import nl.dobots.bluenet.ble.base.structs.ControlMsg;
 import nl.dobots.bluenet.ble.base.structs.EncryptionKeys;
 import nl.dobots.bluenet.ble.base.structs.SetupEncryptionKey;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.extended.callbacks.IExecuteCallback;
-import nl.dobots.bluenet.utils.BleLog;
 
 /**
  * Copyright (c) 2016 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -174,7 +173,7 @@ public class CrownstoneSetup {
 	}
 
 	private void finalizeSetup(IStatusCallback callback) {
-		_bleBase.sendCommand(_targetAddress, new CommandMsg(BluenetConfig.CMD_VALIDATE_SETUP), callback);
+		_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_VALIDATE_SETUP), callback);
 	}
 
 	public void executeSetup(int crownstoneId, String adminKey, String memberKey, String guestKey,

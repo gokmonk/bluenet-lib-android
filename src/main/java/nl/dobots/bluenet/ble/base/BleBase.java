@@ -27,16 +27,16 @@ import nl.dobots.bluenet.ble.base.callbacks.IPowerSamplesCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.ISubscribeCallback;
-import nl.dobots.bluenet.ble.base.structs.CommandMsg;
+import nl.dobots.bluenet.ble.base.structs.ControlMsg;
 import nl.dobots.bluenet.ble.base.structs.ConfigurationMsg;
 import nl.dobots.bluenet.ble.base.structs.CrownstoneServiceData;
 import nl.dobots.bluenet.ble.base.structs.EncryptionKeys;
 import nl.dobots.bluenet.ble.base.structs.EncryptionSessionData;
-import nl.dobots.bluenet.ble.base.structs.MeshMsg;
+import nl.dobots.bluenet.ble.mesh.structs.MeshControlMsg;
 import nl.dobots.bluenet.ble.base.structs.PowerSamples;
 import nl.dobots.bluenet.ble.base.structs.StateMsg;
 import nl.dobots.bluenet.ble.base.structs.TrackedDeviceMsg;
-import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshData;
+import nl.dobots.bluenet.ble.mesh.structs.MeshNotificationPacket;
 import nl.dobots.bluenet.ble.base.structs.mesh.BleMeshHubData;
 import nl.dobots.bluenet.ble.cfg.BleTypes;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
@@ -46,7 +46,6 @@ import nl.dobots.bluenet.ble.core.BleCoreTypes;
 import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
 import nl.dobots.bluenet.ble.extended.callbacks.IBleDeviceCallback;
 import nl.dobots.bluenet.ble.extended.structs.BleDevice;
-import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
 public class BleBase extends BleCore {
@@ -1694,7 +1693,7 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	private void sendCommand(String address, CommandMsg command, String serviceUuid, String characteristicUuid,
+	private void sendCommand(String address, ControlMsg command, String serviceUuid, String characteristicUuid,
 							 final IStatusCallback callback) {
 		byte[] bytes = command.toArray();
 		getLogger().LOGd(TAG, "control command: write %s at service %s and characteristic %s", BleUtils.bytesToString(bytes), BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONTROL_UUID);
@@ -1733,7 +1732,7 @@ public class BleBase extends BleCore {
 	 * @param command command to be executed on the device
 	 * @param callback callback function to be called on success or error
 	 */
-	public void sendCommand(String address, CommandMsg command, final IStatusCallback callback) {
+	public void sendCommand(String address, ControlMsg command, final IStatusCallback callback) {
 		if (_setupMode) {
 			sendCommand(address, command, BluenetConfig.SETUP_SERVICE_UUID, BluenetConfig.CHAR_SETUP_CONTROL_UUID, callback);
 		} else {
@@ -1748,7 +1747,7 @@ public class BleBase extends BleCore {
 	 * @param message the mesh message to be sent into the mesh
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void writeMeshMessage(String address, MeshMsg message, final IStatusCallback callback) {
+	public void writeMeshMessage(String address, MeshControlMsg message, final IStatusCallback callback) {
 		getLogger().LOGd(TAG, "mesh message: write %s at service %s and characteristic %s", message.toString(), BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_MESH_CONTROL_UUID);
 		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_MESH_CONTROL_UUID, message.toArray(),
 				new IStatusCallback() {
@@ -1866,7 +1865,7 @@ public class BleBase extends BleCore {
 					@Override
 					public void onData(JSONObject json) {
 						byte[] bytes = BleCore.getValue(json);
-						BleMeshData meshData = new BleMeshData(bytes);
+						MeshNotificationPacket meshData = new MeshNotificationPacket(bytes);
 						BleMeshHubData meshHubData = BleMeshDataFactory.fromBytes(meshData.getData());
 						callback.onData(meshHubData);
 					}
@@ -1909,7 +1908,7 @@ public class BleBase extends BleCore {
 						final byte[] notificationBytes = BleCore.getValue(json);
 
 						BleMeshHubData meshData;
-						BleMeshData meshDataPart = new BleMeshData(notificationBytes);
+						MeshNotificationPacket meshDataPart = new MeshNotificationPacket(notificationBytes);
 						try {
 							switch (meshDataPart.getOpCode()) {
 								case 0x0: {
@@ -1960,14 +1959,14 @@ public class BleBase extends BleCore {
 //								public void onData(JSONObject json) {
 //									byte[] bytes = BleCore.getValue(json);
 //
-//									BleMeshData meshData = BleMeshDataFactory.fromBytes(bytes);
+//									MeshNotificationPacket meshData = BleMeshDataFactory.fromBytes(bytes);
 //
 //									for (int i = 0; i < notificationBytes.length; ++i) {
 //										if (notificationBytes[i] != bytes[i]) {
 //											getLogger().LOGe(TAG, "did not receive same mesh message as in notifaction");
-//											final BleMeshData notificationMeshData = BleMeshDataFactory.fromBytes(notificationBytes);
-//											getLogger().LOGe(TAG, "notification was from: %s", ((BleMeshScanData)notificationMeshData).getSourceAddress());
-//											getLogger().LOGe(TAG, "read is from: %s", ((BleMeshScanData)meshData).getSourceAddress());
+//											final MeshNotificationPacket notificationMeshData = BleMeshDataFactory.fromBytes(notificationBytes);
+//											getLogger().LOGe(TAG, "notification was from: %s", ((MeshScanResultPacket)notificationMeshData).getSourceAddress());
+//											getLogger().LOGe(TAG, "read is from: %s", ((MeshScanResultPacket)meshData).getSourceAddress());
 //											break;
 //										}
 //									}
@@ -1985,7 +1984,7 @@ public class BleBase extends BleCore {
 
 
 //						byte[] bytes = BleCore.getValue(json);
-//						BleMeshData meshData = BleMeshDataFactory.fromBytes(bytes);
+//						MeshNotificationPacket meshData = BleMeshDataFactory.fromBytes(bytes);
 //						callback.onData(meshData);
 					}
 				}
