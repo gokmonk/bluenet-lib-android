@@ -421,6 +421,14 @@ public class BleCore extends Logging {
 		BluetoothManager bluetoothManager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
 		_bluetoothAdapter = bluetoothManager.getAdapter();
 
+		if (Build.VERSION.SDK_INT >= 21) {
+			_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
+			_scanSettings = new ScanSettings.Builder()
+					.setScanMode(_scanMode)
+					.build();
+			_scanFilters = new ArrayList<>();
+		}
+
 		if (!_receiverRegistered) {
 			_context.registerReceiver(_receiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
 			_context.registerReceiver(_receiver, new IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION));
@@ -501,15 +509,6 @@ public class BleCore extends Logging {
 			}, BLUETOOTH_ENABLE_TIMEOUT);
 		} else {
 			getLogger().LOGd(TAG, "Bluetooth already enabled");
-
-			if (Build.VERSION.SDK_INT >= 21) {
-				_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
-				_scanSettings = new ScanSettings.Builder()
-						.setScanMode(_scanMode)
-						.build();
-				_scanFilters = new ArrayList<>();
-			}
-
 //			_initialized = true;
 //			callback.onSuccess();
 			_bluetoothReady = true;
@@ -551,6 +550,17 @@ public class BleCore extends Logging {
 		if (_bluetoothAdapter.isEnabled()) {
 			_resettingBle = true;
 			_bluetoothAdapter.disable();
+			_timeoutHandler.postDelayed(new Runnable() {
+				@Override
+				public void run() {
+					if (!_bluetoothAdapter.isEnabled()) {
+
+						JSONObject status = new JSONObject();
+						setStatus(status, "BLUETOOTH_OFF");
+						_stateCallback.onData(status);
+					}
+				}
+			}, BLUETOOTH_ENABLE_TIMEOUT);
 		}
 	}
 
@@ -597,7 +607,10 @@ public class BleCore extends Logging {
 					connection.setConnectionState(ConnectionState.DISCONNECTED);
 					BluetoothGatt gatt = connection.getGatt();
 					if (gatt != null) {
-						connection.getGatt().close();
+						// [17.01.17] call gatt.disconnect(), just in case the connection stays open
+						//   even after calling gatt.close()
+						gatt.disconnect();
+						gatt.close();
 					} else {
 						getLogger().LOGe(TAG, "gatt == null");
 					}
@@ -608,6 +621,8 @@ public class BleCore extends Logging {
 					} else {
 						getLogger().LOGe(TAG, "_connectionCallback == null");
 					}
+				} else {
+					getLogger().LOGe(TAG, "connection == null");
 				}
 			}
 		};
@@ -889,7 +904,7 @@ public class BleCore extends Logging {
 
 	public synchronized boolean startEndlessScan(String[] uuids, IDataCallback callback) {
 
-		getLogger().LOGv(TAG, "startEndlessScan ...");
+		getLogger().LOGd(TAG, "startEndlessScan ...");
 
 
 		if (!isInitialized()) {
@@ -937,10 +952,10 @@ public class BleCore extends Logging {
 					_scanFilters.add(filter);
 				}
 			}
-			getLogger().LOGv(TAG, "BluetoothLeScanner.startScan");
+			getLogger().LOGd(TAG, "BluetoothLeScanner.startScan");
 			_leScanner.startScan(_scanFilters, _scanSettings, _coreScanCallback);
 		} else {
-			getLogger().LOGv(TAG, "BluetoothAdapter.startLeScan");
+			getLogger().LOGd(TAG, "BluetoothAdapter.startLeScan");
 			if (uuids.length == 0) {
 				_scanning = _bluetoothAdapter.startLeScan(_coreLeScanCallback);
 			} else {
@@ -949,13 +964,13 @@ public class BleCore extends Logging {
 			}
 
 			if (!_scanning) {
-				getLogger().LOGe(TAG, "startEndlessScan ... error: failed to start LeScan");
+				getLogger().LOGd(TAG, "startEndlessScan ... error: failed to start LeScan");
 				callback.onError(BleErrors.ERROR_SCAN_FAILED);
 				return false;
 			}
 		}
 
-		getLogger().LOGv(TAG, "startEndlessScan ... done");
+		getLogger().LOGd(TAG, "startEndlessScan ... done");
 		return true;
 	}
 
@@ -990,7 +1005,7 @@ public class BleCore extends Logging {
 
 	public synchronized boolean stopEndlessScan(IStatusCallback callback) {
 
-		getLogger().LOGv(TAG, "stopEndlessScan ...");
+		getLogger().LOGd(TAG, "stopEndlessScan ...");
 
 		if (!isInitialized()) {
 			if (callback != null) callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
@@ -1017,7 +1032,7 @@ public class BleCore extends Logging {
 
 		if (callback != null) callback.onSuccess();
 
-		getLogger().LOGv(TAG, "stopEndlessScan ... done");
+		getLogger().LOGd(TAG, "stopEndlessScan ... done");
 		return true;
 	}
 
@@ -1633,6 +1648,9 @@ public class BleCore extends Logging {
 				//   and BluetoothGatt calls close by itself
 				// [09.01.17] This seems to lead to staying connected.
 				//   We have to figure out which errors automatically disconnect and which don't.
+				// [17.01.17] call gatt.disconnect(), just in case the connection stays open
+				//   even after calling gatt.close()
+				gatt.disconnect();
 				gatt.close();
 				connection.setConnectionState(ConnectionState.DISCONNECTED);
 

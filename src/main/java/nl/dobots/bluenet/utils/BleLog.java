@@ -1,8 +1,25 @@
 package nl.dobots.bluenet.utils;
 
+import android.Manifest;
+import android.app.Activity;
+import android.content.pm.PackageManager;
+import android.os.Build;
+import android.os.Environment;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.concurrent.Semaphore;
+
+import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -23,9 +40,17 @@ import java.util.HashMap;
  */
 public class BleLog {
 
+	public static final String TAG = "BleLog";
+
 	private int _logLevel = Log.VERBOSE;
+	private int _fileLogLevel = _logLevel;
+
+	private HashMap<String, Integer> _logLevels = new HashMap<>();
+	private HashMap<String, Integer> _fileLogLevels = new HashMap<>();
 
 	private static BleLog _instance;
+
+	private static FileLogger _fileLogger = null;
 
 	public BleLog(int logLevel) {
 		_logLevel = logLevel;
@@ -42,10 +67,23 @@ public class BleLog {
 		return _instance;
 	}
 
-	private HashMap<String, Integer> _logLevels = new HashMap<>();
+	public static boolean addFileLogger(FileLogger logger) {
+		if (!logger.hasRequestedPermissions()) {
+			getInstance().LOGe(TAG, "file logger didn't request write permissions!!");
+			return false;
+		} else {
+			_fileLogger = logger;
+			return true;
+		}
+	};
 
 	public void setLogLevelPerTag(String tag, int logLevel) {
+		setLogLevelPerTag(tag, logLevel, logLevel);
+	}
+
+	public void setLogLevelPerTag(String tag, int logLevel, int fileLogLevel) {
 		_logLevels.put(tag, logLevel);
+		_fileLogLevels.put(tag, fileLogLevel);
 	}
 
 	public Integer getLogLevel(String tag) {
@@ -57,12 +95,21 @@ public class BleLog {
 	 * @param level the log level to be set
 	 */
 	public void setLogLevel(int level) {
-		_logLevel = level;
+		setLogLevel(level, level);
+	}
+
+	public void setLogLevel(int logLevel, int fileLogLevel) {
+		_logLevel = logLevel;
+		_fileLogLevel = fileLogLevel;
 	}
 
 	public int getLogLevel() {
 		return _logLevel;
 	}
+
+	public int getFileLogLevel() { return _fileLogLevel; }
+
+
 
 	private int getLineNumber() {
 		return Thread.currentThread().getStackTrace()[5].getLineNumber();
@@ -78,9 +125,23 @@ public class BleLog {
 		}
 	}
 
+	private boolean checkFileLogLevel(String tag, int checkLevel) {
+		Integer logLevel = _fileLogLevels.get(tag);
+		if (logLevel == null) {
+			return _fileLogLevel <= checkLevel;
+		} else {
+			return logLevel <= checkLevel;
+		}
+	}
+
 	private void log(int level, String tag, String message) {
 		if (checkLogLevel(tag, level)) {
-			Log.println(level, tag, String.format("[%d] %s", getLineNumber(), message));
+			String line = String.format("[%d] %s", getLineNumber(), message);
+			Log.println(level, tag, line);
+		}
+		if (_fileLogger != null && _fileLogger.isEnabled() && checkFileLogLevel(tag, level)) {
+			String line = String.format("[%d] %s", getLineNumber(), message);
+			_fileLogger.logToFile(level, tag, line);
 		}
 	}
 
@@ -129,5 +190,9 @@ public class BleLog {
 	public void LOGw(String tag, String fmt, Object ... args) {
 		log(Log.WARN, tag, String.format(fmt, args));
 	}
+
+	//***********************************************
+	//* LOG TO FILE
+	//***********************************************
 
 }

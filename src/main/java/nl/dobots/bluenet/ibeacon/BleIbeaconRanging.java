@@ -58,6 +58,8 @@ public class BleIbeaconRanging {
 	// handler used for delayed execution and timeouts
 	private Handler _handler;
 
+	private int _minRssi = 0;
+
 	public BleIbeaconRanging() {
 		_iBeaconFilter = new ArrayList<>();
 //		_scanCallbacks = new HashSet<>();
@@ -107,6 +109,9 @@ public class BleIbeaconRanging {
 		return _iBeaconFilter;
 	}
 
+	public BleDeviceMap getDeviceMap() {
+		return _devices;
+	}
 
 //	public boolean subscribe(IBleBeaconCallback callback) {
 //		return _scanCallbacks.add(callback);
@@ -134,26 +139,31 @@ public class BleIbeaconRanging {
 		// TODO: Fire event to listeners?
 	}
 
+	// Rssi threshold for enter region events
+	public void setRssiThreshold(int rssi) {
+		_minRssi = rssi;
+	}
+
 	public Set getEnteredRegions() {
 		return _inRegion;
 	}
 
-
-	public synchronized boolean onScannedDevice(BleDevice device, @Nullable IBleBeaconCallback callback) {
-
-		boolean iBeaconMatch = false;
+	public boolean isMatch(BleDevice device) {
 		if (_iBeaconFilter.isEmpty() || _paused) return false;
-//		if (callback == null && _scanCallbacks.isEmpty()) return false;
-		if (callback == null && _rangingListeners.isEmpty()) return false;
 		if (device.isIBeacon()) {
 			for (BleIbeaconFilter iBeaconFilter : _iBeaconFilter) {
 				if (iBeaconFilter.matches(device.getProximityUuid(), device.getMajor(), device.getMinor())) {
-					iBeaconMatch = true;
-					break;
+					return true;
 				}
 			}
 //		} else { Log.d(TAG, "is not ibeacon"); }
 		}
+		return false;
+	}
+
+
+	public synchronized boolean onScannedDevice(BleDevice device, @Nullable IBleBeaconCallback callback) {
+		boolean iBeaconMatch = isMatch(device);
 		if (iBeaconMatch) {
 			getLogger().LOGv(TAG, "matching ibeacon filter: " + device.getAddress() + " (" + device.getName() + ")");
 			device = updateDevice(device);
@@ -161,11 +171,13 @@ public class BleIbeaconRanging {
 //				cb.onBeaconScanned(device);
 //			}
 
-			long currentTime = SystemClock.elapsedRealtime();
-			_lastSeen.put(device.getProximityUuid(), currentTime);
-			getLogger().LOGv(TAG, "lastseen " + device.getProximityUuid() + " at " + currentTime + "=" + _lastSeen.get(device.getProximityUuid()));
-			if (!_inRegion.contains(device.getProximityUuid())) {
-				enterRegion(device.getProximityUuid());
+			if (_minRssi >= device.getRssi()) {
+				long currentTime = SystemClock.elapsedRealtime();
+				_lastSeen.put(device.getProximityUuid(), currentTime);
+				getLogger().LOGv(TAG, "lastseen " + device.getProximityUuid() + " at " + currentTime + "=" + _lastSeen.get(device.getProximityUuid()));
+				if (!_inRegion.contains(device.getProximityUuid())) {
+					enterRegion(device.getProximityUuid());
+				}
 			}
 
 			for (BleBeaconRangingListener listener : _rangingListeners) {

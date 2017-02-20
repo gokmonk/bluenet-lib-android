@@ -126,6 +126,11 @@ public class BleScanService extends Service {
 	public static final String EXTRA_LOG_LEVEL = "logLevel";
 
 	/**
+	 * Set the default log level to file of the scan service and the ble library that the service is using
+	 */
+	public static final String EXTRA_FILE_LOG_LEVEL = "fileLogLevel";
+
+	/**
 	 * values for EXTRA_SCAN_FILTER:
 	 *   FILTER_ALL: return all scanned BLE devices
 	 *   FILTER_CROWNSTONE: return only scanned crownstones
@@ -390,7 +395,8 @@ public class BleScanService extends Service {
 				_autoStart = bundle.getBoolean(EXTRA_AUTO_START, DEFAULT_AUTO_START);
 				_scanFilter = getFilterFromExtra(bundle);
 				int logLevel = bundle.getInt(EXTRA_LOG_LEVEL, LOG_LEVEL);
-				getLogger().setLogLevel(logLevel);
+				int fileLogLevel = bundle.getInt(EXTRA_FILE_LOG_LEVEL, LOG_LEVEL);
+				getLogger().setLogLevel(logLevel, fileLogLevel);
 			}
 		}
 	}
@@ -444,14 +450,14 @@ public class BleScanService extends Service {
 		public void run() {
 
 			// wait until service is resumed before starting the next interval
-			while (_paused) { }
+			while (_paused) {}
 
 			if (isScanActive()) {
 				getLogger().LOGw(TAG, "already scanning ...");
 				return;
 			}
 
-			getLogger().LOGv(TAG, "starting scan interval ...");
+			getLogger().LOGd(TAG, "starting scan interval ...");
 			if (_ble.startScan(false, new IBleDeviceCallback() {
 
 				@Override
@@ -497,7 +503,9 @@ public class BleScanService extends Service {
 				_startScanRetryNum = 0;
 
 				onIntervalScanStart();
-				_intervalScanHandler.postDelayed(_stopScanRunnable, _scanInterval);
+				if (_scanPause > 0) {
+					_intervalScanHandler.postDelayed(_stopScanRunnable, _scanInterval);
+				}
 			}
 //			else {
 //				getLogger().LOGe(TAG, "... scan interval start error");
@@ -512,7 +520,7 @@ public class BleScanService extends Service {
 	 * @param device the scanned device
 	 */
 	private void notifyDeviceScanned(BleDevice device) {
-		getLogger().LOGv(TAG, String.format(Locale.US, "scanned device: %s [%d] (%d)", device.getName(), device.getRssi(), device.getOccurrences()));
+		getLogger().LOGv(TAG, String.format(Locale.US, "scanned device: %s [%d] (%d) %s", device.getAddress(), device.getRssi(), device.getOccurrences(), device.getName()));
 
 		for (ScanDeviceListener listener : _scanDeviceListeners) {
 			listener.onDeviceScanned(device);
@@ -534,7 +542,7 @@ public class BleScanService extends Service {
 				return;
 			}
 
-			getLogger().LOGv(TAG, "pausing scan interval ...");
+			getLogger().LOGd(TAG, "pausing scan interval ...");
 			if (_ble.stopScan(new IStatusCallback() {
 				@Override
 				public void onSuccess() {
@@ -554,7 +562,7 @@ public class BleScanService extends Service {
 					sendEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
 				}
 			})) {
-				getLogger().LOGv(TAG, "... scan interval paused");
+				getLogger().LOGd(TAG, "... scan interval paused");
 				_scanning = false;
 			}
 			else {
@@ -590,7 +598,7 @@ public class BleScanService extends Service {
 	public void startIntervalScan(BleDeviceFilter filter) {
 		_ble.setScanFilter(filter);
 		setScanningState(true);
-		getLogger().LOGi(TAG, "startIntervalScan");
+		getLogger().LOGi(TAG, "startIntervalScan with interval=" + _scanInterval + " pause=" + _scanPause);
 
 		if (!_initialized) {
 			getLogger().LOGi(TAG, "Start scan");

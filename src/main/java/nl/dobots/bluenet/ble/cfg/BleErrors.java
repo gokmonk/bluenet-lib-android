@@ -52,6 +52,7 @@ public class BleErrors {
 	public static final int ERROR_SETUP_FAILED = 240;
 	public static final int ERROR_VALIDATION_FAILED = 241;
 	public static final int ERROR_LOCATION_SERVICES_TURNED_OFF = 242;
+	public static final int ERROR_SETUP_CANCELED = 243;
 
 
 	// BleBase
