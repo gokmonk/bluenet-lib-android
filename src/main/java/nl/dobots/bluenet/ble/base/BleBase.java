@@ -195,8 +195,8 @@ public class BleBase extends BleCore {
 	 * @param callback the callback to be notified if devices are detected
 	 * @return true if the scan was started, false otherwise
 	 */
-	public boolean startEndlessScan(final IBleDeviceCallback callback) {
-		return this.startEndlessScan(new String[]{}, callback);
+	public void startEndlessScan(final IBleDeviceCallback callback) {
+		startEndlessScan(new String[]{}, callback);
 	}
 
 	/**
@@ -211,9 +211,9 @@ public class BleBase extends BleCore {
 	 * @param serviceUuids a list of UUIDs to filter for
 	 * @return true if the scan was started, false otherwise
 	 */
-	public boolean startEndlessScan(String[] serviceUuids,  final IBleDeviceCallback callback) {
+	public void startEndlessScan(String[] serviceUuids,  final IBleDeviceCallback callback) {
 		// wrap the status callback to do some pre-processing of the scan result data
-		return super.startEndlessScan(serviceUuids, new IDataCallback() {
+		super.startEndlessScan(serviceUuids, new IDataCallback() {
 
 			@Override
 			public void onError(int error) {

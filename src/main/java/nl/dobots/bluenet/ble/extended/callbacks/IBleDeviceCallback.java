@@ -1,6 +1,7 @@
 package nl.dobots.bluenet.ble.extended.callbacks;
 
 import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.extended.structs.BleDevice;
 
 /**
@@ -20,7 +21,7 @@ import nl.dobots.bluenet.ble.extended.structs.BleDevice;
  *
  * @author Dominik Egger
  */
-public interface IBleDeviceCallback extends IBaseCallback {
+public interface IBleDeviceCallback extends IStatusCallback {
 
 	void onDeviceScanned(BleDevice device);
 
