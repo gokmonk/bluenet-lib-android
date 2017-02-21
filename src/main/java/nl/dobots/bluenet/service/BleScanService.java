@@ -209,6 +209,7 @@ public class BleScanService extends Service {
 
 		_ble = new BleExt();
 		_ble.setLogger(_logger);
+		_ble.setEventListener(_btEventListener);
 
 		getLogger().LOGi(TAG, "starting up scan service");
 
@@ -291,7 +292,7 @@ public class BleScanService extends Service {
 				}
 				_initialized = false;
 			}
-		}, _btStateCallback);
+		});
 	}
 
 	/**
@@ -301,7 +302,7 @@ public class BleScanService extends Service {
 	 * The service will also automatically pause scanning if bluetooth is turned off, and
 	 * resume scanning if bluetooth is turned on again (only if it was scanning before it was turned off)
 	 */
-	private EventListener _btStateCallback = new EventListener() {
+	private EventListener _btEventListener = new EventListener() {
 
 		@Override
 		public void onEvent(Event event) {

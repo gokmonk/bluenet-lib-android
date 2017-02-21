@@ -38,4 +38,11 @@ public class BleCoreTypes {
 
 	public static final String CHARACTERISTIC_UNSUBSCRIBED = "unsubscribed";
 	public static final String CHARACTERISTIC_SUBSCRIBED = "subscribed";
+
+	// EVENT status values
+	public static final String EVT_BLUETOOTH_OFF = "BLUETOOTH_OFF";
+	public static final String EVT_BLUETOOTH_ON = "BLUETOOTH_ON";
+	public static final String EVT_LOCATION_SERVICES_ON = "LOCATION_SERVICES_ON";
+	public static final String EVT_LOCATION_SERVICES_OFF = "LOCATION_SERVICES_OFF";
+
 }

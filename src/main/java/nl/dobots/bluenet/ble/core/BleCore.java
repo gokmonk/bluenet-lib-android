@@ -176,9 +176,9 @@ public class BleCore extends Logging {
 	private boolean _scanning;
 
 	// callbacks used to notify events
-	private IScanCallback _scanCallback;
-	private IStatusCallback _initializeCallback;
-	private IDataCallback _stateCallback;
+	private IScanCallback _scanCallback = null;
+	private IStatusCallback _initializeCallback = null;
+	private IDataCallback _eventCallback = null;
 
 	// timeout handler to check for function timeouts, e.g. bluetooth enable, connect, reconnect, etc.
 	private Handler _timeoutHandler;
@@ -213,6 +213,14 @@ public class BleCore extends Logging {
 		destroy();
 	}
 
+	private void sendEvent(String event) {
+		if (_eventCallback != null) {
+			JSONObject status = new JSONObject();
+			setStatus(status, event);
+			_eventCallback.onData(status);
+		}
+	}
+
 	/**
 	 * Broadcast receiver used to handle Bluetooth Events, i.e. turning on and off of the
 	 * Bluetooth Adapter
@@ -220,7 +228,6 @@ public class BleCore extends Logging {
 	private BroadcastReceiver _receiver = new BroadcastReceiver() {
 		@Override
 		public void onReceive(Context context, Intent intent) {
-//			if (_initializeCallback == null) return;
 
 			if (intent.getAction().equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
 				bleDialogShowing = false;
@@ -228,21 +235,15 @@ public class BleCore extends Logging {
 					case BluetoothAdapter.STATE_OFF: {
 						_bluetoothReady = false;
 
-						JSONObject status = new JSONObject();
-						setStatus(status, "BLUETOOTH_OFF");
-						_stateCallback.onData(status);
+						// if bluetooth is turned off inform state callback about the change
+						sendEvent(BleCoreTypes.EVT_BLUETOOTH_OFF);
 
-						// if bluetooth state turns off because of a reset, enable it again
 						_connections = new HashMap<>();
 						_scanning = false;
-//							_scanCallback = null;
-//						_initialized = false;
 
+						// if bluetooth state turns off because of a reset, enable it again
 						if (_resettingBle) {
 							_bluetoothAdapter.enable();
-						} else {
-							// if bluetooth is turned off, call onError on the bt state callback
-//							_initializeCallback.onError(BleErrors.ERROR_BLUETOOTH_TURNED_OFF);
 						}
 
 						break;
@@ -250,9 +251,8 @@ public class BleCore extends Logging {
 					case BluetoothAdapter.STATE_ON: {
 						_bluetoothReady = true;
 
-						JSONObject status = new JSONObject();
-						setStatus(status, "BLUETOOTH_ON");
-						_stateCallback.onData(status);
+						// if bluetooth is turned on inform state callback about the change
+						sendEvent(BleCoreTypes.EVT_BLUETOOTH_ON);
 
 						if (Build.VERSION.SDK_INT >= 21) {
 							_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
@@ -265,7 +265,6 @@ public class BleCore extends Logging {
 						// if bluetooth state turns on because of a reset, then reset was completed
 						if (_resettingBle) {
 							_resettingBle = false;
-//							_initialized = true;
 						} else {
 							// if location services are ready, notify success
 							if (_locationServicesReady) {
@@ -307,19 +306,13 @@ public class BleCore extends Logging {
 					}
 					_locationServicesReady = true;
 
-					JSONObject status = new JSONObject();
-					setStatus(status, "LOCATION_SERVICES_ON");
-					_stateCallback.onData(status);
+					// if location services are turned on inform state callback about the change
+					sendEvent(BleCoreTypes.EVT_LOCATION_SERVICES_ON);
 				} else {
-//					_initialized = false;
-					if (_locationServicesReady) {
-//						_initializeCallback.onError(BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF);
-					}
 					_locationServicesReady = false;
 
-					JSONObject status = new JSONObject();
-					setStatus(status, "LOCATION_SERVICES_OFF");
-					_stateCallback.onData(status);
+					// if location services are turned off inform state callback about the change
+					sendEvent(BleCoreTypes.EVT_LOCATION_SERVICES_OFF);
 				}
 			}
 		}
@@ -357,7 +350,7 @@ public class BleCore extends Logging {
 		switch (requestCode) {
 			case PERMISSIONS_REQUEST_LOCATION: {
 				if (grantResults.length > 0 &&	grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-					init(_context, _initializeCallback, _stateCallback);
+					init(_context, _initializeCallback);
 					callback.onSuccess();
 				} else {
 					callback.onError(BleErrors.ERROR_BLE_PERMISSION_MISSING);
@@ -384,6 +377,15 @@ public class BleCore extends Logging {
 		return null;
 	}
 
+	/**	Set an event callback listener. will be informed about events such as bluetooth on / off,
+	 *  location services on / off, etc.
+	 *
+	 *  @param callback callback used to report if bluetooth is enabled / disabled, etc.
+	 */
+	public void setEventCallback(IDataCallback callback) {
+		_eventCallback = callback;
+	}
+
 	/**
 	 * Initializes the BLE Modules and tries to enable the Bluetooth adapter. Note, the callback
 	 * provided as parameter will persist. The callback will be triggered whenever the state of
@@ -392,14 +394,13 @@ public class BleCore extends Logging {
 	 * will be triggered. If the user denies enabling bluetooth, then onError will be called after
 	 * a timeout expires
 	 * @param context the context used to enable bluetooth, this can be a service or an activity
-	 * @param callback callback, used to report back if bluetooth is enabled / disabled
+	 * @param callback callback, used to report back init was successful or not
 	 */
 	@SuppressLint("NewApi")
-	public void init(Context context, IStatusCallback callback, IDataCallback stateCallback) {
+	public void init(Context context, IStatusCallback callback) {
 		_context = context;
 
 		_initializeCallback = callback;
-		_stateCallback = stateCallback;
 
 		getLogger().LOGd(TAG, "Initialize BLE hardware");
 		if (!context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE) ||
@@ -543,6 +544,7 @@ public class BleCore extends Logging {
 		_connectionCallback = null;
 		_discoveryCallback = null;
 		_initializeCallback = null;
+		_eventCallback = null;
 		_scanCallback = null;
 		_characteristicsReadCallback = null;
 		_characteristicsWriteCallback = null;
@@ -558,8 +560,8 @@ public class BleCore extends Logging {
 					if (!_bluetoothAdapter.isEnabled()) {
 
 						JSONObject status = new JSONObject();
-						setStatus(status, "BLUETOOTH_OFF");
-						_stateCallback.onData(status);
+						setStatus(status, "EVT_BLUETOOTH_OFF");
+						_eventCallback.onData(status);
 					}
 				}
 			}, BLUETOOTH_ENABLE_TIMEOUT);

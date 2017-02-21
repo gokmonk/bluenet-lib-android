@@ -18,6 +18,7 @@ import java.util.HashMap;
 
 import nl.dobots.bluenet.ble.base.BleBase;
 import nl.dobots.bluenet.ble.base.BleBaseEncryption;
+import nl.dobots.bluenet.ble.core.BleCoreTypes;
 import nl.dobots.bluenet.ble.extended.callbacks.EventListener;
 import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
@@ -252,6 +253,45 @@ public class BleExt extends Logging implements IWriteCallback {
 		return _bleBase.enableEncryption(enable);
 	}
 
+	/**	Set an event callback listener. will be informed about events such as bluetooth on / off,
+	 *  location services on / off, etc.
+	 *
+	 *  @param listener listener used to report if bluetooth is enabled / disabled, etc.
+	 */
+	public void setEventListener(final EventListener listener) {
+		_bleBase.setEventCallback(new IDataCallback() {
+			@Override
+			public void onData(JSONObject json) {
+				String state = BleCore.getStatus(json);
+				if (state != null) {
+					switch (state) {
+						case BleCoreTypes.EVT_BLUETOOTH_ON: {
+							listener.onEvent(EventListener.Event.BLUETOOTH_TURNED_ON);
+							break;
+						}
+						case BleCoreTypes.EVT_BLUETOOTH_OFF: {
+							listener.onEvent(EventListener.Event.BLUETOOTH_TURNED_OFF);
+							break;
+						}
+						case BleCoreTypes.EVT_LOCATION_SERVICES_ON: {
+							listener.onEvent(EventListener.Event.LOCATION_SERVICES_TURNED_ON);
+							break;
+						}
+						case BleCoreTypes.EVT_LOCATION_SERVICES_OFF: {
+							listener.onEvent(EventListener.Event.LOCATION_SERVICES_TURNED_OFF);
+							break;
+						}
+					}
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+
+			}
+		});
+	}
+
 	/**
 	 * Initializes the BLE Modules and tries to enable the Bluetooth adapter. Note, the callback
 	 * provided as parameter will persist. The callback will be triggered whenever the state of
@@ -262,10 +302,8 @@ public class BleExt extends Logging implements IWriteCallback {
 	 *
 	 * @param context       the context used to enable bluetooth, this can be a service or an activity
 	 * @param callback      callback, used to report back success / error of the initialization
-	 * @param eventCallback event callback to inform changes like bluetooth on / off, location services
-	 *                      on / off
 	 */
-	public void init(Context context, final IStatusCallback callback, @Nullable final EventListener eventCallback) {
+	public void init(Context context, final IStatusCallback callback) {
 		_bleBase.init(context, new IStatusCallback() {
 					@Override
 					public void onSuccess() {
@@ -277,38 +315,6 @@ public class BleExt extends Logging implements IWriteCallback {
 					public void onError(int error) {
 						_connectionState = BleDeviceConnectionState.uninitialized;
 						callback.onError(error);
-					}
-				}, new IDataCallback() {
-					@Override
-					public void onData(JSONObject json) {
-						if (eventCallback == null) return;
-
-						String state = BleCore.getStatus(json);
-						if (state != null) {
-							switch (state) {
-								case "BLUETOOTH_ON": {
-									eventCallback.onEvent(EventListener.Event.BLUETOOTH_TURNED_ON);
-									break;
-								}
-								case "BLUETOOTH_OFF": {
-									eventCallback.onEvent(EventListener.Event.BLUETOOTH_TURNED_OFF);
-									break;
-								}
-								case "LOCATION_SERVICES_ON": {
-									eventCallback.onEvent(EventListener.Event.LOCATION_SERVICES_TURNED_ON);
-									break;
-								}
-								case "LOCATION_SERVICES_OFF": {
-									eventCallback.onEvent(EventListener.Event.LOCATION_SERVICES_TURNED_OFF);
-									break;
-								}
-							}
-						}
-					}
-
-					@Override
-					public void onError(int error) {
-
 					}
 				}
 		);
