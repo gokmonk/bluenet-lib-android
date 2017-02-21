@@ -27,6 +27,7 @@ import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IPowerSamplesCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IWriteCallback;
 import nl.dobots.bluenet.ble.base.callbacks.SimpleExecStatusCallback;
 import nl.dobots.bluenet.ble.base.structs.CommandMsg;
 import nl.dobots.bluenet.ble.base.structs.MeshMsg;
@@ -61,7 +62,7 @@ import nl.dobots.bluenet.utils.BleUtils;
  *
  * @author Dominik Egger
  */
-public class BleExt extends Logging {
+public class BleExt extends Logging implements IWriteCallback {
 
 	private static final String TAG = BleExt.class.getCanonicalName();
 	private static final int LOG_LEVEL = Log.VERBOSE;
@@ -111,6 +112,7 @@ public class BleExt extends Logging {
 
 	public BleExt() {
 		_bleBase = new BleBase();
+		_bleBase.setOnWriteCallback(this);
 
 		_bleExtState = new BleExtState(this);
 
@@ -619,10 +621,6 @@ public class BleExt extends Logging {
 	 */
 	private Runnable _connectionKeepAlive = new Runnable() {
 
-		private void reSchedule() {
-			_handler.postDelayed(this, CONNECTION_ALIVE_INTERVAL);
-		}
-
 		@Override
 		public void run() {
 			if (isConnected(null)) {
@@ -631,18 +629,28 @@ public class BleExt extends Logging {
 						@Override
 						public void onSuccess() {
 							getLogger().LOGd(TAG, "keep connection alive success");
-							reSchedule();
+							rescheduleConnectionKeepAlive();
 						}
 
 						@Override
 						public void onError(int error) {
 							getLogger().LOGd(TAG, "keep connection alive error: %d", error);
-							reSchedule();
+							rescheduleConnectionKeepAlive();
 						}
 					});
 			}
 		}
 	};
+
+	private void rescheduleConnectionKeepAlive() {
+		_handler.removeCallbacks(_connectionKeepAlive);
+		_handler.postDelayed(_connectionKeepAlive, CONNECTION_ALIVE_INTERVAL);
+	}
+
+	@Override
+	public void onWrite() {
+		rescheduleConnectionKeepAlive();
+	}
 
 	/**
 	 * Disconnect from the currently connected device. use the callback to report back

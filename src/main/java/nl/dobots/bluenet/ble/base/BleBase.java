@@ -28,6 +28,7 @@ import nl.dobots.bluenet.ble.base.callbacks.IScanCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.ISubscribeCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IWriteCallback;
 import nl.dobots.bluenet.ble.base.structs.CommandMsg;
 import nl.dobots.bluenet.ble.base.structs.ConfigurationMsg;
 import nl.dobots.bluenet.ble.base.structs.CrownstoneServiceData;
@@ -64,6 +65,8 @@ public class BleBase extends BleCore {
 	private EncryptionSessionData _encryptionSessionData = null;
 	private boolean _setupMode = false;
 
+	private IWriteCallback _onWriteCallback = null;
+
 	/** Hashmap of all subscribers, based on characeristic UUID */
 	private HashMap<UUID, ArrayList<IDataCallback>> _subscribers = new HashMap<>();
 
@@ -93,6 +96,10 @@ public class BleBase extends BleCore {
 		HandlerThread handlerThread = new HandlerThread("BleBaseHandler");
 		handlerThread.start();
 		_handler = new Handler(handlerThread.getLooper());
+	}
+
+	public void setOnWriteCallback(IWriteCallback onWriteCallback) {
+		_onWriteCallback = onWriteCallback;
 	}
 
 	IStatusCallback _silentStatusCallback = new IStatusCallback() {
@@ -150,6 +157,9 @@ public class BleBase extends BleCore {
 	}
 
 	public boolean write(String address, String serviceUuid, String characteristicUuid, byte[] value, char accessLevel, IStatusCallback callback) {
+		if (_onWriteCallback != null) {
+			_onWriteCallback.onWrite();
+		}
 		if (_encryptionEnabled && accessLevel != BleBaseEncryption.ACCESS_LEVEL_ENCRYPTION_DISABLED) {
 			// Just use highest available key
 			EncryptionKeys.KeyAccessLevelPair keyAccessLevelPair = _encryptionKeys.getHighestKey();
