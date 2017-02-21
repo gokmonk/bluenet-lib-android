@@ -1,8 +1,6 @@
-package nl.dobots.bluenet.ble.extended.callbacks;
+package nl.dobots.bluenet.ble.base.callbacks;
 
-import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
-import nl.dobots.bluenet.ble.extended.structs.BleDevice;
+import org.json.JSONObject;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -17,12 +15,14 @@ import nl.dobots.bluenet.ble.extended.structs.BleDevice;
  * version 3 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  * <p/>
- * Created on 15-7-15
+ * Created on 14-7-15
+ *
+ * Return data as a JSON object
  *
  * @author Dominik Egger
  */
-public interface IBleDeviceCallback extends IStatusCallback {
+public interface IScanCallback extends IStatusCallback {
 
-	void onDeviceScanned(BleDevice device);
+	void onData(JSONObject json);
 
 }
