@@ -328,8 +328,8 @@ public class BleExt extends Logging {
 	 * @param callback callback used to report back scanned devices
 	 * @return true if the scan was started, false if an error occurred
 	 */
-	public boolean startScan(final IBleDeviceCallback callback) {
-		return startScan(true, callback);
+	public void startScan(final IBleDeviceCallback callback) {
+		startScan(true, callback);
 	}
 
 	/**
@@ -340,12 +340,12 @@ public class BleExt extends Logging {
 	 * @param callback  callback used to report back scanned devices
 	 * @return true if the scan was started, false if an error occurred
 	 */
-	public boolean startScan(boolean clearList, final IBleDeviceCallback callback) {
+	public void startScan(boolean clearList, final IBleDeviceCallback callback) {
 		if (clearList) {
 			clearDeviceMap();
 		}
 //		return startEndlessScan(callback, null);
-		return startEndlessScan(callback);
+		startEndlessScan(callback);
 	}
 
 //	/**
@@ -376,17 +376,22 @@ public class BleExt extends Logging {
 	 * @return true if the scan was started, false if an error occurred
 	 */
 //	private boolean startEndlessScan(final IBleDeviceCallback callback, @Nullable final IBleBeaconCallback beaconCallback) {
-	private boolean startEndlessScan(final IBleDeviceCallback callback) {
+	private void startEndlessScan(final IBleDeviceCallback callback) {
 //		checkConnectionState(BleDeviceConnectionState.initialized, null);
 		if (_connectionState != BleDeviceConnectionState.initialized) {
 			getLogger().LOGe(TAG, "State is not initialized: %s", _connectionState.toString());
 			callback.onError(BleErrors.ERROR_WRONG_STATE);
-			return false;
+			return;
 		}
 
 		_connectionState = BleDeviceConnectionState.scanning;
 
-		return _bleBase.startEndlessScan(new IBleDeviceCallback() {
+		_bleBase.startEndlessScan(new IBleDeviceCallback() {
+			@Override
+			public void onSuccess() {
+				callback.onSuccess();
+			}
+
 			@Override
 			public void onDeviceScanned(BleDevice device) {
 
@@ -494,9 +499,9 @@ public class BleExt extends Logging {
 	 * @param callback the callback used to report success or failure of the stop scan
 	 * @return true if the scan was stopped, false otherwise
 	 */
-	public boolean stopScan(final IStatusCallback callback) {
+	public void stopScan(final IStatusCallback callback) {
 		_connectionState = BleDeviceConnectionState.initialized;
-		return _bleBase.stopEndlessScan(callback);
+		_bleBase.stopEndlessScan(callback);
 	}
 
 	/**
@@ -609,7 +614,7 @@ public class BleExt extends Logging {
 
 	/**
 	 * Keeps the connection alive by sending NOP commands to the device.
-	 * Could be improved by taking advantage of other writes and only send a NOP if no other
+	 * ToDo: Has to be improved by taking advantage of other writes and only send a NOP if no other
 	 * write was sent.
 	 */
 	private Runnable _connectionKeepAlive = new Runnable() {

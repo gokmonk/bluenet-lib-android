@@ -30,6 +30,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.ParcelUuid;
 import android.os.SystemClock;
+import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
@@ -866,11 +867,11 @@ public class BleCore extends Logging {
 		});
 	}
 
-	public boolean startEndlessScan(IDataCallback callback) {
-		return startEndlessScan(new String[] {}, callback);
+	public void startEndlessScan(IDataCallback callback) {
+		startEndlessScan(new String[] {}, callback);
 	}
 
-	public synchronized boolean startEndlessScan(String[] uuids, IDataCallback callback) {
+	public synchronized void startEndlessScan(String[] uuids, IDataCallback callback) {
 
 		getLogger().LOGd(TAG, "startEndlessScan ...");
 
@@ -878,13 +879,27 @@ public class BleCore extends Logging {
 		if (!isInitialized()) {
 			getLogger().LOGe(TAG, "startEndlessScan ... error: not initialized");
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
-			return false;
+			return;
+		}
+
+		if (!_bluetoothAdapter.isEnabled()) {
+			getLogger().LOGe(TAG, "startEndlessScan ... error: ble disabled");
+			callback.onError(BleErrors.ERROR_BLUETOOTH_NOT_ENABLED);
+			return;
+		}
+
+		if (Build.VERSION.SDK_INT >= 23) {
+			if (!isLocationServicesEnabled()) {
+				getLogger().LOGe(TAG, "startEndlessScan ... error: location services disabled");
+				callback.onError(BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF);
+				return;
+			}
 		}
 
 		if (isScanning()) {
 			getLogger().LOGe(TAG, "startEndlessScan ... error: already scanning");
 			callback.onError(BleErrors.ERROR_ALREADY_SCANNING);
-			return false;
+			return;
 		}
 
 		_scanCallback = callback;
@@ -920,12 +935,11 @@ public class BleCore extends Logging {
 			if (!_scanning) {
 				getLogger().LOGd(TAG, "startEndlessScan ... error: failed to start LeScan");
 				callback.onError(BleErrors.ERROR_SCAN_FAILED);
-				return false;
+				return;
 			}
 		}
 
 		getLogger().LOGd(TAG, "startEndlessScan ... done");
-		return true;
 	}
 
 	@TargetApi(21)
@@ -957,13 +971,18 @@ public class BleCore extends Logging {
 		};
 	}
 
-	public synchronized boolean stopEndlessScan(IStatusCallback callback) {
+	public synchronized void stopEndlessScan(@Nullable IStatusCallback callback) {
 
 		getLogger().LOGd(TAG, "stopEndlessScan ...");
 
 		if (!isInitialized()) {
 			if (callback != null) callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
-			return false;
+			return;
+		}
+
+		if (!_bluetoothAdapter.isEnabled()) {
+			if (callback != null) callback.onError(BleErrors.ERROR_BLUETOOTH_NOT_ENABLED);
+			return;
 		}
 
 //		if (!isRunning()) {
@@ -980,9 +999,7 @@ public class BleCore extends Logging {
 		_scanning = false;
 
 		if (callback != null) callback.onSuccess();
-
 		getLogger().LOGd(TAG, "stopEndlessScan ... done");
-		return true;
 	}
 
 	public boolean isScanning() {
