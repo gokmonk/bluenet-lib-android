@@ -1,7 +1,6 @@
 package nl.dobots.bluenet.ble.extended.callbacks;
 
-import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
+import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.extended.structs.BleDevice;
 
 /**

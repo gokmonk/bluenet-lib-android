@@ -5,7 +5,7 @@ import nl.dobots.bluenet.ble.base.BleConfiguration;
 import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IExecStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IProgressCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
+import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.SimpleExecStatusCallback;
 import nl.dobots.bluenet.ble.base.structs.CommandMsg;
 import nl.dobots.bluenet.ble.base.structs.EncryptionKeys;
@@ -13,7 +13,6 @@ import nl.dobots.bluenet.ble.base.structs.SetupEncryptionKey;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.extended.callbacks.IExecuteCallback;
-import nl.dobots.bluenet.utils.BleLog;
 
 /**
  * Copyright (c) 2016 Dominik Egger <dominik@dobots.nl>. All rights reserved.

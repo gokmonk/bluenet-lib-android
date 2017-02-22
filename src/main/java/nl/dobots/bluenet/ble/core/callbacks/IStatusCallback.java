@@ -1,6 +1,6 @@
-package nl.dobots.bluenet.ble.base.callbacks;
+package nl.dobots.bluenet.ble.core.callbacks;
 
-import org.json.JSONObject;
+import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -15,14 +15,14 @@ import org.json.JSONObject;
  * version 3 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  * <p/>
- * Created on 14-7-15
+ * Created on 28-7-15
  *
- * Return data as a JSON object
+ * Notify about success without returning any data
  *
  * @author Dominik Egger
  */
-public interface IScanCallback extends IStatusCallback {
-
-	void onData(JSONObject json);
+public interface IStatusCallback extends IBaseCallback {
+	
+	void onSuccess();
 
 }

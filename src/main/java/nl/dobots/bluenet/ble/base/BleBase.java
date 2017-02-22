@@ -19,15 +19,15 @@ import java.util.UUID;
 
 import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IConfigurationCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
+import nl.dobots.bluenet.ble.core.callbacks.IDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDiscoveryCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IPowerSamplesCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IScanCallback;
+import nl.dobots.bluenet.ble.core.callbacks.IScanCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
-import nl.dobots.bluenet.ble.base.callbacks.ISubscribeCallback;
+import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
+import nl.dobots.bluenet.ble.core.callbacks.ISubscribeCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IWriteCallback;
 import nl.dobots.bluenet.ble.base.structs.CommandMsg;
 import nl.dobots.bluenet.ble.base.structs.ConfigurationMsg;
@@ -291,6 +291,37 @@ public class BleBase extends BleCore {
 				callback.onDeviceScanned(device);
 			}
 		});
+	}
+
+	private void parseAdvertisement(byte[] scanRecord, int search, IByteArrayCallback callback) {
+
+		ByteBuffer bb = ByteBuffer.wrap(scanRecord);
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+
+		try {
+			while (bb.hasRemaining()) {
+				int length = BleUtils.toUint8(bb.get());
+				if (length == 0) {
+					// we have reached the end of the valid scan record data
+					// the rest of the buffer should be filled with 0
+					return;
+				}
+
+				int type = BleUtils.toUint8(bb.get());
+				if (type == search) {
+					byte[] result = new byte[length - 1];
+					bb.get(result, 0, length - 1);
+					callback.onSuccess(result);
+				} else {
+					// skip length elements
+					bb.position(bb.position() + length - 1); // length also includes the type field, so only advance by length-1
+				}
+			}
+		} catch (BufferUnderflowException e) {
+//			getLogger().LOGe(TAG, "failed to parse advertisement, search: %d", search);
+//			e.printStackTrace();
+			callback.onError(BleErrors.ERROR_ADVERTISEMENT_PARSING);
+		}
 	}
 
 	/**

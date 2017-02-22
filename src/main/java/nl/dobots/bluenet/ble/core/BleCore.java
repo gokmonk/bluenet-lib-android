@@ -40,37 +40,44 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.lang.reflect.Method;
-import java.nio.BufferUnderflowException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
-import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IScanCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
-import nl.dobots.bluenet.ble.base.callbacks.ISubscribeCallback;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
+import nl.dobots.bluenet.ble.core.callbacks.IDataCallback;
+import nl.dobots.bluenet.ble.core.callbacks.IScanCallback;
+import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
+import nl.dobots.bluenet.ble.core.callbacks.ISubscribeCallback;
 import nl.dobots.bluenet.utils.BleLog;
-import nl.dobots.bluenet.utils.Logging;
 import nl.dobots.bluenet.utils.BleUtils;
+import nl.dobots.bluenet.utils.Logging;
 
 /*
  * TODO: - implement for multiple connected devices
  */
 
+/**
+ * The BleCore class is a wrapper for the Android Bluetooth classes. All API is done through
+ * callbacks and JSON.
+ * This class does not and should not! have a direct dependency to bluenet, so as
+ * to easily switch. In particular, this class should not import any classes higher than core,
+ * so no base or extended classes.
+ */
 public class BleCore extends Logging {
 
 	private static final String TAG = BleCore.class.getCanonicalName();
+
+	// default log level
 	private static final int LOG_LEVEL = Log.VERBOSE;
 
 	// Timeout for a bluetooth enable request. If timeout expires, an error is created
 	private static final int BLUETOOTH_ENABLE_TIMEOUT = 30000;
+	// Timeout for a location service enable request. If timeout expires, en error is created
 	private static final int LOCATION_SERVICE_ENABLE_TIMEOUT = 30000;
 
+	// the permission request code for requesting location (needed to use ble)
 	private static final int PERMISSIONS_REQUEST_LOCATION = 101;
 
 	// bluetooth adapter used for ble calls
@@ -86,16 +93,23 @@ public class BleCore extends Logging {
 	// default scan mode is low latency
 	private int _scanMode = ScanSettings.SCAN_MODE_LOW_LATENCY;
 
+	// the callback used by the API > 21 to report scanned devices
+	//	@SuppressLint("NewApi")
+	private ScanCallback _coreScanCallback;
+
 	// flags to keep track of state
-//	private boolean _initialized = false;
 	private boolean _bluetoothReady = false;
 	private boolean _locationServicesReady;
 
+	// check if the broadcast receiver is registered
 	private boolean _receiverRegistered = false;
 
+	// flag to keep track of active bluetooth reset
 	private boolean _resettingBle = false;
 
-	static private boolean bleDialogShowing = false;
+	// keep track of the ble enable dialog (to only show it once globally, even if several
+	// libraries try to initialize at the same time)
+	static private boolean _bleDialogShowing = false;
 
 	// enum to keep track of device connection state
 	private enum ConnectionState {
@@ -112,6 +126,10 @@ public class BleCore extends Logging {
 		DISCOVERED
 	}
 
+	/**
+	 * Private class to keep track of open connections (in preparation for connecting to multiple
+	 * devices at the same time)
+	 */
 	private class Connection {
 		// BluetoothGatt object, used to communicate with the BLE device
 		private BluetoothGatt _gatt;
@@ -176,12 +194,34 @@ public class BleCore extends Logging {
 	private boolean _scanning;
 
 	// callbacks used to notify events
+	// scan callback is informed about scan errors and scanned devices
 	private IScanCallback _scanCallback = null;
+	// init callback is informed about success or error of init call (cleared after a trigger)
 	private IStatusCallback _initializeCallback = null;
+	// event callback is informed about changes in bluetooth state and location services
 	private IDataCallback _eventCallback = null;
+	// connection callback is informed about success / failure of a connect and disconnect calls
+	// cleared after successful disconnect or after a connect timeout
+	private IDataCallback _connectionCallback = null;
+	// discovery callback is used when discovering services and triggers for every discovered
+	// characteristic
+	private IDataCallback _discoveryCallback = null;
+	// callback when a characteristic is read (success or failure)
+	private IDataCallback _characteristicsReadCallback = null;
+	// callback when a characteristic is written (success or failure)
+	private IStatusCallback _characteristicsWriteCallback = null;
+	// callback returns if subscribing to a characteristic is successful or failed
+	private IStatusCallback _subscribeCallback = null;
+	// callback returns if unsubscribing from a characteristic is successful or failed
+	private IStatusCallback _unsubscribeCallback = null;
+	// keeps track of the list of callbacks which are listening to notifications, 1 callback per
+	// characteristic
+	private HashMap<UUID, ISubscribeCallback> _notificationCallbacks = new HashMap<>();
 
 	// timeout handler to check for function timeouts, e.g. bluetooth enable, connect, reconnect, etc.
 	private Handler _timeoutHandler;
+	// the runnable to check if a connect/reconnect times out
+	private Runnable _connectTimeout;
 
 	/**
 	 * Default constructor
@@ -193,11 +233,19 @@ public class BleCore extends Logging {
 		_timeoutHandler = new Handler(timeoutThread.getLooper());
 	}
 
+	/**
+	 * Return current log level, see {@link Log}
+	 * @return log level
+	 */
 	@Override
 	protected int getLogLevel() {
 		return LOG_LEVEL;
 	}
 
+	/**
+	 * Get tag used for logs
+	 * @return
+	 */
 	@Override
 	protected String getTag() {
 		return TAG;
@@ -213,14 +261,6 @@ public class BleCore extends Logging {
 		destroy();
 	}
 
-	private void sendEvent(String event) {
-		if (_eventCallback != null) {
-			JSONObject status = new JSONObject();
-			setStatus(status, event);
-			_eventCallback.onData(status);
-		}
-	}
-
 	/**
 	 * Broadcast receiver used to handle Bluetooth Events, i.e. turning on and off of the
 	 * Bluetooth Adapter
@@ -230,7 +270,7 @@ public class BleCore extends Logging {
 		public void onReceive(Context context, Intent intent) {
 
 			if (intent.getAction().equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
-				bleDialogShowing = false;
+				_bleDialogShowing = false;
 				switch (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
 					case BluetoothAdapter.STATE_OFF: {
 						_bluetoothReady = false;
@@ -323,7 +363,7 @@ public class BleCore extends Logging {
 	 * explanation of the different scan modes.
 	 * You need to stop and start scanning again for this to take effect.
 	 * Note: Only used for api 21 and newer
-	 * @param mode
+	 * @param mode scan mode to be set, see {@link ScanSettings}
 	 */
 	@SuppressLint("NewApi")
 	public void setScanMode(int mode) {
@@ -335,6 +375,11 @@ public class BleCore extends Logging {
 		}
 	}
 
+	/**
+	 * Request location permissions. Needed for api 23 and newer
+	 * @param activity an activity is needed for the request. if used from a service, have a look
+	 *                 at {@link nl.dobots.bluenet.service.BluetoothPermissionRequest}
+	 */
 	public void requestPermissions(Activity activity) {
 		ActivityCompat.requestPermissions(activity,
 				new String[] {Manifest.permission.ACCESS_COARSE_LOCATION},
@@ -345,6 +390,7 @@ public class BleCore extends Logging {
 	/**
 	 * @return return true if permission result was handled, false otherwise. if true, then
 	 *   the result will be passed using the callback.onSuccess or callback.onError functions
+	 *   also if true, init is automatically recalled
 	 */
 	public boolean handlePermissionResult(int requestCode, String[] permissions, int[] grantResults, IStatusCallback callback) {
 		switch (requestCode) {
@@ -361,6 +407,13 @@ public class BleCore extends Logging {
 		return false;
 	}
 
+	/**
+	 * Returns the hardware address of the local Bluetooth adapter.
+	 * <p>For example, "00:11:22:AA:BB:CC".
+	 * <p>Requires {@link android.Manifest.permission#BLUETOOTH}
+	 *
+	 * @return Bluetooth hardware address as string
+	 */
 	public String getLocalAddress() {
 		if (_bluetoothAdapter != null) {
 			return _bluetoothAdapter.getAddress();
@@ -369,6 +422,13 @@ public class BleCore extends Logging {
 		return null;
 	}
 
+	/**
+	 * Get the friendly Bluetooth name of the local Bluetooth adapter.
+	 * <p>This name is visible to remote Bluetooth devices.
+	 * <p>Requires {@link android.Manifest.permission#BLUETOOTH}
+	 *
+	 * @return the Bluetooth name, or null on error
+	 */
 	public String getLocalName() {
 		if (_bluetoothAdapter != null) {
 			return _bluetoothAdapter.getName();
@@ -384,6 +444,18 @@ public class BleCore extends Logging {
 	 */
 	public void setEventCallback(IDataCallback callback) {
 		_eventCallback = callback;
+	}
+
+	/**
+	 * Send an event to the event listener. see BleCoreTypes for possible events
+	 * @param event the event to be sent
+	 */
+	private void sendEvent(String event) {
+		if (_eventCallback != null) {
+			JSONObject status = new JSONObject();
+			setStatus(status, event);
+			_eventCallback.onData(status);
+		}
 	}
 
 	/**
@@ -403,6 +475,7 @@ public class BleCore extends Logging {
 		_initializeCallback = callback;
 
 		getLogger().LOGd(TAG, "Initialize BLE hardware");
+		// check first if mobile has bluetooth le
 		if (!context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE) ||
 			Build.VERSION.SDK_INT < 18)
 		{
@@ -411,6 +484,7 @@ public class BleCore extends Logging {
 			return;
 		}
 
+		// if api newer than 23, need to check for location permission
 		if (Build.VERSION.SDK_INT >= 23) {
 			int permissionCheck = ContextCompat.checkSelfPermission(context,
 					Manifest.permission.ACCESS_COARSE_LOCATION);
@@ -424,6 +498,7 @@ public class BleCore extends Logging {
 		BluetoothManager bluetoothManager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
 		_bluetoothAdapter = bluetoothManager.getAdapter();
 
+		// if api newer than 21, use the BluetoothLeScanner object to scan
 		if (Build.VERSION.SDK_INT >= 21) {
 			_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
 			_scanSettings = new ScanSettings.Builder()
@@ -432,6 +507,8 @@ public class BleCore extends Logging {
 			_scanFilters = new ArrayList<>();
 		}
 
+		// register the broadcast receiver for bluetooth action state changes and location manager
+		// action changes
 		if (!_receiverRegistered) {
 			_context.registerReceiver(_receiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
 			_context.registerReceiver(_receiver, new IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION));
@@ -448,13 +525,16 @@ public class BleCore extends Logging {
 
 		// initialize is done if both bluetooth and location services are ready
 		if (_bluetoothReady && _locationServicesReady) {
-//			_initialized = true;
 			_initializeCallback.onSuccess();
 			_initializeCallback = null;
 		}
 
 	}
 
+	/**
+	 * Check if location services are enabled. if api < 23 always return true,
+	 * if not enabled, show the LocationRequest activity
+	 */
 	private void checkLocationServices() {
 
 		if (Build.VERSION.SDK_INT < 23) {
@@ -464,7 +544,6 @@ public class BleCore extends Logging {
 		_locationServicesReady = false;
 
 		if (!isLocationServicesEnabled()) {
-//			_initialized = false;
 			Intent intent = new Intent(_context, LocationRequest.class);
 			intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 			_context.startActivity(intent);
@@ -473,7 +552,6 @@ public class BleCore extends Logging {
 				@Override
 				public void run() {
 					if (!isLocationServicesEnabled()) {
-//						_initialized = false;
 						if (_initializeCallback != null) {
 							_initializeCallback.onError(BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF);
 						}
@@ -485,13 +563,18 @@ public class BleCore extends Logging {
 		}
 	}
 
+	/**
+	 * Check if bluetooth is enabled. only show one dialog at a time even if function is called
+	 * multiple times.
+	 * If not enabled, show the Bluetooth enable request
+	 */
 	private void checkBluetooth() {
 
 		_bluetoothReady = false;
-		if (bleDialogShowing) return;
+		if (_bleDialogShowing) return;
 
 		if (!_bluetoothAdapter.isEnabled()) {
-			bleDialogShowing = true;
+			_bleDialogShowing = true;
 			Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
 			enableBtIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 			_context.startActivity(enableBtIntent);
@@ -502,8 +585,7 @@ public class BleCore extends Logging {
 				@Override
 				public void run() {
 					if (!_bluetoothAdapter.isEnabled()) {
-						bleDialogShowing = false;
-//						_initialized = false;
+						_bleDialogShowing = false;
 						if (_initializeCallback != null) {
 							_initializeCallback.onError(BleErrors.ERROR_BLUETOOTH_NOT_ENABLED);
 						}
@@ -512,14 +594,20 @@ public class BleCore extends Logging {
 			}, BLUETOOTH_ENABLE_TIMEOUT);
 		} else {
 			getLogger().LOGd(TAG, "Bluetooth already enabled");
-//			_initialized = true;
-//			callback.onSuccess();
 			_bluetoothReady = true;
 		}
 	}
 
-
+	/**
+	 * check the state of location services
+	 *
+	 * @return true if location services enabled, false otherwise
+	 */
 	public boolean isLocationServicesEnabled() {
+
+		if (Build.VERSION.SDK_INT < 23) {
+			return true;
+		}
 
 		LocationManager locationManager = (LocationManager) _context.getSystemService(Context.LOCATION_SERVICE);
 		boolean isGpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
@@ -530,7 +618,7 @@ public class BleCore extends Logging {
 	}
 
 	/**
-	 * Reset all callbacks.
+	 * Reset all callbacks and unregister the broadcast receiver
 	 */
 	public synchronized void destroy() {
 		if (_receiverRegistered) {
@@ -540,7 +628,6 @@ public class BleCore extends Logging {
 
 		_bluetoothReady = false;
 		_locationServicesReady = false;
-//		_initialized = false;
 		_connectionCallback = null;
 		_discoveryCallback = null;
 		_initializeCallback = null;
@@ -548,8 +635,15 @@ public class BleCore extends Logging {
 		_scanCallback = null;
 		_characteristicsReadCallback = null;
 		_characteristicsWriteCallback = null;
+		_subscribeCallback = null;
+		_unsubscribeCallback = null;
+		_notificationCallbacks.clear();
 	}
 
+	/**
+	 * Reset Bluetooth. If Bluetooth is not enabled within BLUETOOTH_ENABLE_TIMEOUT, trigger
+	 * a bluetooth off event
+	 */
 	public void resetBle() {
 		if (_bluetoothAdapter.isEnabled()) {
 			_resettingBle = true;
@@ -568,6 +662,11 @@ public class BleCore extends Logging {
 		}
 	}
 
+	/**
+	 * Check if the device is connected
+	 * @param address MAC ddress of the device
+	 * @return true if connected, false if not initialized or if not connected
+	 */
 	public boolean isDeviceConnected(String address) {
 
 		if (!isInitialized()) return false;
@@ -578,6 +677,12 @@ public class BleCore extends Logging {
 
 	}
 
+	/**
+	 * Set the reconnect timeout
+	 *
+	 * @param address MAC address of the device which is reconnecting
+	 * @param timeout timeout in seconds
+	 */
 	private void setReconnectTimeout(final String address, int timeout) {
 		_connectTimeout = new Runnable() {
 
@@ -597,8 +702,12 @@ public class BleCore extends Logging {
 		_timeoutHandler.postDelayed(_connectTimeout, timeout * 1000);
 	}
 
-	private Runnable _connectTimeout;
-
+	/**
+	 * Set the connect timeout
+	 *
+	 * @param address MAC address of the device which is connecting
+	 * @param timeout timeout in seconds
+	 */
 	private void setConnectTimeout(final String address, int timeout) {
 		_timeoutHandler.removeCallbacks(_connectTimeout);
 		_connectTimeout = new Runnable() {
@@ -634,20 +743,32 @@ public class BleCore extends Logging {
 		_timeoutHandler.postDelayed(_connectTimeout, timeout);
 	}
 
+	/**
+	 * Clear the connect timeout (if connection was successful)
+	 */
 	private void clearConnectTimeout() {
 		getLogger().LOGd(TAG, "clear connect timeout");
 		_timeoutHandler.removeCallbacks(_connectTimeout);
 	}
 
+	/**
+	 * Connect to the given device and set the timeout. Callback is informed about success
+	 * or failure of the connect
+	 *
+	 * @param address the MAC address of the device to connect to
+	 * @param timeout timeout of the connect. if connection is not successful within timeout,
+	 *                abort and trigger the callback's onError
+	 * @param callback the callback to be notified about success or failure
+	 */
 	public void connectDevice(String address, int timeout, IDataCallback callback) {
 		getLogger().LOGd(TAG, "Connecting to %s with %d ms timeout ...", address, timeout);
-		_connectionCallback = callback;
 
 		if (!isInitialized()) {
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return;
 		}
 
+		_connectionCallback = callback;
 		BluetoothDevice device = _bluetoothAdapter.getRemoteDevice(address);
 
 		Connection connection = new Connection();
@@ -660,6 +781,14 @@ public class BleCore extends Logging {
 
 	}
 
+	/**
+	 * Reconnect to a previously connected device
+	 *
+	 * @param address the MAC address of the device to connect to
+	 * @param timeout timeout of the connect. if connection is not successful within timeout,
+	 *                abort and trigger the callback's onError
+	 * @param callback the callback to be notified about success or failure
+	 */
 	public boolean reconnectDevice(String address, int timeout, IDataCallback callback) {
 
 		getLogger().LOGd(TAG, "reconnecting device ...");
@@ -709,15 +838,25 @@ public class BleCore extends Logging {
 			return false;
 		}
 
-
-
 		return true;
 	}
 
+	/**
+	 * Check if library initialized by checking if bluetooth is ready and location services
+	 * are ready
+	 *
+	 * @return true if initialized, false otherwise
+	 */
 	private boolean isInitialized() {
 		return _bluetoothReady && _locationServicesReady;
 	}
 
+	/**
+	 * Check if library is ready. Checks if libray is initialized, if bluetooth adapter is
+	 * enabled and if location services are enabled
+	 *
+	 * @return
+	 */
 	public boolean isReady() {
 		if (isInitialized()) {
 			return _bluetoothAdapter.isEnabled() && isLocationServicesEnabled();
@@ -726,17 +865,27 @@ public class BleCore extends Logging {
 		}
 	}
 
+	/**
+	 * Start discovering services of the connected device. services have to be discovered before
+	 * the device can be used to read/write, etc. Uses cache if found.
+	 *
+	 * @param address the MAC address of the device for which the services should be discovered
+	 * @param callback callback to be invoked about discovered services and characteristics, or error
+	 */
 	public void discoverServices(String address, IDataCallback callback) {
 		// by default, return cached discovery if present, otherwise start new discovery
 		discoverServices(address, false, callback);
 	}
 
 	/**
+	 * Start discovering services of the connected device. services have to be discovered before
+	 * the device can be used to read/write, etc. To force a new discovery, i.e. not use the cache,
+	 * use forceDiscover=true
 	 *
-	 * @param address
+	 * @param address the MAC address of the device for which the services should be discovered
 	 * @param forceDiscover, set to true to force a new discovery,
-	 *						 if false and cached discovery found, return the cached
-	 * @param callback
+	 *						 if false and cached discovery found, return the cach
+	 * @param callback callback to be invoked about discovered services and characteristics, or error
 	 */
 	public void discoverServices(String address, boolean forceDiscover, IDataCallback callback) {
 		getLogger().LOGd(TAG, "Discovering services ...");
@@ -793,6 +942,34 @@ public class BleCore extends Logging {
 		}
 	}
 
+	/**
+	 * Get the discovery from the device after a discover, i.e. list of all services and characteristics
+	 * parses the discovery and creates a json object with services array and characteristics arrays
+	 * in the form of
+	 * {
+	 *     status: discovered,
+	 *     address: ...,
+	 *     name: ...,
+	 *     services : [
+	 *     		{
+	 *     		 	serviceUUID: ...,
+	 *     		 	characteristics: [
+	 *     		 		{
+	 *     		 		 	   characteristicUUID: ...,
+	 *     		 		 	   properties: { ... } ,
+	 *     		 		 	   descriptors: [
+	 *     		 		 	   		{
+	 *     		 		 	   		    descriptorUUID: ...
+	 *     		 		 	   		}
+	 *     		 		 	   ]
+	 *     		 		}
+	 *     		 	]
+	 *     		}
+	 *     ]
+	 * }
+	 * @param gatt the bluetooth gatt server obtained from the connection
+	 * @return the json object
+	 */
 	private JSONObject getDiscovery(BluetoothGatt gatt) {
 
 		JSONObject deviceJson = new JSONObject();
@@ -839,6 +1016,20 @@ public class BleCore extends Logging {
 		return deviceJson;
 	}
 
+	/**
+	 * Return the properties of a characteristic as a json, the json has the following boolean fields:
+	 * 		extendedProperties
+	 * 		signedWrite
+	 * 		indicate
+	 * 		notify
+	 * 		write
+	 * 		writeNoResponse
+	 * 		read
+	 * 		broadcast
+	 *
+	 * @param characteristic the characteristic in question
+	 * @return json with the properties of the characteristic
+	 */
 	private JSONObject getProperties(BluetoothGattCharacteristic characteristic) {
 
 		int properties = characteristic.getProperties();
@@ -859,11 +1050,31 @@ public class BleCore extends Logging {
 		return propertiesJSON;
 	}
 
+	/**
+	 * discover if the address has a given characteristic. Uses cached data if available.
+	 *
+	 * @param address the MAC address of the device
+	 * @param serviceUuid the UUID of the service
+	 * @param characteristicUuid the UUID of the characteristic
+	 * @param callback callback to informed, onSuccess is called if the characteristic is found,
+	 *                 otherwise the onError is called
+	 */
 	public void discoverCharacteristic(String address, String serviceUuid, String characteristicUuid,
 									   IStatusCallback callback) {
 		discoverCharacteristic(address, serviceUuid, characteristicUuid, false, callback);
 	}
 
+	/**
+	 * Discover if the address has a given characteristic
+	 *
+	 * @param address the MAC address of the device
+	 * @param serviceUuid the UUID of the service
+	 * @param characteristicUuid the UUID of the characteristic
+	 * @param forceDiscover if true, force a new discovery, i.e. do not use the cache, if false,
+	 *                      use cached data if available
+	 * @param callback callback to informed, onSuccess is called if the characteristic is found,
+	 *                 otherwise the onError is called
+	 */
 	public void discoverCharacteristic(String address, final String serviceUuid, final String characteristicUuid,
 									   boolean forceDiscover, final IStatusCallback callback) {
 
@@ -902,14 +1113,27 @@ public class BleCore extends Logging {
 		});
 	}
 
+	/**
+	 * Start an endless scan for bluetooth le devices. endless means it continues to scan until
+	 * stopScan is called.
+	 *
+	 * @param callback callback to informed about scanned devices or errors
+	 */
 	public void startEndlessScan(IScanCallback callback) {
 		startEndlessScan(new String[] {}, callback);
 	}
 
+	/**
+	 * Start an endless scan for bluetooth le devices. endless means it continues to scan until
+	 * stopScan is called. Use the list of uuids as filter. E.g. to return only devices with
+	 * the given service data uuid
+	 *
+	 * @param uuids list of service data uuids for which to filter
+	 * @param callback callback to informed about scanned devices or errors
+	 */
 	public synchronized void startEndlessScan(String[] uuids, IScanCallback callback) {
 
 		getLogger().LOGd(TAG, "startEndlessScan ...");
-
 
 		if (!isInitialized()) {
 			getLogger().LOGe(TAG, "startEndlessScan ... error: not initialized");
@@ -978,6 +1202,9 @@ public class BleCore extends Logging {
 		getLogger().LOGd(TAG, "startEndlessScan ... done");
 	}
 
+	/**
+	 * For api > 21 use a different scan api
+	 */
 	@TargetApi(21)
 	private void createCoreScanCallback() {
 		_coreScanCallback = new ScanCallback() {
@@ -1007,6 +1234,11 @@ public class BleCore extends Logging {
 		};
 	}
 
+	/**
+	 * Stop an endless scan. i.e. stop scanning for ble devices.
+	 *
+	 * @param callback callback to be informed if the scan was successfully stopped or not
+	 */
 	public synchronized void stopEndlessScan(@Nullable IStatusCallback callback) {
 
 		getLogger().LOGd(TAG, "stopEndlessScan ...");
@@ -1021,6 +1253,8 @@ public class BleCore extends Logging {
 			return;
 		}
 
+		// [] just to be sure, stop even if already stopped. has happened that the library
+		// thinks the scan is stopped but the bluetooth adapter was still scanning ...
 //		if (!isRunning()) {
 //			callback.onError(BleCoreTypes.ERROR_NOT_SCANNING);
 //			return false;
@@ -1038,10 +1272,19 @@ public class BleCore extends Logging {
 		getLogger().LOGd(TAG, "stopEndlessScan ... done");
 	}
 
+	/**
+	 * Check if the library is scanning for devices
+	 *
+	 * @return true if scanning, false otherwise
+	 */
 	public boolean isScanning() {
 		return _scanning;
 	}
 
+	/**
+	 * The callback used by the bluetooth adapter to report scanned devices
+	 * FOR API <= 21
+	 */
 	private LeScanCallback _coreLeScanCallback = new LeScanCallback() {
 
 		@Override
@@ -1051,6 +1294,13 @@ public class BleCore extends Logging {
 
 	};
 
+	/**
+	 * Create a json object from the scanned device and trigger the scanCallback's onData
+	 *
+	 * @param device the bluetooth device that was scanned
+	 * @param rssi the rssi value with which the device was scanned
+	 * @param scanRecord the scan record (advertisement data) which was scanned.
+	 */
 	private synchronized void onDeviceScanned(BluetoothDevice device, int rssi, byte[] scanRecord) {
 
 		// [3.11.15] moved scanning = false into if statement, so that if scan is stopped but a scan
@@ -1068,40 +1318,12 @@ public class BleCore extends Logging {
 		}
 	}
 
-	//	@SuppressLint("NewApi")
-	private ScanCallback _coreScanCallback;
-
-	protected void parseAdvertisement(byte[] scanRecord, int search, IByteArrayCallback callback) {
-
-		ByteBuffer bb = ByteBuffer.wrap(scanRecord);
-		bb.order(ByteOrder.LITTLE_ENDIAN);
-
-		try {
-			while (bb.hasRemaining()) {
-				int length = BleUtils.toUint8(bb.get());
-				if (length == 0) {
-					// we have reached the end of the valid scan record data
-					// the rest of the buffer should be filled with 0
-					return;
-				}
-
-				int type = BleUtils.toUint8(bb.get());
-				if (type == search) {
-					byte[] result = new byte[length - 1];
-					bb.get(result, 0, length - 1);
-					callback.onSuccess(result);
-				} else {
-					// skip length elements
-					bb.position(bb.position() + length - 1); // length also includes the type field, so only advance by length-1
-				}
-			}
-		} catch (BufferUnderflowException e) {
-//			getLogger().LOGe(TAG, "failed to parse advertisement, search: %d", search);
-//			e.printStackTrace();
-			callback.onError(BleErrors.ERROR_ADVERTISEMENT_PARSING);
-		}
-	}
-
+	/**
+	 * Disconnect a currently connected device
+	 *
+	 * @param address the MAC address of the device which should be disconnected
+	 * @param callback the callback to be informed about success or failure
+	 */
 	public boolean disconnectDevice(String address, IDataCallback callback) {
 
 		getLogger().LOGd(TAG, "disconnecting device ...");
@@ -1164,20 +1386,50 @@ public class BleCore extends Logging {
 		return true;
 	}
 
+	/**
+	 * Check if the device is connected
+	 *
+	 * @param address MAC address of the device
+	 * @return true if connected, false otherwise
+	 */
 	public boolean isConnected(String address) {
 		Connection connection = _connections.get(address);
 		return connection.getConnectionState() == ConnectionState.CONNECTED;
 	}
 
+	/**
+	 * Check if the device is disconnected
+	 *
+	 * @param address MAC address of the device
+	 * @return true if disconnected, false otherwise
+	 */
 	public boolean isDisconnected(String address) {
 		Connection connection = _connections.get(address);
 		return connection.getConnectionState() == ConnectionState.DISCONNECTED;
 	}
 
+	/**
+	 * Check if the device is closed
+	 *
+	 * @param address MAC address of the device
+	 * @return true if closed, false otherwise
+	 */
 	public boolean isClosed(String address) {
 		return !_connections.containsKey(address);
 	}
 
+	/**
+	 * Close a disconnected device. only a certain number of device can be kept open at a time
+	 * even if they are disconnected. to avoid reaching the limit, always close the device after
+	 * a disconnect
+	 * if clearCache is set to true, the cache of discovered services is cleared. this means next
+	 * discover will return a fresh list, but it makes discovery (and connects) slower. so only
+	 * refresh if really needed.
+	 *
+	 * @param address MAC address of the device
+	 * @param clearCache if true, clear the cache of discovered services, false otherwise.
+	 * @param callback callback to be informed about success or failure
+	 */
 	public boolean closeDevice(String address, boolean clearCache, IStatusCallback callback) {
 
 		getLogger().LOGd(TAG, "closing device ...");
@@ -1221,6 +1473,11 @@ public class BleCore extends Logging {
 
 	}
 
+	/**
+	 * Refresh the cache of discovered services and characteristics
+	 *
+	 * @param gatt the bluetooth gatt server of the device
+	 */
 	private void refreshDeviceCache(final BluetoothGatt gatt) {
 		getLogger().LOGd(TAG, "refreshDeviceCache");
 		/*
@@ -1247,6 +1504,13 @@ public class BleCore extends Logging {
 //		}
 	}
 
+	/**
+	 * Disconnect and close the device
+	 *
+	 * @param address MAC address of the device
+	 * @param clearCache true if the discovery cache should be cleared, false otherwise
+	 * @param callback callback to be informed about success or failure
+	 */
 	public boolean disconnectAndCloseDevice(final String address, final boolean clearCache, final IDataCallback callback) {
 
 		return disconnectDevice(address, new IDataCallback() {
@@ -1301,6 +1565,15 @@ public class BleCore extends Logging {
 		});
 	}
 
+	/**
+	 * Read a characteristic
+	 *
+	 * @param address MAC address of the device
+	 * @param serviceUuid UUID of the service containing the characteristic
+	 * @param characteristicUuid UUID of the characteristic
+	 * @param callback callback to be informed about read value or error
+	 * @return true if read started, false if error
+	 */
 	public boolean read(String address, String serviceUuid, String characteristicUuid, IDataCallback callback) {
 
 		getLogger().LOGd(TAG, "read ...");
@@ -1357,14 +1630,45 @@ public class BleCore extends Logging {
 		return true;
 	}
 
+	/**
+	 * Write to a characteristic with write type default
+	 *
+	 * @param address MAC address of the device
+	 * @param serviceUuid UUID of the service containing the characteristic
+	 * @param characteristicUuid UUID of the characteristic
+	 * @param value the value to be written as an array of bytes
+	 * @param callback callback to be informed about success or error
+	 * @return true if the write was started, false if error
+	 */
 	public boolean write(String address, String serviceUuid, String characteristicUuid, byte[] value, IStatusCallback callback) {
 		return write(address, serviceUuid, characteristicUuid, value, callback, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
 	}
 
+	/**
+	 * Write to a characteristic with write type no response
+	 *
+	 * @param address MAC address of the device
+	 * @param serviceUuid UUID of the service containing the characteristic
+	 * @param characteristicUuid UUID of the characteristic
+	 * @param value the value to be written as an array of bytes
+	 * @param callback callback to be informed about success or error
+	 * @return true if the write was started, false if error
+	 */
 	public boolean writeNoResponse(String address, String serviceUuid, String characteristicUuid, byte[] value, IStatusCallback callback) {
 		return write(address, serviceUuid, characteristicUuid, value, callback, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
 	}
 
+	/**
+	 * Write to a characteristic
+	 *
+	 * @param address MAC address of the device
+	 * @param serviceUuid UUID of the service containing the characteristic
+	 * @param characteristicUuid UUID of the characteristic
+	 * @param value the value to be written as an array of bytes
+	 * @param callback callback to be informed about success or error
+	 * @param writeType write type to be used, see {@link BluetoothGattCharacteristic}
+	 * @return true if the write was started, false if error
+	 */
 	private synchronized boolean write(String address, String serviceUuid, String characteristicUuid, byte[] value, IStatusCallback callback, int writeType) {
 
 		getLogger().LOGd(TAG, "write ...");
@@ -1438,7 +1742,18 @@ public class BleCore extends Logging {
 		return true;
 	}
 
-	protected boolean subscribe(String address, String serviceUuid, String characteristicUuid, IStatusCallback statusCallback, ISubscribeCallback callback) {
+	/**
+	 * Subscribe to a characteristic in order to receive notifications.
+	 *
+	 * @param address MAC address of the device
+	 * @param serviceUuid UUID of the service containing the characteristic
+	 * @param characteristicUuid UUID of the characteristic
+	 * @param statusCallback callback to be informed about success or error
+	 * @param callback callback to be informed about received notifications
+	 * @return true if subscribe started, false if error
+	 */
+	protected boolean subscribe(String address, String serviceUuid, String characteristicUuid,
+								IStatusCallback statusCallback, ISubscribeCallback callback) {
 
 		getLogger().LOGd(TAG, "subscribe ...");
 
@@ -1511,7 +1826,17 @@ public class BleCore extends Logging {
 		return true;
 	}
 
-	protected boolean unsubscribe(String address, String serviceUuid, String characteristicUuid, IStatusCallback statusCallback) {
+	/**
+	 * Unsubscribe from a characteristic, i.e. stop receiving notifications
+	 *
+	 * @param address MAC address of the device
+	 * @param serviceUuid UUID of the service containing the characteristic
+	 * @param characteristicUuid UUID of the characteristic
+	 * @param statusCallback callback to be informed about success or error
+	 * @return true if unsubscribe started, false if error
+	 */
+	protected boolean unsubscribe(String address, String serviceUuid, String characteristicUuid,
+								  IStatusCallback statusCallback) {
 
 		getLogger().LOGd(TAG, "unsubscribe ...");
 
@@ -1583,17 +1908,17 @@ public class BleCore extends Logging {
 		return true;
 	}
 
-	IDataCallback _connectionCallback = null;
-	IDataCallback _discoveryCallback = null;
-	IDataCallback _characteristicsReadCallback = null;
-	IStatusCallback _characteristicsWriteCallback = null;
-
-	IStatusCallback _subscribeCallback = null;
-	IStatusCallback _unsubscribeCallback = null;
-	HashMap<UUID, ISubscribeCallback> _notificationCallbacks = new HashMap<>();
-
+	/**
+	 * The BluetoothGattCallback is used by the Bluetooth Adapter to inform about connection
+	 * state changes, read write status, notifcations, subscribe and unsubscribe status, etc.
+	 */
 	private class BluetoothGattCallbackExt extends BluetoothGattCallback {
 
+		/**
+		 * Called whenever the connection state changes, e.g. device disconnects or is connected
+		 * We check if the state change is as expected and trigger success or failure on the
+		 * connectionCallback
+		 */
 		@Override
 		public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
 //			String intentAction;
@@ -1663,6 +1988,10 @@ public class BleCore extends Logging {
 
 		}
 
+		/**
+		 * Is called when the service discovery completed. we obtain the discovered
+		 * services and characteristics and trigger the discoveryCallback
+		 */
 		@Override
 		// New services discovered
 		public void onServicesDiscovered(BluetoothGatt gatt, int status) {
@@ -1692,6 +2021,10 @@ public class BleCore extends Logging {
 			}
 		}
 
+		/**
+		 * Is called whenever a characteristic is read. this can be successful or failure
+		 * trigger the characteristicsReadCallback with the read value or the error
+		 */
 		@Override
 		// Result of a characteristic read operation
 		public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
@@ -1719,6 +2052,10 @@ public class BleCore extends Logging {
 			}
 		}
 
+		/**
+		 * Is called whenever a notification is received from a subscribed characteristic
+		 * trigger the notificationCallback for the given characteristic
+		 */
 		@Override
 		public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
 
@@ -1741,6 +2078,10 @@ public class BleCore extends Logging {
 
 		}
 
+		/**
+		 * Is called whenever a write on a characteristic completes. either successful or with error
+		 * trigger the characteristicsWriteCallback with success or error
+		 */
 		@Override
 		public synchronized void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
 
@@ -1766,8 +2107,11 @@ public class BleCore extends Logging {
 			}
 		}
 
+		/**
+		 * Is called if the descriptor of a characteristic is read
+		 * NOT USED CURRENTLY
+		 */
 		public void onDescriptorRead(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
-
 			if (status == BluetoothGatt.GATT_SUCCESS) {
 
 				JSONObject json = new JSONObject();
@@ -1791,9 +2135,13 @@ public class BleCore extends Logging {
 				}
 
 			}
-
 		}
 
+		/**
+		 * Is called if a descriptor of a characteristic is written. this is the case when
+		 * a characteristic is subscribed / unsubscribed.
+		 * trigger the subscribeCallback / unsubscribeCallback respectively
+		 */
 		public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
 
 			BluetoothGattCharacteristic characteristic = descriptor.getCharacteristic();
@@ -1843,6 +2191,11 @@ public class BleCore extends Logging {
 
 		}
 	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////
+	// HELPER FUNCTIONS
+	// to populate the JSON objects with data and to retrieve the data again
+	////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 	public static boolean hasCharacteristicProperty(int properties, int property) {
