@@ -1,27 +1,24 @@
-package nl.dobots.bluenet.ble.extended.callbacks;
-
-import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
-import nl.dobots.bluenet.ble.extended.structs.BleDevice;
+package nl.dobots.bluenet.ble.base.callbacks;
 
 /**
- * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
- * <p/>
+ * Copyright (c) 2017 Dominik Egger <dominik@dobots.nl>. All rights reserved.
+ * <p>
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 3, as
  * published by the Free Software Foundation.
- * <p/>
+ * <p>
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 3 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * <p/>
- * Created on 15-7-15
+ * <p>
+ * Created on 21-2-17
  *
- * @author Dominik Egger
+ * @author Dominik Egger <dominik@dobots.nl>
  */
-public interface IBleDeviceCallback extends IStatusCallback {
+public interface IWriteCallback {
 
-	void onDeviceScanned(BleDevice device);
+	void onWrite();
 
 }

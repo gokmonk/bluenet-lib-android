@@ -19,14 +19,16 @@ import java.util.UUID;
 
 import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IConfigurationCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IDataCallback;
+import nl.dobots.bluenet.ble.core.callbacks.IDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDiscoveryCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IMeshDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IPowerSamplesCallback;
+import nl.dobots.bluenet.ble.core.callbacks.IScanCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
-import nl.dobots.bluenet.ble.base.callbacks.ISubscribeCallback;
+import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
+import nl.dobots.bluenet.ble.core.callbacks.ISubscribeCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IWriteCallback;
 import nl.dobots.bluenet.ble.base.structs.CommandMsg;
 import nl.dobots.bluenet.ble.base.structs.ConfigurationMsg;
 import nl.dobots.bluenet.ble.base.structs.CrownstoneServiceData;
@@ -46,7 +48,6 @@ import nl.dobots.bluenet.ble.core.BleCoreTypes;
 import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
 import nl.dobots.bluenet.ble.extended.callbacks.IBleDeviceCallback;
 import nl.dobots.bluenet.ble.extended.structs.BleDevice;
-import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
 public class BleBase extends BleCore {
@@ -56,13 +57,15 @@ public class BleBase extends BleCore {
 	// handler used for delayed execution, e.g. a to get the configuration we need to write first
 	// to the select configuration characteristic, then wait for a moment for the device to process
 	// the request before reading from the get configuration characteristic
-//	private Handler _timeoutHandler = new Handler();
-	private Handler _timeoutHandler;
+//	private Handler _handler = new Handler();
+	private Handler _handler;
 
 	private boolean _encryptionEnabled = false;
 	private EncryptionKeys _encryptionKeys = null;
 	private EncryptionSessionData _encryptionSessionData = null;
 	private boolean _setupMode = false;
+
+	private IWriteCallback _onWriteCallback = null;
 
 	/** Hashmap of all subscribers, based on characeristic UUID */
 	private HashMap<UUID, ArrayList<IDataCallback>> _subscribers = new HashMap<>();
@@ -92,7 +95,11 @@ public class BleBase extends BleCore {
 		// create handler with its own thread
 		HandlerThread handlerThread = new HandlerThread("BleBaseHandler");
 		handlerThread.start();
-		_timeoutHandler = new Handler(handlerThread.getLooper());
+		_handler = new Handler(handlerThread.getLooper());
+	}
+
+	public void setOnWriteCallback(IWriteCallback onWriteCallback) {
+		_onWriteCallback = onWriteCallback;
 	}
 
 	IStatusCallback _silentStatusCallback = new IStatusCallback() {
@@ -150,6 +157,9 @@ public class BleBase extends BleCore {
 	}
 
 	public boolean write(String address, String serviceUuid, String characteristicUuid, byte[] value, char accessLevel, IStatusCallback callback) {
+		if (_onWriteCallback != null) {
+			_onWriteCallback.onWrite();
+		}
 		if (_encryptionEnabled && accessLevel != BleBaseEncryption.ACCESS_LEVEL_ENCRYPTION_DISABLED) {
 			// Just use highest available key
 			EncryptionKeys.KeyAccessLevelPair keyAccessLevelPair = _encryptionKeys.getHighestKey();
@@ -196,8 +206,8 @@ public class BleBase extends BleCore {
 	 * @param callback the callback to be notified if devices are detected
 	 * @return true if the scan was started, false otherwise
 	 */
-	public boolean startEndlessScan(final IBleDeviceCallback callback) {
-		return this.startEndlessScan(new String[]{}, callback);
+	public void startEndlessScan(final IBleDeviceCallback callback) {
+		startEndlessScan(new String[]{}, callback);
 	}
 
 	/**
@@ -212,9 +222,13 @@ public class BleBase extends BleCore {
 	 * @param serviceUuids a list of UUIDs to filter for
 	 * @return true if the scan was started, false otherwise
 	 */
-	public boolean startEndlessScan(String[] serviceUuids,  final IBleDeviceCallback callback) {
+	public void startEndlessScan(String[] serviceUuids, final IBleDeviceCallback callback) {
 		// wrap the status callback to do some pre-processing of the scan result data
-		return super.startEndlessScan(serviceUuids, new IDataCallback() {
+		super.startEndlessScan(serviceUuids, new IScanCallback() {
+			@Override
+			public void onSuccess() {
+				callback.onSuccess();
+			}
 
 			@Override
 			public void onError(int error) {
@@ -277,6 +291,37 @@ public class BleBase extends BleCore {
 				callback.onDeviceScanned(device);
 			}
 		});
+	}
+
+	private void parseAdvertisement(byte[] scanRecord, int search, IByteArrayCallback callback) {
+
+		ByteBuffer bb = ByteBuffer.wrap(scanRecord);
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+
+		try {
+			while (bb.hasRemaining()) {
+				int length = BleUtils.toUint8(bb.get());
+				if (length == 0) {
+					// we have reached the end of the valid scan record data
+					// the rest of the buffer should be filled with 0
+					return;
+				}
+
+				int type = BleUtils.toUint8(bb.get());
+				if (type == search) {
+					byte[] result = new byte[length - 1];
+					bb.get(result, 0, length - 1);
+					callback.onSuccess(result);
+				} else {
+					// skip length elements
+					bb.position(bb.position() + length - 1); // length also includes the type field, so only advance by length-1
+				}
+			}
+		} catch (BufferUnderflowException e) {
+//			getLogger().LOGe(TAG, "failed to parse advertisement, search: %d", search);
+//			e.printStackTrace();
+			callback.onError(BleErrors.ERROR_ADVERTISEMENT_PARSING);
+		}
 	}
 
 	/**
@@ -1209,7 +1254,7 @@ public class BleBase extends BleCore {
 						// we need to give the crownstone some time to handle the config write,
 						// because it needs to access persistent memory in order to store the new
 						// config value
-						_timeoutHandler.postDelayed(new Runnable() {
+						_handler.postDelayed(new Runnable() {
 							@Override
 							public void run() {
 								// if verify is set, get the configuration value from the crownstone
@@ -1221,7 +1266,7 @@ public class BleBase extends BleCore {
 											if (Arrays.equals(readConfig.getPayload(), configuration.getPayload())) {
 												callback.onSuccess();
 											} else {
-												getLogger().LOGe(TAG, "write: %s, read: %s", BleUtils.bytesToString(configuration.getPayload()), Arrays.toString(readConfig.getPayload()));
+												getLogger().LOGe(TAG, "write: %s, read: %s", BleUtils.bytesToString(configuration.getPayload()), BleUtils.bytesToString(readConfig.getPayload()));
 												callback.onError(BleErrors.ERROR_VALIDATION_FAILED);
 											}
 										}
@@ -1560,7 +1605,7 @@ public class BleBase extends BleCore {
 							// select failed, unsubscribe again
 							unsubscribeState(address, subscriberId[0]);
 							callback.onError(error);
-//							_timeoutHandler.postDelayed(new Runnable() {
+//							_handler.postDelayed(new Runnable() {
 //								@Override
 //								public void run() {
 //									unsubscribeState(address, subscriberId[0]);
@@ -1595,7 +1640,7 @@ public class BleBase extends BleCore {
 							callback.onSuccess(state);
 						}
 					});
-//					_timeoutHandler.postDelayed(new Runnable() {
+//					_handler.postDelayed(new Runnable() {
 //						@Override
 //						public void run() {
 //							unsubscribeState(address, subscriberId[0]);
@@ -1607,7 +1652,7 @@ public class BleBase extends BleCore {
 				public void onError(int error) {
 					unsubscribeState(address, subscriberId[0]);
 					callback.onError(error);
-//					_timeoutHandler.postDelayed(new Runnable() {
+//					_handler.postDelayed(new Runnable() {
 //						@Override
 //						public void run() {
 //							unsubscribeState(address, subscriberId[0]);
@@ -1621,7 +1666,7 @@ public class BleBase extends BleCore {
 //			@Override
 //			public void onSuccess() {
 //				// todo: do we need a timeout here?
-////				_timeoutHandler.postDelayed(new Runnable() {
+////				_handler.postDelayed(new Runnable() {
 ////					@Override
 ////					public void run() {
 //						readState(address, callback);
@@ -1708,7 +1753,7 @@ public class BleBase extends BleCore {
 						// from interrupt in firmware
 						callback.onSuccess();
 //						// we need to give the crownstone some time to handle the control command
-//						_timeoutHandler.postDelayed(new Runnable() {
+//						_handler.postDelayed(new Runnable() {
 //							@Override
 //							public void run() {
 //								callback.onSuccess();

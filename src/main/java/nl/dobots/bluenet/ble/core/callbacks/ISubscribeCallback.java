@@ -1,7 +1,11 @@
-package nl.dobots.bluenet.ble.base.callbacks;
+package nl.dobots.bluenet.ble.core.callbacks;
+
+import org.json.JSONObject;
+
+import java.util.UUID;
 
 /**
- * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
+ * Copyright (c) 2016 Dominik Egger <dominik@dobots.nl>. All rights reserved.
  * <p/>
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 3, as
@@ -13,14 +17,13 @@ package nl.dobots.bluenet.ble.base.callbacks;
  * version 3 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  * <p/>
- * Created on 28-7-15
- *
- * Notify about success without returning any data
+ * Created on 10-6-16
  *
  * @author Dominik Egger
  */
-public interface IStatusCallback extends IBaseCallback {
-	
-	void onSuccess();
+public interface ISubscribeCallback {
+
+	void onData(UUID uuidService, UUID uuidCharacteristic, JSONObject data);
+	void onError(UUID uuidService, UUID uuidCharacteristic, int error);
 
 }

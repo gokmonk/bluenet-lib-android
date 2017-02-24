@@ -111,6 +111,7 @@ public class BluenetConfig {
 	public static final char CMD_REQUEST_SERVICE_DATA =                 18;   // 0x12
 	public static final char CMD_DISCONNECT =                           19;   // 0x13
 	public static final char CMD_SET_LED =                              20;   // 0x14
+	public static final char CMD_NOP =                                  21;   // 0x15
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////

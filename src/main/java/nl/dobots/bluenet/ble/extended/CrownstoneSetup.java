@@ -5,7 +5,7 @@ import nl.dobots.bluenet.ble.base.BleConfiguration;
 import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IExecStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IProgressCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
+import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.SimpleExecStatusCallback;
 import nl.dobots.bluenet.ble.base.structs.CommandMsg;
 import nl.dobots.bluenet.ble.base.structs.EncryptionKeys;
@@ -13,7 +13,6 @@ import nl.dobots.bluenet.ble.base.structs.SetupEncryptionKey;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.extended.callbacks.IExecuteCallback;
-import nl.dobots.bluenet.utils.BleLog;
 
 /**
  * Copyright (c) 2016 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -55,6 +54,8 @@ public class CrownstoneSetup {
 	private IProgressCallback _progressCallback;
 	private IStatusCallback _statusCallback;
 
+	private boolean _cancel;
+
 	public CrownstoneSetup(BleExt bleExt) {
 		_bleExt = bleExt;
 		_bleBase = bleExt.getBleBase();
@@ -82,6 +83,11 @@ public class CrownstoneSetup {
 	}
 
 	private void setupStep(final int step) {
+		if (_cancel) {
+			_statusCallback.onError(BleErrors.ERROR_SETUP_CANCELED);
+			return;
+		}
+
 		_currentStep = step;
 		switch(step) {
 			case 0:
@@ -189,6 +195,8 @@ public class CrownstoneSetup {
 			_progressCallback = progressCallback;
 			_statusCallback = statusCallback;
 
+			_cancel = false;
+
 			setupStep(1);
 		}
 
@@ -236,5 +244,8 @@ public class CrownstoneSetup {
 		});
 	}
 
+	public void cancelSetup() {
+		_cancel = true;
+	}
 
 }

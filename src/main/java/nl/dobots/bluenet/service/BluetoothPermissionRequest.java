@@ -12,8 +12,7 @@ import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 
-import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
-import nl.dobots.bluenet.utils.BleLog;
+import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
 
 public class BluetoothPermissionRequest extends AppCompatActivity {
 
