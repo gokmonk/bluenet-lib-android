@@ -180,6 +180,7 @@ public class BluenetConfig {
 	public static final char STATE_OPERATION_MODE =                     134;  // 0x86
 	public static final char STATE_TEMPERATURE =                        135;  // 0x87
 	public static final char STATE_TIME =                               136;  // 0x88
+	public static final char STATE_ERRORS =                             139;  // 0x8B
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -224,6 +225,16 @@ public class BluenetConfig {
 	public static final char MESH_REPLY_STATUS =                        0;    // 0x00;
 	public static final char MESH_REPLY_CONFIG =                        1;    // 0x01;
 	public static final char MESH_REPLY_STATE =                         2;    // 0x02;
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Switch intent types
+	public static final char SWITCH_INTENT_SPHERE_ENTER =               0;    // 0x00;
+	public static final char SWITCH_INTENT_SPHERE_EXIT =                1;    // 0x01;
+	public static final char SWITCH_INTENT_ENTER =                      2;    // 0x02;
+	public static final char SWITCH_INTENT_EXIT =                       3;    // 0x03;
+	public static final char SWITCH_INTENT_MANUAL =                     4;    // 0x04;
+
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////

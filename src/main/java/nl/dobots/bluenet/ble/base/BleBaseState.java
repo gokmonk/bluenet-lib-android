@@ -2,17 +2,13 @@ package nl.dobots.bluenet.ble.base;
 
 import android.util.Log;
 
-import nl.dobots.bluenet.ble.base.callbacks.IConfigurationCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
-import nl.dobots.bluenet.ble.base.callbacks.IStatusCallback;
-import nl.dobots.bluenet.ble.base.structs.ConfigurationMsg;
+import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.structs.StateMsg;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
-import nl.dobots.bluenet.ble.extended.callbacks.IStringCallback;
 import nl.dobots.bluenet.utils.BleLog;
-import nl.dobots.bluenet.utils.Logging;
 
 /**
  * Copyright (c) 2016 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -52,7 +48,7 @@ public class BleBaseState {
 	private void parseSwitchState(StateMsg state, IIntegerCallback callback) {
 		if (state.getType() == BluenetConfig.STATE_SWITCH_STATE) {
 			if (state.getLength() != 1) {
-				getLogger().LOGe(TAG, "Wrong length parameter: %s", state.getLength());
+				getLogger().LOGe(TAG, "Wrong length parameter: %d", state.getLength());
 				callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 			} else {
 				int switchState = state.getUint8Value();
@@ -95,7 +91,7 @@ public class BleBaseState {
 	private void parseAccumulatedEnergy(StateMsg state, IIntegerCallback callback) {
 		if (state.getType() == BluenetConfig.STATE_ACCUMULATED_ENERGY) {
 			if (state.getLength() != 4) {
-				getLogger().LOGe(TAG, "Wrong length parameter: %s", state.getLength());
+				getLogger().LOGe(TAG, "Wrong length parameter: %d", state.getLength());
 				callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 			} else {
 				int accumulatedEnergy = state.getIntValue();
@@ -138,7 +134,7 @@ public class BleBaseState {
 	private void parsePowerUsage(StateMsg state, IIntegerCallback callback) {
 		if (state.getType() == BluenetConfig.STATE_POWER_USAGE) {
 			if (state.getLength() != 4) {
-				getLogger().LOGe(TAG, "Wrong length parameter: %s", state.getLength());
+				getLogger().LOGe(TAG, "Wrong length parameter: %d", state.getLength());
 				callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 			} else {
 				int powerUsage = state.getIntValue();
@@ -181,11 +177,11 @@ public class BleBaseState {
 	private void parseTemperature(StateMsg state, IIntegerCallback callback) {
 		if (state.getType() == BluenetConfig.STATE_TEMPERATURE) {
 			if (state.getLength() != 4) {
-				getLogger().LOGe(TAG, "Wrong length parameter: %s", state.getLength());
+				getLogger().LOGe(TAG, "Wrong length parameter: %d", state.getLength());
 				callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 			} else {
 				int temperature = state.getIntValue();
-				getLogger().LOGd(TAG, "power usage: %d", temperature);
+				getLogger().LOGd(TAG, "temperature: %d", temperature);
 				callback.onSuccess(temperature);
 			}
 		}
@@ -212,6 +208,49 @@ public class BleBaseState {
 					@Override
 					public void onSuccess(StateMsg state) {
 						parseTemperature(state, callback);
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				});
+	}
+
+	private void parseErrorState(StateMsg state, IIntegerCallback callback) {
+		if (state.getType() == BluenetConfig.STATE_ERRORS) {
+			if (state.getLength() != 4) {
+				getLogger().LOGe(TAG, "Wrong length parameter: %d", state.getLength());
+				callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+			} else {
+				int errorState = state.getIntValue();
+				getLogger().LOGd(TAG, "error state: %s", Integer.toBinaryString(errorState));
+				callback.onSuccess(errorState);
+			}
+		}
+	}
+
+	public void getErrorState(String address, final IIntegerCallback callback) {
+		_bleBase.getState(address, BluenetConfig.STATE_ERRORS, new IStateCallback() {
+			@Override
+			public void onSuccess(StateMsg state) {
+				parseErrorState(state, callback);
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
+
+	public void getErrorStateNotifications(String address, final IIntegerCallback statusCallback,
+	                                        final IIntegerCallback callback) {
+		_bleBase.getStateNotifications(address, BluenetConfig.STATE_ERRORS, statusCallback,
+				new IStateCallback() {
+					@Override
+					public void onSuccess(StateMsg state) {
+						parseErrorState(state, callback);
 					}
 
 					@Override

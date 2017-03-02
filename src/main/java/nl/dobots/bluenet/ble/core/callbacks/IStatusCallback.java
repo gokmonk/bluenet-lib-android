@@ -1,4 +1,6 @@
-package nl.dobots.bluenet.service.callbacks;
+package nl.dobots.bluenet.ble.core.callbacks;
+
+import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -13,24 +15,14 @@ package nl.dobots.bluenet.service.callbacks;
  * version 3 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  * <p/>
- * Created on 19-8-15
+ * Created on 28-7-15
+ *
+ * Notify about success without returning any data
  *
  * @author Dominik Egger
  */
-public interface EventListener {
-
-	enum Event {
-		BLUETOOTH_TURNED_OFF,
-		BLUETOOTH_NOT_ENABLED,
-		BLUETOOTH_INITIALIZED,
-		BLUETOOTH_START_SCAN_ERROR,
-		BLUETOOTH_STOP_SCAN_ERROR,
-		BLE_PERMISSIONS_MISSING,
-		BLE_PERMISSIONS_GRANTED,
-		LOCATION_SERVICES_TURNED_OFF,
-		LOCATION_SERVICES_NOT_ENABLED,
-	}
-
-	void onEvent(Event event);
+public interface IStatusCallback extends IBaseCallback {
+	
+	void onSuccess();
 
 }
