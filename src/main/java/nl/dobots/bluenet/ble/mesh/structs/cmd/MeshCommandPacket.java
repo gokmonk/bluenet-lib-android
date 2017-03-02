@@ -3,6 +3,7 @@ package nl.dobots.bluenet.ble.mesh.structs.cmd;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.Locale;
 
 import nl.dobots.bluenet.ble.mesh.structs.MeshPayload;
 import nl.dobots.bluenet.utils.BleUtils;
@@ -98,7 +99,7 @@ public class MeshCommandPacket implements MeshPayload {
 
 	@Override
 	public String toString() {
-		return String.format("{messageType: %d, numIds: %d [%s], payload: %s}",
+		return String.format(Locale.ENGLISH, "{messageType: %d, numIds: %d [%s], payload: %s}",
 				_messageType, _numberOfIds, Arrays.toString(_ids), payloadToString());
 	}
 }

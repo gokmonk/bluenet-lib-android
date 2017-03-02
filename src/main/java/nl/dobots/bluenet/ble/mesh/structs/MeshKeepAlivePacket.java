@@ -3,6 +3,7 @@ package nl.dobots.bluenet.ble.mesh.structs;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.Locale;
 
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.utils.BleLog;
@@ -57,7 +58,8 @@ public class MeshKeepAlivePacket implements MeshPayload {
 		}
 
 		public KeepAliveItem(ByteBuffer bb) {
-
+			_crownstoneId = BleUtils.toUint16(bb.getShort());
+			_actionSwitchState = BleUtils.toUint8(bb.get());
 		}
 
 		public int getCrownstoneId() {
@@ -78,7 +80,7 @@ public class MeshKeepAlivePacket implements MeshPayload {
 
 		@Override
 		public String toString() {
-			return String.format("{id: %d, action: %d}", _crownstoneId, _actionSwitchState);
+			return String.format(Locale.ENGLISH, "{id: %d, action: %d}", _crownstoneId, _actionSwitchState);
 		}
 	}
 
@@ -111,6 +113,11 @@ public class MeshKeepAlivePacket implements MeshPayload {
 
 		_timeout = BleUtils.toUint16(bb.getShort());
 		_size = BleUtils.toUint8(bb.get());
+		if (_size > MAX_LIST_ELEMENTS) {
+			BleLog.getInstance().LOGe(TAG, "Invalid length: " + _size);
+			BleLog.getInstance().LOGe(TAG, "from mesh message: " + BleUtils.bytesToString(bytes));
+			_size = 0;
+		}
 
 		for (int i = 0; i < _size; i++) {
 			int crownstoneId = BleUtils.toUint16(bb.getShort());
@@ -150,7 +157,7 @@ public class MeshKeepAlivePacket implements MeshPayload {
 		for (int i = 0; i < _size; i++) {
 			sb.append(_list[i].toString());
 		}
-		return String.format("{timeout: %d, size: %d, list: [%s]}", _timeout, _size, sb.toString());
+		return String.format(Locale.ENGLISH, "{timeout: %d, size: %d, list: [%s]}", _timeout, _size, sb.toString());
 	}
 
 	public int getTimeout() {

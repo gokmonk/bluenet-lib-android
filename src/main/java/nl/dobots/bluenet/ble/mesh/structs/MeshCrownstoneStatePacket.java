@@ -2,6 +2,7 @@ package nl.dobots.bluenet.ble.mesh.structs;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Locale;
 
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.utils.BleLog;
@@ -79,7 +80,7 @@ public class MeshCrownstoneStatePacket implements MeshPayload {
 
 		@Override
 		public String toString() {
-			return String.format("{id: %d, switchState: %d, powerUsage: %d, accumulatedEnergy: %d}",
+			return String.format(Locale.ENGLISH, "{id: %d, switchState: %d, powerUsage: %d, accumulatedEnergy: %d}",
 					_crownstoneId, _switchState, _powerUsage, _accumulatedEnergy);
 		}
 	}
@@ -144,7 +145,7 @@ public class MeshCrownstoneStatePacket implements MeshPayload {
 		for (int i = 0; i < _size; i++) {
 			sb.append(getCrownstoneState(i).toString());
 		}
-		return String.format("{head: %d, tail: %d, size: %d, list: [%s]", _head, _tail, _size,
+		return String.format(Locale.ENGLISH, "{head: %d, tail: %d, size: %d, list: [%s]", _head, _tail, _size,
 				sb.toString());
 	}
 

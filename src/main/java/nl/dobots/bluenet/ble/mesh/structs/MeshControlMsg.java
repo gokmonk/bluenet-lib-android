@@ -3,6 +3,7 @@ package nl.dobots.bluenet.ble.mesh.structs;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.Locale;
 
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 
@@ -105,7 +106,7 @@ public class MeshControlMsg {
 	 */
 	@Override
 	public String toString() {
-		return String.format("{_handle: %d, _length: %d, _payload: %s}",
+		return String.format(Locale.ENGLISH, "{_handle: %d, _length: %d, _payload: %s}",
 				_handle, _length, Arrays.toString(_payload));
 	}
 
