@@ -300,6 +300,11 @@ public class CrownstoneServiceData extends JSONObject {
 		return ((eventBitmask & (1L << 1)) != 0);
 	}
 
+	public boolean isErrorBit() { return isErrorBit(getEventBitmask()); }
+	public static boolean isErrorBit(byte eventBitmask) {
+		return ((eventBitmask & (1L << 2)) != 0);
+	}
+
 //	public boolean isSetupMode() { return isSetupMode(getEventBitmask()); }
 //	public static boolean isSetupMode(byte eventBitmask) {
 //		return ((eventBitmask & (1L << 7)) != 0);

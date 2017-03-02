@@ -143,7 +143,33 @@ public class BleExtState {
 //				}
 			}
 		});
+	}
 
+	public void getErrorState(final IIntegerCallback callback) {
+		_bleExt.getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				if (_bleExt.isConnected(callback) && _bleExt.hasStateCharacteristics(callback)) {
+					getLogger().LOGd(TAG, "Get error state ...");
+					_bleBaseState.getErrorState(_bleExt.getTargetAddress(), callback);
+				}
+			}
+		});
+	}
+
+	public void getErrorState(final String address, final IIntegerCallback callback) {
+		_bleExt.getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGv(TAG, "Get error state");
+				_bleExt.connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						getErrorState(execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////

@@ -179,6 +179,7 @@ public class BluenetConfig {
 	public static final char STATE_SCHEDULE =                           133;  // 0x85
 	public static final char STATE_OPERATION_MODE =                     134;  // 0x86
 	public static final char STATE_TEMPERATURE =                        135;  // 0x87
+	public static final char STATE_ERRORS =                             139;  // 0x8B
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
