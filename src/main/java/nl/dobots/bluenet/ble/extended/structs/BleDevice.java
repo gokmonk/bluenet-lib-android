@@ -351,7 +351,7 @@ public class BleDevice {
 		return hasChange;
 	}
 
-	public int getOccurrences() {
+	public synchronized int getOccurrences() {
 		refreshHistory();
 		return _rssiHistory.size();
 	}

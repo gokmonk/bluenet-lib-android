@@ -151,7 +151,9 @@ public class BleExt extends Logging implements IWriteCallback {
 	 */
 	public void setScanFilter(BleDeviceFilter filter) {
 		if (_scanFilter != filter) {
-			_devices.clear();
+			synchronized (BleExt.class) {
+				_devices.clear();
+			}
 		}
 		_scanFilter = filter;
 	}
@@ -471,7 +473,11 @@ public class BleExt extends Logging implements IWriteCallback {
 
 				// If we didn't get any service data, we probably received an advertisement with no scan response
 				// So if the device is already in the list, let's assume that it still passes the filter.
-				if (_devices.contains(device) && device.getServiceData() == null) {
+				boolean isInDeviceMap;
+				synchronized (BleExt.class) {
+					isInDeviceMap = _devices.contains(device);
+				}
+				if (isInDeviceMap && device.getServiceData() == null) {
 					// Just update rssi
 				}
 				else {
