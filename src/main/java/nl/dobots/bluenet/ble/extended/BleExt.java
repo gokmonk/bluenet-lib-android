@@ -2311,7 +2311,7 @@ public class BleExt extends Logging implements IWriteCallback {
 							}
 						});
 					}
-				}, 100);
+				}, 500);
 			}
 
 			@Override
