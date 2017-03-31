@@ -2353,7 +2353,7 @@ public class BleExt extends Logging implements IWriteCallback {
 									case BleErrors.ERROR_RETURN_VALUE_PARSING:
 									case BleErrors.ERROR_RECOVER_MODE_DISABLED:
 									case BleErrors.ERROR_NOT_IN_RECOVERY_MODE: {
-										getLogger().LOGd(TAG, "recover mode disabled or not in recovery mode");
+										getLogger().LOGw(TAG, "recover mode disabled or not in recovery mode");
 										callback.onError(error);
 										execCallback.onSuccess();
 										break;
