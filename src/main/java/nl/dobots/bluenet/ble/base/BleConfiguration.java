@@ -1269,15 +1269,15 @@ public class BleConfiguration {
 	}
 
 	/**
-	 * Write the pwm frequency to the configuration
+	 * Write the pwm period to the configuration
 	 * @param address the MAC address of the device
-	 * @param value new pwm frequency
+	 * @param value new pwm period in μs (uint 32)
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void setPwmFrequency(String address, int value, final IStatusCallback callback) {
-		_bleBase.getLogger().LOGd(TAG, "tbd");
-//		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_PWM_FREQ, 1, new byte[]{(byte)value});
-//		_bleBase.writeConfiguration(address, configuration, callback);
+	public void setPwmPeriod(String address, long value, final IStatusCallback callback) {
+		byte[] valArr = BleUtils.uint32ToByteArray(value);
+		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_PWM_PERIOD, valArr.length, valArr);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
 	}
 
 	/**
@@ -1285,27 +1285,67 @@ public class BleConfiguration {
 	 * @param address the MAC address of the device
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
-	public void getPwmFrequency(String address, final IIntegerCallback callback) {
-		_bleBase.getLogger().LOGd(TAG, "tbd");
-//		_bleBase.getConfiguration(address, BluenetConfig.CONFIG_PWM_FREQ, new IConfigurationCallback() {
-//			@Override
-//			public void onSuccess(ConfigurationMsg configuration) {
-//				if (configuration.getLength() != 1) {
-//					_bleBase.getLogger().LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
-//					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
-//				} else {
-//					int pwmFrequency = configuration.getUint8Value();
-//					_bleBase.getLogger().LOGd(TAG, "pwm frequency: %d", pwmFrequency);
-//					callback.onSuccess(pwmFrequency);
-//				}
-//			}
-//
-//			@Override
-//			public void onError(int error) {
-//				callback.onError(error);
-//			}
-//		});
+	public void getPwmPeriod(String address, final IIntegerCallback callback) {
+		_bleBase.getConfiguration(address, BluenetConfig.CONFIG_PWM_PERIOD, new IConfigurationCallback() {
+			@Override
+			public void onSuccess(ConfigurationMsg configuration) {
+				if (configuration.getLength() != 4) {
+					_bleBase.getLogger().LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
+					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+				} else {
+					int pwmPeriod = configuration.getIntValue();
+					_bleBase.getLogger().LOGd(TAG, "pwm period: %d", pwmPeriod);
+					callback.onSuccess(pwmPeriod);
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
 	}
+
+
+
+	/**
+	 * Write the relay high duration to the configuration
+	 * @param address the MAC address of the device
+	 * @param value new relay high duration in ms (uint 16)
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void setRelayHighDuration(String address, int value, final IStatusCallback callback) {
+		byte[] valArr = BleUtils.shortToByteArray(value);
+		ConfigurationMsg configuration = new ConfigurationMsg(BluenetConfig.CONFIG_RELAY_HIGH_DURATION, valArr.length, valArr);
+		_bleBase.writeConfiguration(address, configuration, true, callback);
+	}
+
+	/**
+	 * Get the relay high duration from the configuration
+	 * @param address the MAC address of the device
+	 * @param callback the callback which will get the value on success, or an error otherwise
+	 */
+	public void getRelayHighDuration(String address, final IIntegerCallback callback) {
+		_bleBase.getConfiguration(address, BluenetConfig.CONFIG_RELAY_HIGH_DURATION, new IConfigurationCallback() {
+			@Override
+			public void onSuccess(ConfigurationMsg configuration) {
+				if (configuration.getLength() != 2) {
+					_bleBase.getLogger().LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
+					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+				} else {
+					int relayHighDuration = configuration.getShortValue();
+					_bleBase.getLogger().LOGd(TAG, "relay high duration: %d", relayHighDuration);
+					callback.onSuccess(relayHighDuration);
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
+
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// read only

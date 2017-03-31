@@ -122,7 +122,7 @@ public class BluenetConfig {
 	public static final char CONFIG_ROOM =                              2;    // 0x02
 	public static final char CONFIG_FLOOR =                             3;    // 0x03
 	public static final char CONFIG_NEARBY_TIMEOUT =                    4;    // 0x04
-	public static final char CONFIG_PWM_FREQ =                          5;    // 0x05
+	public static final char CONFIG_PWM_PERIOD =                        5;    // 0x05
 	public static final char CONFIG_IBEACON_MAJOR =                     6;    // 0x06
 	public static final char CONFIG_IBEACON_MINOR =                     7;    // 0x07
 	public static final char CONFIG_IBEACON_PROXIMITY_UUID =            8;    // 0x08

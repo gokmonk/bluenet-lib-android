@@ -122,6 +122,15 @@ public class BleUtils {
 		return num & 0xFFFFFFFFL;
 	}
 
+	public static byte[] uint32ToByteArray(long num) {
+		byte[] bytes = new byte[4];
+		bytes[3] = (byte) (num & 0xFF000000L);
+		bytes[2] = (byte) (num & 0x00FF0000L);
+		bytes[1] = (byte) (num & 0x0000FF00L);
+		bytes[0] = (byte) (num & 0x000000FFL);
+		return bytes;
+	}
+
 	public static byte[] hexStringToBytes(String hex) {
 		byte[] result = new byte[hex.length() / 2];
 		for (int i = 0; i < result.length; ++i) {
