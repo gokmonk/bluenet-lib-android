@@ -89,7 +89,7 @@ public class BleIbeaconRanging {
 	}
 
 	public synchronized void remIbeaconFilter(BleIbeaconFilter filter) {
-		for (int i = _iBeaconFilter.size(); i > 0; i--) {
+		for (int i = _iBeaconFilter.size()-1; i >= 0; i--) {
 			if (_iBeaconFilter.get(i).equals(filter)) {
 				_iBeaconFilter.remove(i);
 			}
