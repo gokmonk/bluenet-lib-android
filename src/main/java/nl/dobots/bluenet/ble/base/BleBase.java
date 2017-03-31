@@ -161,7 +161,13 @@ public class BleBase extends BleCore {
 		if (_encryptionEnabled && accessLevel != BleBaseEncryption.ACCESS_LEVEL_ENCRYPTION_DISABLED) {
 			// Just use highest available key
 			EncryptionKeys.KeyAccessLevelPair keyAccessLevelPair = _encryptionKeys.getHighestKey();
+			if (_encryptionSessionData == null || keyAccessLevelPair == null) {
+				return false;
+			}
 			byte[] encryptedBytes = BleBaseEncryption.encryptCtr(value, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, keyAccessLevelPair.key, keyAccessLevelPair.accessLevel);
+			if (encryptedBytes == null) {
+				return false;
+			}
 			return super.write(address, serviceUuid, characteristicUuid, encryptedBytes, callback);
 		}
 		return super.write(address, serviceUuid, characteristicUuid, value, callback);
@@ -178,6 +184,10 @@ public class BleBase extends BleCore {
 				@Override
 				public void onData(JSONObject json) {
 					byte[] encryptedBytes = getValue(json);
+					if (_encryptionSessionData == null || _encryptionKeys == null) {
+						callback.onError(BleErrors.ENCRYPTION_ERROR);
+						return;
+					}
 					byte[] decryptedBytes = BleBaseEncryption.decryptCtr(encryptedBytes, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, _encryptionKeys);
 					if (decryptedBytes == null) {
 						callback.onError(BleErrors.ENCRYPTION_ERROR);
