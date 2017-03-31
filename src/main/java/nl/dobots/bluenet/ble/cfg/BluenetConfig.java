@@ -113,6 +113,8 @@ public class BluenetConfig {
 	public static final char CMD_DISCONNECT =                           19;   // 0x13
 	public static final char CMD_SET_LED =                              20;   // 0x14
 	public static final char CMD_NOP =                                  21;   // 0x15
+	public static final char CMD_INCREASE_TX =                          22;   // 0x16
+	public static final char CMD_RESET_STATE_ERRORS =                   23;   // 0x17
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -235,7 +237,14 @@ public class BluenetConfig {
 	public static final char SWITCH_INTENT_ENTER =                      2;    // 0x02;
 	public static final char SWITCH_INTENT_EXIT =                       3;    // 0x03;
 	public static final char SWITCH_INTENT_MANUAL =                     4;    // 0x04;
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// State error bits
+	public static final char STATE_ERROR_BIT_OVERCURRENT =              0;    // 0x00;
+	public static final char STATE_ERROR_BIT_OVERCURRENT_PWM =          1;    // 0x01;
+	public static final char STATE_ERROR_BIT_CHIP_TEMP =                2;    // 0x02;
+	public static final char STATE_ERROR_BIT_PWM_TEMP =                 3;    // 0x03;
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -286,7 +295,12 @@ public class BluenetConfig {
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	public static final int PWM_ON =                                    100;
 	public static final int PWM_OFF =                                   0;
-	public static final int RELAY_ON =                                  255;
+	public static final int RELAY_ON =                                  128; // Can be 100 too actually
 	public static final int RELAY_OFF =                                 0;
+	public static final int SWITCH_ON =                                 100; // Fully on
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+	public static final int KEEP_ALIVE_NO_ACTION =                      255;
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 }

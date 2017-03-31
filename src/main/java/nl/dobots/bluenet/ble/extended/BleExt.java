@@ -1394,6 +1394,50 @@ public class BleExt extends Logging implements IWriteCallback {
 	///////////////////
 
 	/**
+	 * Function to write the given switch value to the device.
+	 * <p>
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 *
+	 * @param value    the switch value to be written to the device (0-100)
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void writeSwitch(final int value, final IStatusCallback callback) {
+		if (isConnected(callback)) {
+			getLogger().LOGd(TAG, "Set switch to %d", value);
+			if (hasControlCharacteristic(null)) {
+				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_SWITCH, 1, new byte[]{(byte) value}), callback);
+			}
+		}
+	}
+
+	/**
+	 * Function to write the given switch value to the device. Connects to the device if not already
+	 * connected, and/or delays the disconnect if necessary.
+	 * <p>
+	 *
+	 * @param address  the MAC address of the device to which the switch value should be written
+	 * @param value    the switch value to be written (0-100)
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void writeSwitch(final String address, final int value, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "Set switch to %d", value);
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						writeSwitch(value, execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
+
+
+	/**
 	 * Function to read the current PWM value from the device.
 	 * <p>
 	 * Note: needs to be already connected or an error is created! Use overloaded function
@@ -1469,8 +1513,6 @@ public class BleExt extends Logging implements IWriteCallback {
 	 * Function to write the given PWM value to the device. Connects to the device if not already
 	 * connected, and/or delays the disconnect if necessary.
 	 * <p>
-	 * Note: needs to be already connected or an error is created! Use overloaded function
-	 * with address otherwise
 	 *
 	 * @param address  the MAC address of the device to which the PWM value should be written
 	 * @param value    the PWM value to be written
@@ -1570,8 +1612,6 @@ public class BleExt extends Logging implements IWriteCallback {
 	 * Function to write the given Relay value to the device. Connects to the device if not already
 	 * connected, and/or delays the disconnect if necessary.
 	 * <p>
-	 * Note: needs to be already connected or an error is created! Use overloaded function
-	 * with address otherwise
 	 *
 	 * @param address  the MAC address of the device to which the Relay value should be written
 	 * @param relayOn  true if the relay should be switched on, false otherwise
@@ -2894,6 +2934,54 @@ public class BleExt extends Logging implements IWriteCallback {
 					@Override
 					public void execute(final IExecStatusCallback execCallback) {
 						writeKeepAlive(execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
+	public void writeNOP(final IStatusCallback callback) {
+		if (isConnected(callback)) {
+			getLogger().LOGd(TAG, "write NOP");
+			_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_NOP), callback);
+		}
+	}
+
+	public void writeNOP(final String address, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "write NOP");
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						writeNOP(execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
+	public void writeResetStateErrors(final IStatusCallback callback) {
+		if (isConnected(callback)) {
+			getLogger().LOGd(TAG, "write reset state errors");
+			ByteBuffer bb = ByteBuffer.allocate(4);
+			bb.order(ByteOrder.LITTLE_ENDIAN);
+			int resetErrorBitmask = 0xFFFFFFFF;
+			bb.putInt(resetErrorBitmask);
+			_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_RESET_STATE_ERRORS, 4, bb.array()), callback);
+		}
+	}
+
+	public void writeResetStateErrors(final String address, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "write reset state errors");
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						writeResetStateErrors(execCallback);
 					}
 				}, new SimpleExecStatusCallback(callback));
 			}
