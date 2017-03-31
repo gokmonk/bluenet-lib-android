@@ -335,8 +335,8 @@ public class BleScanService extends Service {
 					if (_running) {
 						_wasRunning = true;
 
-						_running = false;
-//						stopIntervalScan();
+//						_running = false;
+						stopIntervalScan();
 					} else {
 						_wasRunning = false;
 					}
