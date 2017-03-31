@@ -30,20 +30,34 @@ public class MeshCrownstoneStatePacket implements MeshPayload {
 	private static final String TAG = MeshCrownstoneStatePacket.class.getCanonicalName();
 
 	public class CrownstoneStateItem {
-
 		private int _crownstoneId;
-
 		private int _switchState;
-
+		private int _eventBitmask;
 		private int _powerUsage;
-
 		private int _accumulatedEnergy;
 
-		public CrownstoneStateItem(int crownstoneId, int switchState, int powerUsage, int accumulatedEnergy) {
+		public CrownstoneStateItem(int crownstoneId, int switchState, int eventBitmask, int powerUsage, int accumulatedEnergy) {
 			_crownstoneId = crownstoneId;
 			_switchState = switchState;
+			_eventBitmask = eventBitmask;
 			_powerUsage = powerUsage;
 			_accumulatedEnergy = accumulatedEnergy;
+		}
+
+		public CrownstoneStateItem(ByteBuffer bb) {
+			_crownstoneId =      BleUtils.toUint16(bb.getShort());
+			_switchState =       BleUtils.toUint8(bb.get());
+			_eventBitmask =      BleUtils.toUint8(bb.get());
+			_powerUsage =        bb.getInt();
+			_accumulatedEnergy = bb.getInt();
+		}
+
+		public void toArray(ByteBuffer bb) {
+			bb.putShort((short) _crownstoneId);
+			bb.put((byte) _switchState);
+			bb.put((byte) _eventBitmask);
+			bb.putInt(_powerUsage);
+			bb.putInt(_accumulatedEnergy);
 		}
 
 		public int getCrownstoneId() {
@@ -52,6 +66,14 @@ public class MeshCrownstoneStatePacket implements MeshPayload {
 
 		public void setCrownstoneId(int crownstoneId) {
 			_crownstoneId = crownstoneId;
+		}
+
+		public int getEventBitmask() {
+			return _eventBitmask;
+		}
+
+		public void setEventBitmask(int eventBitmask) {
+			_eventBitmask = eventBitmask;
 		}
 
 		public int getSwitchState() {
@@ -80,17 +102,17 @@ public class MeshCrownstoneStatePacket implements MeshPayload {
 
 		@Override
 		public String toString() {
-			return String.format(Locale.ENGLISH, "{id: %d, switchState: %d, powerUsage: %d, accumulatedEnergy: %d}",
-					_crownstoneId, _switchState, _powerUsage, _accumulatedEnergy);
+			return String.format(Locale.ENGLISH, "{id: %d, switchState: %d, bitmask: %d, powerUsage: %d, accumulatedEnergy: %d}",
+					_crownstoneId, _switchState, _eventBitmask, _powerUsage, _accumulatedEnergy);
 		}
 	}
 
 	// 1B head + 1B tail + 1B size
 	private static final int CROWNSTONE_STATE_PACKET_HEADER_SIZE = 3;
-	// 2B Crownstone ID + 1B switch state + 4B power usage + 4B accumulated energy
-	private static final int CROWNSTONE_STATE_ITEM_SIZE = 11; // bytes
+	// 2B Crownstone ID + 1B switch state + 1B event bitmask + 4B power usage + 4B accumulated energy
+	private static final int CROWNSTONE_STATE_ITEM_SIZE = 12; // bytes
 	// max capacity of the list
-	private static final int MAX_LIST_ELEMENTS = BluenetConfig.MESH_MAX_PAYLOAD_SIZE / CROWNSTONE_STATE_ITEM_SIZE;
+	private static final int MAX_LIST_ELEMENTS = (BluenetConfig.MESH_MAX_PAYLOAD_SIZE - CROWNSTONE_STATE_PACKET_HEADER_SIZE) / CROWNSTONE_STATE_ITEM_SIZE;
 
 	private int _head;
 
@@ -100,7 +122,11 @@ public class MeshCrownstoneStatePacket implements MeshPayload {
 
 	private CrownstoneStateItem[] _list = new CrownstoneStateItem[MAX_LIST_ELEMENTS];
 
-	public MeshCrownstoneStatePacket() {}
+	public MeshCrownstoneStatePacket() {
+		_head = 0;
+		_tail = 0;
+		_size = 0;
+	}
 
 	public MeshCrownstoneStatePacket(byte[] bytes) {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
@@ -109,13 +135,26 @@ public class MeshCrownstoneStatePacket implements MeshPayload {
 		_head = BleUtils.toUint8(bb.get());
 		_tail = BleUtils.toUint8(bb.get());
 		_size = BleUtils.toUint8(bb.get());
+		if (_head > MAX_LIST_ELEMENTS ||
+				_tail > MAX_LIST_ELEMENTS ||
+				_size > MAX_LIST_ELEMENTS ||
+				(_tail == _head && (_size != 0 && _size != MAX_LIST_ELEMENTS)) ||
+				(_tail != _head && ((_tail + MAX_LIST_ELEMENTS - _head) % MAX_LIST_ELEMENTS != _size))
+				) {
+			BleLog.getInstance().LOGe(TAG, "Invalid message: " + BleUtils.bytesToString(bytes));
+			_size = 0;
+			_head = 0;
+			_tail = 0;
+		}
 
 		for (int i = 0; i < MAX_LIST_ELEMENTS; i++) {
-			int crownstoneId = BleUtils.toUint16(bb.getShort());
-			int switchState = BleUtils.toUint8(bb.get());
-			int powerUsage = bb.getInt();
-			int accumulatedEnergy = bb.getInt();
-			_list[i] = new CrownstoneStateItem(crownstoneId, switchState, powerUsage, accumulatedEnergy);
+			_list[i] = new CrownstoneStateItem(bb);
+//			int crownstoneId = BleUtils.toUint16(bb.getShort());
+//			int switchState = BleUtils.toUint8(bb.get());
+//			int eventBitmask = BleUtils.toUint8(bb.get());
+//			int powerUsage = bb.getInt();
+//			int accumulatedEnergy = bb.getInt();
+//			_list[i] = new CrownstoneStateItem(crownstoneId, switchState, eventBitmask, powerUsage, accumulatedEnergy);
 		}
 
 	}
@@ -130,12 +169,8 @@ public class MeshCrownstoneStatePacket implements MeshPayload {
 		bb.put((byte)_size);
 
 		for (int i = 0; i < _size; i++) {
-			bb.putShort((short) _list[i].getCrownstoneId());
-			bb.put((byte) _list[i].getSwitchState());
-			bb.putInt(_list[i].getPowerUsage());
-			bb.putInt(_list[i].getAccumulatedEnergy());
+			_list[i].toArray(bb);
 		}
-
 		return bb.array();
 	}
 
@@ -145,8 +180,7 @@ public class MeshCrownstoneStatePacket implements MeshPayload {
 		for (int i = 0; i < _size; i++) {
 			sb.append(getCrownstoneState(i).toString());
 		}
-		return String.format(Locale.ENGLISH, "{head: %d, tail: %d, size: %d, list: [%s]", _head, _tail, _size,
-				sb.toString());
+		return String.format(Locale.ENGLISH, "{head: %d, tail: %d, size: %d, list: [%s]", _head, _tail, _size, sb.toString());
 	}
 
 	private void incTail() {
@@ -160,8 +194,8 @@ public class MeshCrownstoneStatePacket implements MeshPayload {
 		_head = (_head + 1) % MAX_LIST_ELEMENTS;
 	}
 
-	public void addCrownstoneState(int crownstoneId, int switchState, int powerUsage, int accumulatedEnergy) {
-		_list[_tail] = new CrownstoneStateItem(crownstoneId, switchState, powerUsage, accumulatedEnergy);
+	public void addCrownstoneState(int crownstoneId, int switchState, int eventBitmask, int powerUsage, int accumulatedEnergy) {
+		_list[_tail] = new CrownstoneStateItem(crownstoneId, switchState, eventBitmask, powerUsage, accumulatedEnergy);
 		incTail();
 	}
 

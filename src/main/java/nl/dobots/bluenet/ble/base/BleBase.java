@@ -1803,7 +1803,13 @@ public class BleBase extends BleCore {
 	 */
 	public void writeMeshMessage(String address, MeshControlMsg message, final IStatusCallback callback) {
 		getLogger().LOGd(TAG, "mesh message: write %s at service %s and characteristic %s", message.toString(), BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_MESH_CONTROL_UUID);
-		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_MESH_CONTROL_UUID, message.toArray(),
+		byte[] msgBytArr = message.toArray();
+		if (msgBytArr.length > BluenetConfig.MESH_MAX_PAYLOAD_SIZE) {
+			getLogger().LOGe(TAG, "Message too large: " + BleUtils.bytesToString(msgBytArr));
+			callback.onError(BleErrors.ERROR_WRONG_PAYLOAD_SIZE);
+			return;
+		}
+		write(address, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_MESH_CONTROL_UUID, msgBytArr,
 				new IStatusCallback() {
 
 					@Override

@@ -9,6 +9,7 @@ import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
+
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
  * <p/>
@@ -30,7 +31,7 @@ import nl.dobots.bluenet.utils.BleUtils;
  *
  * The mesh message has the following fields:
  * 		* Handle: the handle on which the message should be sent, see MeshMessageTypes for details
- * 		* Length: the _size in bytes of the payload
+ * 		* Length: the size in bytes of the payload
  * 		* Payload: the payload data of the mesh message, this layout depends on the type
  *
  * The format is:
@@ -89,7 +90,7 @@ public class MeshKeepAlivePacket implements MeshPayload {
 	// 2B Crownstone ID + 1B action + switch state
 	private static final int KEEP_ALIVE_ITEM_SIZE = 3; // bytes
 	// max capacity of the list
-	private static final int MAX_LIST_ELEMENTS = BluenetConfig.MESH_MAX_PAYLOAD_SIZE / KEEP_ALIVE_ITEM_SIZE;
+	private static final int MAX_LIST_ELEMENTS = (BluenetConfig.MESH_MAX_PAYLOAD_SIZE - KEEP_ALIVE_PACKET_HEADER_SIZE) / KEEP_ALIVE_ITEM_SIZE;
 
 	// handle on which the message is sent in the mesh network
 	private int _timeout;
@@ -169,23 +170,23 @@ public class MeshKeepAlivePacket implements MeshPayload {
 	}
 
 	/**
-	 * Get the _size
-	 * @return _size
+	 * Get the size
+	 * @return size
 	 */
 	public int getSize() {
 		return _size;
 	}
 
 	/**
-	 * Set a new _size
-	 * @param size new _size
+	 * Set a new size
+	 * @param size new size
 	 */
 	public void setSize(int size) {
 		this._size = size;
 	}
 
 	public boolean addKeepAlive(int crownstoneId, int actionSwitchState) {
-		if (_size + 1 < MAX_LIST_ELEMENTS) {
+		if (_size < MAX_LIST_ELEMENTS) {
 			_list[_size++] = new KeepAliveItem(crownstoneId, actionSwitchState);
 			return true;
 		} else {

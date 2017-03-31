@@ -99,7 +99,7 @@ public class MeshMultiSwitchPacket implements MeshPayload {
 	// 2B Crownstone ID + 1B switch state + 2B timeout + 1B intent
 	private static final int MULTI_SWITCH_ITEM_SIZE = 6;
 	// max capacity of the list
-	private static final int MAX_LIST_ELEMENTS = BluenetConfig.MESH_MAX_PAYLOAD_SIZE / MULTI_SWITCH_ITEM_SIZE;
+	private static final int MAX_LIST_ELEMENTS = (BluenetConfig.MESH_MAX_PAYLOAD_SIZE - MULTI_SWITCH_PACKET_HEADER_SIZE) / MULTI_SWITCH_ITEM_SIZE;
 
 	// number of elements in the list
 	private int _size;
@@ -112,8 +112,8 @@ public class MeshMultiSwitchPacket implements MeshPayload {
 	}
 
 	/**
-	 * Parses the given byte array into a keep alive packet
-	 * @param bytes byte array containing the keep alive packet
+	 * Parses the given byte array into a multi switch packet
+	 * @param bytes byte array containing the multi switch packet
 	 */
 	public MeshMultiSwitchPacket(byte[] bytes) {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
@@ -137,8 +137,8 @@ public class MeshMultiSwitchPacket implements MeshPayload {
 	}
 
 	/**
-	 * Convert the keep alive packet into a byte array to be set as payload in a mesh control message
-	 * @return byte array representation of the keep alive packet
+	 * Convert the multi switch packet into a byte array to be set as payload in a mesh control message
+	 * @return byte array representation of the multi switch packet
 	 */
 	@Override
 	public byte[] toArray() {
@@ -152,7 +152,7 @@ public class MeshMultiSwitchPacket implements MeshPayload {
 	}
 
 	/**
-	 * For debug purposes, create a string representation of the keep alive packet
+	 * For debug purposes, create a string representation of the multi switch packet
 	 * @return string representation of the object
 	 */
 	@Override
@@ -165,7 +165,7 @@ public class MeshMultiSwitchPacket implements MeshPayload {
 	}
 
 	/**
-	 * Get the _size
+	 * Get the size
 	 * @return _size
 	 */
 	public int getSize() {
@@ -173,7 +173,7 @@ public class MeshMultiSwitchPacket implements MeshPayload {
 	}
 
 	/**
-	 * Set a new _size
+	 * Set a new size
 	 * @param size new _size
 	 */
 	public void setSize(int size) {
@@ -181,7 +181,7 @@ public class MeshMultiSwitchPacket implements MeshPayload {
 	}
 
 	public boolean addMultiSwitch(int crownstoneId, int switchState, int timeout, int intent) {
-		if (_size + 1 < MAX_LIST_ELEMENTS) {
+		if (_size < MAX_LIST_ELEMENTS) {
 			_list[_size++] = new MultiSwitchItem(crownstoneId, switchState, timeout, intent);
 			return true;
 		} else {

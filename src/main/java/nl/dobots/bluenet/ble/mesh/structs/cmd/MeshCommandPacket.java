@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.Locale;
 
 import nl.dobots.bluenet.ble.mesh.structs.MeshPayload;
+import nl.dobots.bluenet.ibeacon.BleIbeaconFilter;
 import nl.dobots.bluenet.utils.BleUtils;
 
 /**
@@ -94,7 +95,7 @@ public class MeshCommandPacket implements MeshPayload {
 	}
 
 	protected String payloadToString() {
-		return "";
+		return BleUtils.bytesToString(_payload);
 	}
 
 	@Override

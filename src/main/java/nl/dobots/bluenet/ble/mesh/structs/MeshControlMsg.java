@@ -111,36 +111,36 @@ public class MeshControlMsg {
 	}
 
 	/**
-	 * Get the _handle
-	 * @return _handle
+	 * Get the handle
+	 * @return handle
 	 */
 	public int getHandle() {
 		return _handle;
 	}
 
 	/**
-	 * Set a new _handle
-	 * @param handle new _handle
+	 * Set a new handle
+	 * @param handle new handle
 	 */
 	public void setHandle(int handle) {
 		this._handle = handle;
 	}
 
 	/**
-	 * Get the _length
-	 * @return _length
+	 * Get the payload size
+	 * @return size of the payload in bytes
 	 */
-	public int getLength() {
+	public int getPayloadSize() {
 		return _length;
 	}
 
-	/**
-	 * Set a new _length
-	 * @param length new _length
-	 */
-	public void setLength(int length) {
-		this._length = length;
-	}
+//	/**
+//	 * Set a new payload size
+//	 * @param new size in bytes
+//	 */
+//	public void setPayloadSize(int length) {
+//		this._length = length;
+//	}
 
 	/**
 	 * Get the mesh message's _payload

@@ -198,13 +198,14 @@ public class BluenetConfig {
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Mesh handles (channel)
-	public static final char CHANNEL_KEEP_ALIVE =                       1;    // 0x01
-	public static final char CHANNEL_STATE_BROADCAST =                  2;    // 0x02
-	public static final char CHANNEL_STATE_CHANGE =                     3;    // 0x03
-	public static final char CHANNEL_COMMAND =                          4;    // 0x04
-	public static final char CHANNEL_COMMAND_REPLY =                    5;    // 0x05
-	public static final char CHANNEL_SCAN_RESULT =                      6;    // 0x06
-	public static final char CHANNEL_BIG_DATA =                         7;    // 0x07
+	public static final char MESH_HANDLE_KEEP_ALIVE =                       1;    // 0x01
+	public static final char MESH_HANDLE_STATE_BROADCAST =                  2;    // 0x02
+	public static final char MESH_HANDLE_STATE_CHANGE =                     3;    // 0x03
+	public static final char MESH_HANDLE_COMMAND =                          4;    // 0x04
+	public static final char MESH_HANDLE_COMMAND_REPLY =                    5;    // 0x05
+	public static final char MESH_HANDLE_SCAN_RESULT =                      6;    // 0x06
+	public static final char MESH_HANDLE_BIG_DATA =                         7;    // 0x07
+	public static final char MESH_HANDLE_MULTI_SWITCH =                     8;    // 0x08
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
