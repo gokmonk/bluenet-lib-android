@@ -2318,7 +2318,7 @@ public class BleExt extends Logging implements IWriteCallback {
 							}
 						});
 					}
-				}, 500);
+				}, 100); // Should be less than FACTORY_PROCESS_TIMEOUT
 			}
 
 			@Override
