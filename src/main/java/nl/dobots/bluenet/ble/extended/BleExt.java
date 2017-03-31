@@ -650,7 +650,8 @@ public class BleExt extends Logging implements IWriteCallback {
 		_connectionState = BleDeviceConnectionState.connected;
 		_subscriberIds.clear();
 
-		_handler.postDelayed(_connectionKeepAlive, CONNECTION_ALIVE_INTERVAL);
+		// Do not automatically keep the connection alive!
+//		_handler.postDelayed(_connectionKeepAlive, CONNECTION_ALIVE_INTERVAL);
 	}
 
 	/**
