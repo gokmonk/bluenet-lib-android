@@ -2383,9 +2383,11 @@ public class BleExt extends Logging implements IWriteCallback {
 	}
 
 	public void recover(final String address, final IStatusCallback callback) {
+		// Perform step 1
 		recoverStep(address, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
+				// Perform step 2
 				recoverStep(address, callback);
 			}
 

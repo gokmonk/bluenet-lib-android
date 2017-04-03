@@ -334,8 +334,6 @@ public class BleScanService extends Service {
 					// detection won't work without BLE ...
 					if (_running) {
 						_wasRunning = true;
-
-//						_running = false;
 						stopIntervalScan();
 					} else {
 						_wasRunning = false;
@@ -481,7 +479,7 @@ public class BleScanService extends Service {
 
 				@Override
 				public void onError(int error) {
-					_running = false;
+//					_running = false; // TODO: why do we have to set it to false here? It breaks the retries.
 					getLogger().LOGe(TAG, "... scan interval start error: " + error);
 					boolean sendError = true;
 
@@ -506,6 +504,7 @@ public class BleScanService extends Service {
 					}
 
 					if (sendError) {
+						_running = false;
 						sendEvent(EventListener.Event.BLUETOOTH_START_SCAN_ERROR);
 					}
 				}
