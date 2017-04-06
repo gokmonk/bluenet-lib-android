@@ -58,7 +58,7 @@ public class BleIbeaconRanging {
 	// handler used for delayed execution and timeouts
 	private Handler _handler;
 
-	private int _minRssi = 0;
+	private int _minRssi = -110;
 
 	public BleIbeaconRanging() {
 		_iBeaconFilter = new ArrayList<>();
@@ -170,8 +170,7 @@ public class BleIbeaconRanging {
 //			for (IBleBeaconCallback cb : _scanCallbacks) {
 //				cb.onBeaconScanned(device);
 //			}
-
-			if (_minRssi >= device.getRssi()) {
+			if (device.getRssi() >= _minRssi) {
 				long currentTime = SystemClock.elapsedRealtime();
 				_lastSeen.put(device.getProximityUuid(), currentTime);
 				getLogger().LOGv(TAG, "lastseen " + device.getProximityUuid() + " at " + currentTime + "=" + _lastSeen.get(device.getProximityUuid()));
