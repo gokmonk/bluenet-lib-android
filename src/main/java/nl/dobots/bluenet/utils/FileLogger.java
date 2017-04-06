@@ -279,7 +279,9 @@ public class FileLogger {
 
 	public boolean clearLogFiles() {
 		try {
-			_logFileDos.close();
+			if (_logFileDos != null) {
+				_logFileDos.close();
+			}
 		} catch (IOException e) {
 			Log.e("BleLog", "Error closing logfile", e);
 			return false;
