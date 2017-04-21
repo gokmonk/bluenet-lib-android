@@ -22,7 +22,7 @@ import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
  *
  * @author Dominik Egger
  */
-public interface IExecStatusCallback extends IBaseCallback, IStatusCallback, IIntegerCallback, IBooleanCallback {
+public interface IExecStatusCallback extends IBaseCallback, IStatusCallback, IIntegerCallback, IBooleanCallback, IByteArrayCallback {
 
 	void onExecuteSuccess(boolean disconnect);
 

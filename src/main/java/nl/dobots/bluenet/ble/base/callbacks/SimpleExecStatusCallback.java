@@ -27,9 +27,10 @@ public class SimpleExecStatusCallback implements IExecStatusCallback {
 
 	private static final String TAG = SimpleExecStatusCallback.class.getCanonicalName();
 
-	private IIntegerCallback _integerCallback;
-	private IStatusCallback _statusCallback;
-	private IBooleanCallback _booleanCallback;
+	private IIntegerCallback   _integerCallback;
+	private IStatusCallback    _statusCallback;
+	private IBooleanCallback   _booleanCallback;
+	private IByteArrayCallback _byteArrayCallback;
 
 	public SimpleExecStatusCallback() {}
 
@@ -43,6 +44,19 @@ public class SimpleExecStatusCallback implements IExecStatusCallback {
 
 	public SimpleExecStatusCallback(IBooleanCallback booleanCallback) {
 		_booleanCallback = booleanCallback;
+	}
+
+	public SimpleExecStatusCallback(IByteArrayCallback byteArrayCallback) {
+		_byteArrayCallback = byteArrayCallback;
+	}
+
+	@Override
+	public void onSuccess(byte[] result) {
+		if (_byteArrayCallback != null) {
+			_byteArrayCallback.onSuccess(result);
+		} else {
+			BleLog.getInstance().LOGw(TAG, "Stub, Wrong usage?!");
+		}
 	}
 
 	@Override

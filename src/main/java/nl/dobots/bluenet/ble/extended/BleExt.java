@@ -1285,6 +1285,12 @@ public class BleExt extends Logging implements IWriteCallback {
 			}
 
 			@Override
+			public void onSuccess(byte[] result) {
+				callback.onSuccess(result);
+				onExecuteSuccess(true);
+			}
+
+			@Override
 			public void onSuccess() {
 				callback.onSuccess();
 				onExecuteSuccess(true);
@@ -2860,6 +2866,13 @@ public class BleExt extends Logging implements IWriteCallback {
 //		}
 //	}
 
+
+
+
+	////////////////////////
+	// Crownstone service //
+	////////////////////////
+
 	/**
 	 * Function to write the given PWM value to the device.
 	 * <p>
@@ -2996,5 +3009,75 @@ public class BleExt extends Logging implements IWriteCallback {
 			}
 		});
 	}
+
+	public void readFirmwareRevision(final IByteArrayCallback callback) {
+		if (isConnected(callback)) {
+			getLogger().LOGd(TAG, "readFirmwareRevision");
+			_bleBase.readFirmwareRevision(_targetAddress, callback);
+		}
+	}
+
+	public void readFirmwareRevision(final String address, final IIntegerCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "Reading firmware revision ...");
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						readFirmwareRevision(execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
+	public void readHardwareRevision(final IByteArrayCallback callback) {
+		if (isConnected(callback)) {
+			getLogger().LOGd(TAG, "readHardwareRevision");
+			_bleBase.readHardwareRevision(_targetAddress, callback);
+		}
+	}
+
+	public void readHardwareRevision(final String address, final IIntegerCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "Reading hardware revision ...");
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						readHardwareRevision(execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
+//	public void readTemperature(IIntegerCallback callback) {
+//		if (isConnected(callback)) {
+//			getLogger().LOGd(TAG, "Reading Temperature value ...");
+//			if (hasStateCharacteristics(null)) {
+//				_bleExtState.getTemperature(_targetAddress, callback);
+//			} else if (hasCharacteristic(BluenetConfig.CHAR_TEMPERATURE_UUID, callback)) {
+//				_bleBase.readTemperature(_targetAddress, callback);
+//			}
+//		}
+//	}
+//	public void readTemperature(final String address, final IIntegerCallback callback) {
+//		getHandler().post(new Runnable() {
+//			@Override
+//			public void run() {
+//				getLogger().LOGd(TAG, "Reading Temperature value ...");
+//				connectAndExecute(address, new IExecuteCallback() {
+//					@Override
+//					public void execute(final IExecStatusCallback execCallback) {
+//						readTemperature(execCallback);
+//					}
+//				}, new SimpleExecStatusCallback(callback));
+//			}
+//		});
+//	}
+
 
 }

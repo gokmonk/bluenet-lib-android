@@ -8,7 +8,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.nio.BufferOverflowException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -37,7 +36,6 @@ import nl.dobots.bluenet.ble.mesh.structs.MeshControlMsg;
 import nl.dobots.bluenet.ble.base.structs.PowerSamples;
 import nl.dobots.bluenet.ble.base.structs.StateMsg;
 import nl.dobots.bluenet.ble.base.structs.TrackedDeviceMsg;
-import nl.dobots.bluenet.ble.mesh.structs.MeshNotificationPacket;
 import nl.dobots.bluenet.ble.cfg.BleTypes;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
@@ -2138,6 +2136,42 @@ public class BleBase extends BleCore {
 		} else {
 			callback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
 		}
+	}
+
+
+
+	public void readFirmwareRevision(final String address, final IByteArrayCallback callback) {
+		getLogger().LOGd(TAG, "readFirmwareRevision");
+		read(address, BluenetConfig.DEVICE_INFO_SERVICE_UUID, BluenetConfig.CHAR_SOFTWARE_REVISION_UUID, false, new IDataCallback() {
+			@Override
+			public void onData(JSONObject json) {
+				byte[] bytes = getValue(json);
+				getLogger().LOGd(TAG, "firmware version: %s", BleUtils.bytesToString(bytes));
+				callback.onSuccess(bytes);
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
+
+	public void readHardwareRevision(final String address, final IByteArrayCallback callback) {
+		getLogger().LOGd(TAG, "readFirmwareRevision");
+		read(address, BluenetConfig.DEVICE_INFO_SERVICE_UUID, BluenetConfig.CHAR_HARDWARE_REVISION_UUID, false, new IDataCallback() {
+			@Override
+			public void onData(JSONObject json) {
+				byte[] bytes = getValue(json);
+				getLogger().LOGd(TAG, "hardware version: %s", BleUtils.bytesToString(bytes));
+				callback.onSuccess(bytes);
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
 	}
 
 }
