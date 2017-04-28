@@ -114,12 +114,16 @@ public class CrownstoneSetup {
 			}
 			case 2: {
 				// nothing to do here, session nonce was already read out on connect
-			}
-			case 3: {
 				// nothing to do here, set session nonce and enable encryption are handled in callbacks
 			}
+			case 3: {
+				// Increase the TX power of the crownstone. This is possible, since the data is encrypted from here on.
+				// hack, make sure step is set to 3 in case function was called with step 2
+				_currentStep = 3;
+				_bleExt.writeIncreaseTx(_defaultCallback);
+				break;
+			}
 			case 4: {
-				// hack, make sure step is set to 4 in case function was called with step 2 or 3
 				_currentStep = 4;
 				_bleConfiguration.setCrownstoneId(_targetAddress, _crownstoneId, _defaultCallback);
 				break;

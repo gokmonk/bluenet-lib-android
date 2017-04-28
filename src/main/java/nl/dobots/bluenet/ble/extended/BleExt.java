@@ -2984,6 +2984,28 @@ public class BleExt extends Logging implements IWriteCallback {
 		});
 	}
 
+	public void writeIncreaseTx(final IStatusCallback callback) {
+		if (isConnected(callback)) {
+			getLogger().LOGd(TAG, "writeIncreaseTx");
+			_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_INCREASE_TX), callback);
+		}
+	}
+
+	public void writeIncreaseTx(final String address, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "writeIncreaseTx");
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						writeIncreaseTx(execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
 	public void writeResetStateErrors(final IStatusCallback callback) {
 		if (isConnected(callback)) {
 			getLogger().LOGd(TAG, "write reset state errors");
