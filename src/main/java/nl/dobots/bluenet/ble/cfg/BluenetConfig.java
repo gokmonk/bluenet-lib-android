@@ -91,10 +91,16 @@ public class BluenetConfig {
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Device Information Service
-	public static final String DEVICE_INFO_SERVICE_UUID =               "0x180A";
+//	public static final String DEVICE_INFO_SERVICE_UUID =               "0x180A";
+	public static final String DEVICE_INFO_SERVICE_UUID =               "0000180A-0000-1000-8000-00805F9B34FB";
 	// Device Information Service - Characteristics
-	public static final String CHAR_HARDWARE_REVISION_UUID =            "0x2A27";
-	public static final String CHAR_SOFTWARE_REVISION_UUID =            "0x2A26";
+//	public static final String CHAR_HARDWARE_REVISION_UUID =            "0x2A27";
+//	public static final String CHAR_SOFTWARE_REVISION_UUID =            "0x2A26";
+	public static final String CHAR_HARDWARE_REVISION_UUID =            "00002A27-0000-1000-8000-00805F9B34FB";
+	public static final String CHAR_SOFTWARE_REVISION_UUID =            "00002A26-0000-1000-8000-00805F9B34FB";
+
+
+
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
