@@ -112,12 +112,23 @@ public class MeshKeepAlivePacket implements MeshPayload {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
-		_timeout = BleUtils.toUint16(bb.getShort());
-		_size = BleUtils.toUint8(bb.get());
-		if (_size > MAX_LIST_ELEMENTS) {
+		if (bytes.length < KEEP_ALIVE_PACKET_HEADER_SIZE) {
 			BleLog.getInstance().LOGe(TAG, "Invalid length: " + _size);
 			BleLog.getInstance().LOGe(TAG, "from mesh message: " + BleUtils.bytesToString(bytes));
+			_timeout = 0;
 			_size = 0;
+			return;
+		}
+
+		_timeout = BleUtils.toUint16(bb.getShort());
+		_size = BleUtils.toUint8(bb.get());
+		if ((_size > MAX_LIST_ELEMENTS) ||
+				(bytes.length < KEEP_ALIVE_PACKET_HEADER_SIZE + KEEP_ALIVE_ITEM_SIZE * _size)) {
+			BleLog.getInstance().LOGe(TAG, "Invalid length: " + _size);
+			BleLog.getInstance().LOGe(TAG, "from mesh message: " + BleUtils.bytesToString(bytes));
+			_timeout = 0;
+			_size = 0;
+			return;
 		}
 
 		for (int i = 0; i < _size; i++) {
