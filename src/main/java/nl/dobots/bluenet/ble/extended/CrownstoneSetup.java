@@ -2,14 +2,11 @@ package nl.dobots.bluenet.ble.extended;
 
 import nl.dobots.bluenet.ble.base.BleBase;
 import nl.dobots.bluenet.ble.base.BleConfiguration;
-import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IExecStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IProgressCallback;
 import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.SimpleExecStatusCallback;
 import nl.dobots.bluenet.ble.base.structs.ControlMsg;
-import nl.dobots.bluenet.ble.base.structs.EncryptionKeys;
-import nl.dobots.bluenet.ble.base.structs.SetupEncryptionKey;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.extended.callbacks.IExecuteCallback;
@@ -92,25 +89,26 @@ public class CrownstoneSetup {
 		switch(step) {
 			case 0:
 			case 1: {
-				// hack, make sure step is set to 1 in case function was called with step 0
-				_currentStep = 1;
-				_bleBase.readSessionKey(_targetAddress, new IByteArrayCallback() {
-					@Override
-					public void onSuccess(byte[] result) {
-						_progressCallback.onProgress(1, null);
-						SetupEncryptionKey encryptionKey = new SetupEncryptionKey(result);
-						_bleBase.setEncryptionKeys(encryptionKey);
-
-						// go directly to step 3
-						setupStep(3);
-					}
-
-					@Override
-					public void onError(int error) {
-						setupError(error);
-					}
-				});
-				break;
+//				// hack, make sure step is set to 1 in case function was called with step 0
+//				_currentStep = 1;
+//				_bleBase.readSessionKey(_targetAddress, new IByteArrayCallback() {
+//					@Override
+//					public void onSuccess(byte[] result) {
+//						_progressCallback.onProgress(1, null);
+//						_bleBase.setSetupEncryptionKey(result);
+////						SetupEncryptionKey encryptionKey = new SetupEncryptionKey(result);
+////						_bleBase.setEncryptionKeys(encryptionKey);
+//
+//						// go directly to step 3
+//						setupStep(3);
+//					}
+//
+//					@Override
+//					public void onError(int error) {
+//						setupError(error);
+//					}
+//				});
+//				break;
 			}
 			case 2: {
 				// nothing to do here, session nonce was already read out on connect
@@ -165,7 +163,7 @@ public class CrownstoneSetup {
 				break;
 			}
 			case 14: {
-				_bleBase.setEncryptionKeys(new EncryptionKeys(_adminKey, _memberKey, _guestKey));
+//				_bleBase.setEncryptionKeys(new EncryptionKeys(_adminKey, _memberKey, _guestKey));
 				_statusCallback.onSuccess();
 				break;
 			}

@@ -159,6 +159,9 @@ public class EncryptionKeys {
 			this.key = key;
 			this.accessLevel = accessLevel;
 		}
+		public String toString() {
+			return "key: " + BleUtils.bytesToString(key) + " access level: " + (int)accessLevel;
+		}
 	}
 
 	public String toString() {

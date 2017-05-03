@@ -18,6 +18,7 @@ import java.util.UUID;
 
 import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IConfigurationCallback;
+import nl.dobots.bluenet.ble.base.structs.SetupEncryptionKey;
 import nl.dobots.bluenet.ble.core.callbacks.IDataCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IDiscoveryCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
@@ -60,6 +61,7 @@ public class BleBase extends BleCore {
 	private EncryptionKeys _encryptionKeys = null;
 	private EncryptionSessionData _encryptionSessionData = null;
 	private boolean _setupMode = false;
+	private byte[] _setupEncryptionKey = null;
 
 	private IWriteCallback _onWriteCallback = null;
 
@@ -125,12 +127,34 @@ public class BleBase extends BleCore {
 		_encryptionKeys = encryptionKeys;
 	}
 
+	public void setSetupEncryptionKey(byte[] key) {
+		getLogger().LOGd(TAG, "setSetupEncryptionKey to " + BleUtils.bytesToString(key));
+		_setupEncryptionKey = key;
+	}
+
+	public void setSetupEncryptionKey(String key) {
+		getLogger().LOGd(TAG, "setSetupEncryptionKey to " + key);
+		try {
+			if (key != null) {
+				_setupEncryptionKey = BleUtils.hexStringToBytes(key);
+			}
+		} catch (java.lang.NumberFormatException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void clearSetupEncryptionKey() {
+		getLogger().LOGd(TAG, "clearSetupEncryptionKey");
+		_setupEncryptionKey = null;
+	}
+
 	public void setEncryptionSessionData(EncryptionSessionData sessionData) {
 		_encryptionSessionData = sessionData;
 	}
 
 	@Override
 	public void connectDevice(String address, int timeout, IDataCallback callback) {
+		clearSetupEncryptionKey(); // Make sure we start clean
 		_subscribers.clear();
 		super.connectDevice(address, timeout, callback);
 	}
@@ -157,8 +181,15 @@ public class BleBase extends BleCore {
 			_onWriteCallback.onWrite();
 		}
 		if (_encryptionEnabled && accessLevel != BleBaseEncryption.ACCESS_LEVEL_ENCRYPTION_DISABLED) {
+			EncryptionKeys encryptionKeys = _encryptionKeys;
+			if (_setupMode && _setupEncryptionKey != null) {
+				// TODO: this is a hackish solution
+				getLogger().LOGi(TAG, "Use setup encryption key");
+				encryptionKeys = new SetupEncryptionKey(_setupEncryptionKey);
+			}
+
 			// Just use highest available key
-			EncryptionKeys.KeyAccessLevelPair keyAccessLevelPair = _encryptionKeys.getHighestKey();
+			EncryptionKeys.KeyAccessLevelPair keyAccessLevelPair = encryptionKeys.getHighestKey();
 			if (_encryptionSessionData == null || keyAccessLevelPair == null) {
 				return false;
 			}
@@ -182,11 +213,18 @@ public class BleBase extends BleCore {
 				@Override
 				public void onData(JSONObject json) {
 					byte[] encryptedBytes = getValue(json);
-					if (_encryptionSessionData == null || _encryptionKeys == null) {
+
+					EncryptionKeys encryptionKeys = _encryptionKeys;
+					if (_setupMode && _setupEncryptionKey != null) {
+						// TODO: this is a hackish solution
+						getLogger().LOGi(TAG, "Use setup encryption key");
+						encryptionKeys = new SetupEncryptionKey(_setupEncryptionKey);
+					}
+					if (_encryptionSessionData == null || encryptionKeys == null) {
 						callback.onError(BleErrors.ENCRYPTION_ERROR);
 						return;
 					}
-					byte[] decryptedBytes = BleBaseEncryption.decryptCtr(encryptedBytes, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, _encryptionKeys);
+					byte[] decryptedBytes = BleBaseEncryption.decryptCtr(encryptedBytes, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, encryptionKeys);
 					if (decryptedBytes == null) {
 						callback.onError(BleErrors.ENCRYPTION_ERROR);
 						return;
@@ -600,7 +638,14 @@ public class BleBase extends BleCore {
 
 				byte[] decryptedBytes;
 				if (_decrypt) {
-					decryptedBytes = BleBaseEncryption.decryptCtr(result, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, _encryptionKeys);
+					EncryptionKeys encryptionKeys = _encryptionKeys;
+					if (_setupMode && _setupEncryptionKey != null) {
+						// TODO: this is a hackish solution
+						getLogger().LOGi(TAG, "Use setup encryption key");
+						encryptionKeys = new SetupEncryptionKey(_setupEncryptionKey);
+					}
+
+					decryptedBytes = BleBaseEncryption.decryptCtr(result, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, encryptionKeys);
 					if (decryptedBytes == null) {
 						getLogger().LOGw(TAG, "Unable to decrypt");
 						callback.onError(BleErrors.ENCRYPTION_ERROR);
@@ -2074,7 +2119,7 @@ public class BleBase extends BleCore {
 		getLogger().LOGd(TAG, "readSessionNonce");
 		IDataCallback sessionCallback = new IDataCallback() {
 			@Override
-			public void onData(JSONObject json) {
+			public void onData(final JSONObject json) {
 				byte[] data = getValue(json);
 				if (_setupMode) {
 					_encryptionSessionData = BleBaseEncryption.getSessionData(data, false);
@@ -2098,7 +2143,25 @@ public class BleBase extends BleCore {
 				getLogger().LOGd(TAG, "validationKey:" + BleUtils.bytesToString(_encryptionSessionData.validationKey));
 				addBytes(json, "sessionNonce", _encryptionSessionData.sessionNonce);
 				addBytes(json, "validationKey", _encryptionSessionData.validationKey);
-				callback.onData(json);
+
+				// In setup mode, also get the sesssion key
+				if (_setupMode) {
+					readSessionKey(address, new IByteArrayCallback() {
+						@Override
+						public void onSuccess(byte[] result) {
+							setSetupEncryptionKey(result);
+							callback.onData(json);
+						}
+
+						@Override
+						public void onError(int error) {
+							callback.onError(error);
+						}
+					});
+				}
+				else {
+					callback.onData(json);
+				}
 			}
 
 			@Override
