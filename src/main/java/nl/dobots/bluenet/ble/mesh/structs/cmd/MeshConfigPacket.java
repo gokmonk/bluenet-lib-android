@@ -24,15 +24,28 @@ public class MeshConfigPacket extends MeshCommandPacket {
 
 	private ConfigurationMsg _configMsg;
 
+	public MeshConfigPacket() {
+		super();
+		_configMsg = null;
+	}
+
 	public MeshConfigPacket(ConfigurationMsg message, int... ids) {
 		super(BluenetConfig.MESH_CMD_CONFIG, ids);
 		_configMsg = message;
 		setPayload(_configMsg.toArray());
 	}
 
-	public MeshConfigPacket(byte[] bytes) {
-		super(bytes);
-		_configMsg = new ConfigurationMsg(getPayload());
+	@Override
+	public boolean fromArray(byte[] bytes) {
+		if (!super.fromArray(bytes)) {
+			return false;
+		}
+		_configMsg = new ConfigurationMsg();
+		if (!_configMsg.fromArray(getPayload())) {
+			_configMsg = null;
+			return false;
+		}
+		return true;
 	}
 
 	@Override

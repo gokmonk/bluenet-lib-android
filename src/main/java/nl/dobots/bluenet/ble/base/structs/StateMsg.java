@@ -42,6 +42,10 @@ import nl.dobots.bluenet.utils.BleUtils;
  */
 public class StateMsg extends StreamMsg {
 
+	public StateMsg() {
+		super();
+	}
+
 	public StateMsg(int type, int opCode, int length, byte[] payload) {
 		super(type, opCode, length, payload);
 	}
@@ -50,8 +54,13 @@ public class StateMsg extends StreamMsg {
 		super(type, length, payload);
 	}
 
-	public StateMsg(byte[] bytes) {
-		super(bytes);
+//	public StateMsg(byte[] bytes) {
+//	}
+
+	@Override
+	public boolean fromArray(byte[] bytes) {
+		// to do: parsing for errors?
+		return super.fromArray(bytes);
 	}
 
 	@Override

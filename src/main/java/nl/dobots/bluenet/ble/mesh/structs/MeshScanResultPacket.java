@@ -61,57 +61,96 @@ public class MeshScanResultPacket implements MeshPayload {
 		}
 	}
 
-	private static final int SIZE_WITHOUT_DEVICES = 1;
+	private static final int MESH_SCAN_RESULT_HEADER_SIZE = 1;
 	private static final int SIZE_OF_DEVICE = 9;
 
-	private int numDevices;
+	private int _numDevices;
 //	private ScannedDevice[] devices;
-	private ArrayList<ScannedDevice> devices;
+	private ArrayList<ScannedDevice> _devices;
 
 	// debug
-	private Date timeStamp;
+	private Date _timeStamp;
 
 	public Date getTimeStamp() {
-		return timeStamp;
+		return _timeStamp;
 	}
 
-	/**
-	 * Parses the given byte array into a
-	 * @param bytes byte array containing the
-	 */
-	public MeshScanResultPacket(byte[] bytes) {
-		try {
-			ByteBuffer bb = ByteBuffer.wrap(bytes);
-			bb.order(ByteOrder.LITTLE_ENDIAN);
 
-			timeStamp = new Date();
-			numDevices = bb.get();
-//		devices = new ScannedDevice[numDevices];
-			devices = new ArrayList<>();
+	public MeshScanResultPacket() {
+		_numDevices = 0;
+	}
 
-			for (int i = 0; i < numDevices; ++i) {
-				ScannedDevice device = new ScannedDevice();
-				// need to reverse the address because it is in little endian, and even though we
-				// set the byte order to little endian, arrays are still being read as is, and not
-				// reversed automatically
-				byte[] address = new byte[BluenetConfig.BLE_DEVICE_ADDRESS_LENGTH];
-				bb.get(address);
-				device.address = BleUtils.reverse(address);
-				device.rssi = bb.get();
-				device.occurrences = bb.getShort();
-//			devices[i] = device;
-				devices.add(device);
-			}
+//	/**
+//	 * Parses the given byte array into a
+//	 * @param bytes byte array containing the
+//	 */
+//	public MeshScanResultPacket(byte[] bytes) {
+//		try {
+//			ByteBuffer bb = ByteBuffer.wrap(bytes);
+//			bb.order(ByteOrder.LITTLE_ENDIAN);
+//
+//			timeStamp = new Date();
+//			numDevices = bb.get();
+////		devices = new ScannedDevice[numDevices];
+//			devices = new ArrayList<>();
+//
+//			for (int i = 0; i < numDevices; ++i) {
+//				ScannedDevice device = new ScannedDevice();
+//				// need to reverse the address because it is in little endian, and even though we
+//				// set the byte order to little endian, arrays are still being read as is, and not
+//				// reversed automatically
+//				byte[] address = new byte[BluenetConfig.BLE_DEVICE_ADDRESS_LENGTH];
+//				bb.get(address);
+//				device.address = BleUtils.reverse(address);
+//				device.rssi = bb.get();
+//				device.occurrences = bb.getShort();
+////			devices[i] = device;
+//				devices.add(device);
+//			}
+//
+////			Collections.sort(devices, new Comparator<ScannedDevice>() {
+////				@Override
+////				public int compare(ScannedDevice lhs, ScannedDevice rhs) {
+////					return -Integer.compare(lhs.getRssi(), rhs.getRssi());
+////				}
+////			});
+//		} catch (Exception e) {
+//
+//		}
+//	}
 
-//			Collections.sort(devices, new Comparator<ScannedDevice>() {
-//				@Override
-//				public int compare(ScannedDevice lhs, ScannedDevice rhs) {
-//					return -Integer.compare(lhs.getRssi(), rhs.getRssi());
-//				}
-//			});
-		} catch (Exception e) {
-			
+
+	@Override
+	public boolean fromArray(byte[] bytes) {
+		ByteBuffer bb = ByteBuffer.wrap(bytes);
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+
+		if (bytes.length < MESH_SCAN_RESULT_HEADER_SIZE) {
+			return false;
 		}
+
+		_timeStamp = new Date();
+		_numDevices = bb.get();
+		if (bytes.length < MESH_SCAN_RESULT_HEADER_SIZE + _numDevices * SIZE_OF_DEVICE) {
+			_numDevices = 0;
+			return false;
+		}
+
+		_devices = new ArrayList<>();
+		for (int i = 0; i < _numDevices; ++i) {
+			ScannedDevice device = new ScannedDevice();
+			// need to reverse the address because it is in little endian, and even though we
+			// set the byte order to little endian, arrays are still being read as is, and not
+			// reversed automatically
+			byte[] address = new byte[BluenetConfig.BLE_DEVICE_ADDRESS_LENGTH];
+			bb.get(address);
+			device.address = BleUtils.reverse(address);
+			device.rssi = bb.get();
+			device.occurrences = bb.getShort();
+			_devices.add(device);
+		}
+
+		return true;
 	}
 
 	/**
@@ -119,12 +158,12 @@ public class MeshScanResultPacket implements MeshPayload {
 	 */
 	public byte[] toArray() {
 
-		ByteBuffer bb = ByteBuffer.allocate(SIZE_WITHOUT_DEVICES + numDevices * SIZE_OF_DEVICE);
+		ByteBuffer bb = ByteBuffer.allocate(MESH_SCAN_RESULT_HEADER_SIZE + _numDevices * SIZE_OF_DEVICE);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
-		bb.put((byte) numDevices);
+		bb.put((byte) _numDevices);
 
-		for (ScannedDevice device : devices) {
+		for (ScannedDevice device : _devices) {
 			bb.put(device.address);
 			bb.put((byte) device.rssi);
 			bb.putShort((short) device.occurrences);
@@ -134,19 +173,19 @@ public class MeshScanResultPacket implements MeshPayload {
 	}
 
 	public int getNumDevices() {
-		return numDevices;
+		return _numDevices;
 	}
 
 	public ScannedDevice[] getDevices() {
-		ScannedDevice[] array = new ScannedDevice[devices.size()];
-		devices.toArray(array);
+		ScannedDevice[] array = new ScannedDevice[_devices.size()];
+		_devices.toArray(array);
 		return array;
 	}
 
 	@Override
 	public String toString() {
 		return "MeshScanResultPacket{" +
-				", numDevices=" + numDevices +
+				", numDevices=" + _numDevices +
 				", devices=" + Arrays.toString(getDevices()) +
 				'}';
 	}

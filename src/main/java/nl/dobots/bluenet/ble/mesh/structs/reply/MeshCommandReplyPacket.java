@@ -2,6 +2,7 @@ package nl.dobots.bluenet.ble.mesh.structs.reply;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Locale;
 
 import nl.dobots.bluenet.ble.mesh.structs.MeshPayload;
 import nl.dobots.bluenet.utils.BleUtils;
@@ -38,22 +39,41 @@ public class MeshCommandReplyPacket implements MeshPayload {
 
 	protected byte[] _payload;
 
+
+	/**
+	 * Create an empty, invalid, packet.
+	 */
+	public MeshCommandReplyPacket() {
+		_replyType = 0;
+		_messageCounter = 0;
+		_numberOfReplies = 0;
+		_payload = null;
+	}
+
 	public MeshCommandReplyPacket(int replyType, long messageCounter) {
 		_replyType = replyType;
 		_messageCounter = messageCounter;
+		_numberOfReplies = 0;
 	}
 
-	public MeshCommandReplyPacket(byte[] bytes) {
+//	public MeshCommandReplyPacket(byte[] bytes) {
+//	}
+
+	@Override
+	public boolean fromArray(byte[] bytes) {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
+		if (bytes.length < COMMAND_REPLY_PACKET_HEADER_SIZE) {
+			return false;
+		}
 		_replyType = BleUtils.toUint16(bb.getShort());
 		_messageCounter = BleUtils.toUint32(bb.getInt());
 		_numberOfReplies = BleUtils.toUint8(bb.get());
 		_payload = new byte[bb.remaining()];
 		bb.get(_payload);
+		return true;
 	}
-
 
 	@Override
 	public byte[] toArray() {
@@ -90,7 +110,7 @@ public class MeshCommandReplyPacket implements MeshPayload {
 
 	@Override
 	public String toString() {
-		return String.format("{replyType: %d, numReplies: %d [%s], payload: %s}",
-				_replyType, _numberOfReplies, payloadToString());
+		return String.format(Locale.ENGLISH, "{replyType: %d, numReplies: %d [%s], payload: %s}",
+				_replyType, _numberOfReplies, payloadToString(), BleUtils.bytesToString(_payload));
 	}
 }

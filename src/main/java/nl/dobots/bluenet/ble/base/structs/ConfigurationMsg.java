@@ -40,6 +40,10 @@ package nl.dobots.bluenet.ble.base.structs;
  */
 public class ConfigurationMsg extends StreamMsg {
 
+	public ConfigurationMsg() {
+		super();
+	}
+
 	public ConfigurationMsg(int type, int opCode, int length, byte[] payload) {
 		super(type, opCode, length, payload);
 	}
@@ -48,8 +52,14 @@ public class ConfigurationMsg extends StreamMsg {
 		super(type, length, payload);
 	}
 
-	public ConfigurationMsg(byte[] bytes) {
-		super(bytes);
+//	public ConfigurationMsg(byte[] bytes) {
+//	}
+
+
+	@Override
+	public boolean fromArray(byte[] bytes) {
+		// to do: parsing for errors?
+		return super.fromArray(bytes);
 	}
 
 	@Override

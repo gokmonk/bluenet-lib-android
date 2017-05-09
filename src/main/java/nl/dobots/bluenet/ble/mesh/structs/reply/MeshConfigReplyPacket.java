@@ -27,17 +27,36 @@ import nl.dobots.bluenet.utils.BleLog;
  */
 public class MeshConfigReplyPacket extends MeshCommandReplyPacket {
 
+	// TODO: this only holds 1 config reply packet at the moment
+
 	private ConfigurationMsg _configMsg;
+
+	public MeshConfigReplyPacket() {
+		super();
+		_configMsg = null;
+	}
 
 	public MeshConfigReplyPacket(ConfigurationMsg message, long messageNumber) {
 		super(BluenetConfig.MESH_REPLY_CONFIG, messageNumber);
 		_configMsg = message;
+		setNumberOfReplies(1);
 		setPayload(_configMsg.toArray());
 	}
 
-	public MeshConfigReplyPacket(byte[] bytes) {
-		super(bytes);
-		_configMsg = new ConfigurationMsg(getPayload());
+//	public MeshConfigReplyPacket(byte[] bytes) {
+//	}
+
+	@Override
+	public boolean fromArray(byte[] bytes) {
+		if (!super.fromArray(bytes)) {
+			return false;
+		}
+		_configMsg = new ConfigurationMsg();
+		if (!_configMsg.fromArray(getPayload())) {
+			_configMsg = null;
+			return false;
+		}
+		return true;
 	}
 
 	public ConfigurationMsg getReplyItem() {

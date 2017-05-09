@@ -24,15 +24,28 @@ public class MeshStatePacket extends MeshCommandPacket {
 
 	private StateMsg _stateMsg;
 
+	public MeshStatePacket() {
+		super();
+		_stateMsg = null;
+	}
+
 	public MeshStatePacket(StateMsg message, int... ids) {
 		super(BluenetConfig.MESH_CMD_STATE, ids);
 		_stateMsg = message;
 		setPayload(_stateMsg.toArray());
 	}
 
-	public MeshStatePacket(byte[] bytes) {
-		super(bytes);
-		_stateMsg = new StateMsg(getPayload());
+	@Override
+	public boolean fromArray(byte[] bytes) {
+		if (!super.fromArray(bytes)) {
+			return false;
+		}
+		_stateMsg = new StateMsg();
+		if (!_stateMsg.fromArray(getPayload())) {
+			_stateMsg = null;
+			return false;
+		}
+		return true;
 	}
 
 	@Override

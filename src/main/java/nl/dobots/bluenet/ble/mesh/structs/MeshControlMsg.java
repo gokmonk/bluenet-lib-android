@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.Locale;
 
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
+import nl.dobots.bluenet.utils.BleUtils;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -44,7 +45,7 @@ public class MeshControlMsg {
 
 	// size of message without _payload is:
 	// 1B _handle + 1B RESERVED + 2B _length
-	private static final int SIZE_WITHOUT_PAYLOAD = 4;
+	private static final int MESH_CONTROL_MSG_HEADER_SIZE = 4;
 
 	// _handle on which the message is sent in the mesh network
 	private int _handle;
@@ -52,6 +53,15 @@ public class MeshControlMsg {
 	private int _length;
 	// _payload of the mesh message, i.e. the data to be sent into the mesh
 	private byte[] _payload;
+
+	/**
+	 * Create an empty, invalid, mesh message
+	 */
+	public MeshControlMsg() {
+		_handle = -1;
+		_length = 0;
+		_payload = null;
+	}
 
 	/**
 	 * Create a mesh message from the parameters to be written to devices mesh characteristic
@@ -69,19 +79,34 @@ public class MeshControlMsg {
 //
 //	}
 
+//	/**
+//	 * Parses the given byte array into a mesh message
+//	 * @param bytes byte array containing the mesh message
+//	 */
+//	public MeshControlMsg(byte[] bytes) {
+//	}
+
 	/**
 	 * Parses the given byte array into a mesh message
 	 * @param bytes byte array containing the mesh message
+	 * @return true when parsing was successful
 	 */
-	public MeshControlMsg(byte[] bytes) {
+	public boolean fromArray(byte[] bytes) {
+		if (bytes.length < MESH_CONTROL_MSG_HEADER_SIZE) {
+			return false;
+		}
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
 		_handle = bb.get();
 		bb.get(); // skip reserved field
 		_length = bb.getShort();
+		if (bytes.length < MESH_CONTROL_MSG_HEADER_SIZE + _length) {
+			return false;
+		}
 		_payload = new byte[bb.remaining()];
 		bb.get(_payload);
+		return true;
 	}
 
 	/**
@@ -89,7 +114,7 @@ public class MeshControlMsg {
 	 * @return byte array representation of the mesh message
 	 */
 	public byte[] toArray() {
-		ByteBuffer bb = ByteBuffer.allocate(SIZE_WITHOUT_PAYLOAD + _payload.length);
+		ByteBuffer bb = ByteBuffer.allocate(MESH_CONTROL_MSG_HEADER_SIZE + _payload.length);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
 		bb.put((byte) _handle);
@@ -107,7 +132,7 @@ public class MeshControlMsg {
 	@Override
 	public String toString() {
 		return String.format(Locale.ENGLISH, "{_handle: %d, _length: %d, _payload: %s}",
-				_handle, _length, Arrays.toString(_payload));
+				_handle, _length, BleUtils.bytesToString(_payload));
 	}
 
 	/**

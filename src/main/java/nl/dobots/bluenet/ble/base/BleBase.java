@@ -11,6 +11,7 @@ import org.json.JSONObject;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -1274,9 +1275,16 @@ public class BleBase extends BleCore {
 
 						getLogger().LOGv(TAG, BleUtils.bytesToString(decryptedBytes));
 
-						ConfigurationMsg configuration = new ConfigurationMsg(decryptedBytes);
-						getLogger().LOGd(TAG, "read configuration: %s", configuration.toString());
-						callback.onSuccess(configuration);
+//						ConfigurationMsg configuration = new ConfigurationMsg(decryptedBytes);
+						ConfigurationMsg configuration = new ConfigurationMsg();
+						if (!configuration.fromArray(decryptedBytes)) {
+							getLogger().LOGw(TAG, "failed to parse configuration: " + BleUtils.bytesToString(decryptedBytes));
+							callback.onError(BleErrors.ERROR_MSG_PARSING);
+						}
+						else {
+							getLogger().LOGd(TAG, "read configuration: %s", configuration.toString());
+							callback.onSuccess(configuration);
+						}
 					}
 				}
 		);
@@ -1439,9 +1447,15 @@ public class BleBase extends BleCore {
 			@Override
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
-				ConfigurationMsg configuration = new ConfigurationMsg(bytes);
-				getLogger().LOGd(TAG, "read configuration: %s", configuration.toString());
-				callback.onSuccess(configuration);
+				ConfigurationMsg configuration = new ConfigurationMsg();
+				if (!configuration.fromArray(bytes)) {
+					getLogger().LOGw(TAG, "failed to parse configuration: " + BleUtils.bytesToString(bytes));
+					callback.onError(BleErrors.ERROR_MSG_PARSING);
+				}
+				else {
+					getLogger().LOGd(TAG, "read configuration: %s", configuration.toString());
+					callback.onSuccess(configuration);
+				}
 			}
 		});
 	}
@@ -1528,9 +1542,15 @@ public class BleBase extends BleCore {
 						final byte[] decryptedBytes = BleCore.getValue(json);
 
 						getLogger().LOGd(TAG, BleUtils.bytesToString(decryptedBytes));
-						StateMsg state = new StateMsg(decryptedBytes);
-						getLogger().LOGd(TAG, "received state notification: %s", state.toString());
-						callback.onSuccess(state);
+						StateMsg state = new StateMsg();
+						if (!state.fromArray(decryptedBytes)) {
+							getLogger().LOGw(TAG, "failed parsing state notification: ", BleUtils.bytesToString(decryptedBytes));
+							callback.onError(BleErrors.ERROR_MSG_PARSING);
+						}
+						else {
+							getLogger().LOGd(TAG, "received state notification: %s", state.toString());
+							callback.onSuccess(state);
+						}
 					}
 				}
 		);
@@ -1783,9 +1803,15 @@ public class BleBase extends BleCore {
 			@Override
 			public void onData(JSONObject json) {
 				byte[] bytes = BleCore.getValue(json);
-				StateMsg state = new StateMsg(bytes);
-				getLogger().LOGd(TAG, "read state: %s", state.toString());
-				callback.onSuccess(state);
+				StateMsg state = new StateMsg();
+				if (!state.fromArray(bytes)) {
+					getLogger().LOGw(TAG, "failed parsing state notification: ", BleUtils.bytesToString(bytes));
+					callback.onError(BleErrors.ERROR_MSG_PARSING);
+				}
+				else {
+					getLogger().LOGd(TAG, "read state: %s", state.toString());
+					callback.onSuccess(state);
+				}
 			}
 		});
 	}
@@ -2209,7 +2235,7 @@ public class BleBase extends BleCore {
 			@Override
 			public void onData(JSONObject json) {
 				byte[] bytes = getValue(json);
-				getLogger().LOGd(TAG, "firmware version: %s", BleUtils.bytesToString(bytes));
+				getLogger().LOGd(TAG, "firmware version: %s", new String(bytes));
 				callback.onSuccess(bytes);
 			}
 
@@ -2226,7 +2252,7 @@ public class BleBase extends BleCore {
 			@Override
 			public void onData(JSONObject json) {
 				byte[] bytes = getValue(json);
-				getLogger().LOGd(TAG, "hardware version: %s", BleUtils.bytesToString(bytes));
+				getLogger().LOGd(TAG, "hardware version: %s", new String(bytes));
 				callback.onSuccess(bytes);
 			}
 

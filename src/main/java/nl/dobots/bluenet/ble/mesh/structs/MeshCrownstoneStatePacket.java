@@ -128,10 +128,17 @@ public class MeshCrownstoneStatePacket implements MeshPayload {
 		_size = 0;
 	}
 
-	public MeshCrownstoneStatePacket(byte[] bytes) {
+//	public MeshCrownstoneStatePacket(byte[] bytes) {
+//	}
+
+	@Override
+	public boolean fromArray(byte[] bytes) {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
+		if (bytes.length < CROWNSTONE_STATE_PACKET_HEADER_SIZE + CROWNSTONE_STATE_ITEM_SIZE*CROWNSTONE_STATE_ITEM_SIZE) {
+			return false;
+		}
 		_head = BleUtils.toUint8(bb.get());
 		_tail = BleUtils.toUint8(bb.get());
 		_size = BleUtils.toUint8(bb.get());
@@ -141,22 +148,17 @@ public class MeshCrownstoneStatePacket implements MeshPayload {
 				(_tail == _head && (_size != 0 && _size != MAX_LIST_ELEMENTS)) ||
 				(_tail != _head && ((_tail + MAX_LIST_ELEMENTS - _head) % MAX_LIST_ELEMENTS != _size))
 				) {
-			BleLog.getInstance().LOGe(TAG, "Invalid message: " + BleUtils.bytesToString(bytes));
+//			BleLog.getInstance().LOGe(TAG, "Invalid message: " + BleUtils.bytesToString(bytes));
 			_size = 0;
 			_head = 0;
 			_tail = 0;
+			return false;
 		}
 
 		for (int i = 0; i < MAX_LIST_ELEMENTS; i++) {
 			_list[i] = new CrownstoneStateItem(bb);
-//			int crownstoneId = BleUtils.toUint16(bb.getShort());
-//			int switchState = BleUtils.toUint8(bb.get());
-//			int eventBitmask = BleUtils.toUint8(bb.get());
-//			int powerUsage = bb.getInt();
-//			int accumulatedEnergy = bb.getInt();
-//			_list[i] = new CrownstoneStateItem(crownstoneId, switchState, eventBitmask, powerUsage, accumulatedEnergy);
 		}
-
+		return true;
 	}
 
 	@Override
@@ -192,6 +194,7 @@ public class MeshCrownstoneStatePacket implements MeshPayload {
 
 	private void incHead() {
 		_head = (_head + 1) % MAX_LIST_ELEMENTS;
+		--_size;
 	}
 
 	public void addCrownstoneState(int crownstoneId, int switchState, int eventBitmask, int powerUsage, int accumulatedEnergy) {

@@ -54,6 +54,7 @@ public class BleErrors {
 	public static final int ERROR_LOCATION_SERVICES_TURNED_OFF = 242;
 	public static final int ERROR_SETUP_CANCELED = 243;
 	public static final int ERROR_WRONG_PAYLOAD_SIZE = 244;
+	public static final int ERROR_MSG_PARSING = 245;
 
 
 	// BleBase

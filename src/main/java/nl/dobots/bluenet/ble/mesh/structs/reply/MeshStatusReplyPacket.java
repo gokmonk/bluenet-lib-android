@@ -70,21 +70,34 @@ public class MeshStatusReplyPacket extends MeshCommandReplyPacket {
 
 	private StatusReplyItem[] _list = new StatusReplyItem[MAX_STATUS_REPLY_ITEMS];
 
+	public MeshStatusReplyPacket() {
+		super();
+	}
+
 	public MeshStatusReplyPacket(long messageCounter) {
 		super(BluenetConfig.MESH_REPLY_STATUS, messageCounter);
 	}
 
-	public MeshStatusReplyPacket(byte[] bytes) {
-		super(bytes);
+//	public MeshStatusReplyPacket(byte[] bytes) {
+//	}
 
+	@Override
+	public boolean fromArray(byte[] bytes) {
+		if (!super.fromArray(bytes)) {
+			return false;
+		}
+		byte[] payload = getPayload();
+		if (_numberOfReplies > MAX_STATUS_REPLY_ITEMS || payload.length < _numberOfReplies * STATUS_REPLY_ITEM_SIZE) {
+			return false;
+		}
 		ByteBuffer bb = ByteBuffer.wrap(getPayload());
 		bb.order(ByteOrder.LITTLE_ENDIAN);
-
-		for (int i = 0; i < getNumberOfReplies(); i++) {
+		for (int i = 0; i < _numberOfReplies; i++) {
 			int crownstoneId = BleUtils.toUint16(bb.getShort());
 			int status = BleUtils.toUint16(bb.getShort());
 			_list[i] = new StatusReplyItem(crownstoneId, status);
 		}
+		return true;
 	}
 
 	@Override

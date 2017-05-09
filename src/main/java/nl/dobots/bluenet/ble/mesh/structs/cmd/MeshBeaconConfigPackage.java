@@ -2,6 +2,7 @@ package nl.dobots.bluenet.ble.mesh.structs.cmd;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Locale;
 import java.util.UUID;
 
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
@@ -36,6 +37,10 @@ public class MeshBeaconConfigPackage extends MeshCommandPacket {
 		private UUID _uuid;
 		private int _txPower;
 
+		public BeaconConfigPackage() {
+
+		}
+
 		public BeaconConfigPackage(int major, int minor, UUID uuid, int txPower) {
 			_major = major;
 			_minor = minor;
@@ -43,16 +48,20 @@ public class MeshBeaconConfigPackage extends MeshCommandPacket {
 			_txPower = txPower;
 		}
 
-		public BeaconConfigPackage(byte[] bytes) {
+		public boolean fromArray(byte[] bytes) {
 			ByteBuffer bb = ByteBuffer.wrap(bytes);
 			bb.order(ByteOrder.LITTLE_ENDIAN);
 
+			if (bytes.length < BEACON_CONFIG_MESSAGE_SIZE) {
+				return false;
+			}
 			_major = BleUtils.toUint16(bb.getShort());
 			_minor = BleUtils.toUint16(bb.getShort());
 			byte[] uuidBytes = new byte[16];
 			bb.get(uuidBytes);
 			_uuid = UUID.fromString(BleUtils.bytesToUuid(uuidBytes));
 			_txPower = BleUtils.toUint8(bb.get());
+			return true;
 		}
 
 		public byte[] toArray() {
@@ -101,12 +110,17 @@ public class MeshBeaconConfigPackage extends MeshCommandPacket {
 
 		@Override
 		public String toString() {
-			return String.format("{major: %d, minor: %d, uuid: %s, txPower: %d}",
+			return String.format(Locale.ENGLISH, "{major: %d, minor: %d, uuid: %s, txPower: %d}",
 					_major, _minor, _uuid.toString(), _txPower);
 		}
 	}
 
 	private BeaconConfigPackage _package;
+
+	public MeshBeaconConfigPackage() {
+		super();
+		_package = null;
+	}
 
 	public MeshBeaconConfigPackage(int major, int minor, UUID uuid, int txPower, int... ids) {
 		super(BluenetConfig.MESH_CMD_BEACON, ids);
@@ -114,9 +128,17 @@ public class MeshBeaconConfigPackage extends MeshCommandPacket {
 		setPayload(_package.toArray());
 	}
 
-	public MeshBeaconConfigPackage(byte[] bytes) {
-		super(bytes);
-		_package = new BeaconConfigPackage(getPayload());
+	@Override
+	public boolean fromArray(byte[] bytes) {
+		if (!super.fromArray(bytes)) {
+			return false;
+		}
+		_package = new BeaconConfigPackage();
+		if (!_package.fromArray(getPayload())) {
+			_package = null;
+			return false;
+		}
+		return true;
 	}
 
 	@Override

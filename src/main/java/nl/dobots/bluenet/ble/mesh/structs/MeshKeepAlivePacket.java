@@ -99,44 +99,59 @@ public class MeshKeepAlivePacket implements MeshPayload {
 	// list of keep alive items
 	private KeepAliveItem[] _list = new KeepAliveItem[MAX_LIST_ELEMENTS];
 
+	/**
+	 * Create an empty, invalid, ble stream message
+	 */
+	public MeshKeepAlivePacket() {
+		_timeout = 0;
+		_size = 0;
+	}
+
 	public MeshKeepAlivePacket(int timeout) {
 		_timeout = timeout;
 		_size = 0;
 	}
 
+//	/**
+//	 * Parses the given byte array into a keep alive packet
+//	 * @param bytes byte array containing the keep alive packet
+//	 */
+//	public MeshKeepAlivePacket(byte[] bytes) {
+//	}
+
 	/**
 	 * Parses the given byte array into a keep alive packet
 	 * @param bytes byte array containing the keep alive packet
+	 * @return true when parsing was successful
 	 */
-	public MeshKeepAlivePacket(byte[] bytes) {
+	@Override
+	public boolean fromArray(byte[] bytes) {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
 		if (bytes.length < KEEP_ALIVE_PACKET_HEADER_SIZE) {
-			BleLog.getInstance().LOGe(TAG, "Invalid length: " + _size);
-			BleLog.getInstance().LOGe(TAG, "from mesh message: " + BleUtils.bytesToString(bytes));
+//			BleLog.getInstance().LOGe(TAG, "Invalid length: " + _size);
+//			BleLog.getInstance().LOGe(TAG, "from mesh message: " + BleUtils.bytesToString(bytes));
 			_timeout = 0;
 			_size = 0;
-			return;
+			return false;
 		}
 
 		_timeout = BleUtils.toUint16(bb.getShort());
 		_size = BleUtils.toUint8(bb.get());
 		if ((_size > MAX_LIST_ELEMENTS) ||
-				(bytes.length < KEEP_ALIVE_PACKET_HEADER_SIZE + KEEP_ALIVE_ITEM_SIZE * _size)) {
-			BleLog.getInstance().LOGe(TAG, "Invalid length: " + _size);
-			BleLog.getInstance().LOGe(TAG, "from mesh message: " + BleUtils.bytesToString(bytes));
+				(bytes.length < KEEP_ALIVE_PACKET_HEADER_SIZE + _size * KEEP_ALIVE_ITEM_SIZE)) {
+//			BleLog.getInstance().LOGe(TAG, "Invalid length: " + _size);
+//			BleLog.getInstance().LOGe(TAG, "from mesh message: " + BleUtils.bytesToString(bytes));
 			_timeout = 0;
 			_size = 0;
-			return;
+			return false;
 		}
 
 		for (int i = 0; i < _size; i++) {
-			int crownstoneId = BleUtils.toUint16(bb.getShort());
-			int actionSwitchState = BleUtils.toUint8(bb.get());
-			_list[i] = new KeepAliveItem(crownstoneId, actionSwitchState);
+			_list[i] = new KeepAliveItem(bb);
 		}
-
+		return true;
 	}
 
 	/**

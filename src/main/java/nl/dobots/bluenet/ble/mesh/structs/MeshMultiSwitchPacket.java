@@ -111,29 +111,33 @@ public class MeshMultiSwitchPacket implements MeshPayload {
 		_size = 0;
 	}
 
-	/**
-	 * Parses the given byte array into a multi switch packet
-	 * @param bytes byte array containing the multi switch packet
-	 */
-	public MeshMultiSwitchPacket(byte[] bytes) {
+//	/**
+//	 * Parses the given byte array into a multi switch packet
+//	 * @param bytes byte array containing the multi switch packet
+//	 */
+//	public MeshMultiSwitchPacket(byte[] bytes) {
+//	}
+
+	@Override
+	public boolean fromArray(byte[] bytes) {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
+		if (bytes.length < MULTI_SWITCH_PACKET_HEADER_SIZE) {
+			return false;
+		}
 		_size = BleUtils.toUint8(bb.get());
-		if (_size > MAX_LIST_ELEMENTS) {
-			BleLog.getInstance().LOGe(TAG, "Invalid length: " + _size);
-			BleLog.getInstance().LOGe(TAG, "from mesh message: " + BleUtils.bytesToString(bytes));
+		if (_size > MAX_LIST_ELEMENTS || bytes.length < MULTI_SWITCH_PACKET_HEADER_SIZE + _size * MULTI_SWITCH_ITEM_SIZE) {
+//			BleLog.getInstance().LOGe(TAG, "Invalid length: " + _size);
+//			BleLog.getInstance().LOGe(TAG, "from mesh message: " + BleUtils.bytesToString(bytes));
 			_size = 0;
+			return false;
 		}
 
 		for (int i=0; i < _size; i++) {
-//			int crownstoneId =    BleUtils.toUint16(bb.getShort());
-//			int switchState =     BleUtils.toUint8(bb.get());
-//			int timeout =         BleUtils.toUint16(bb.getShort());
-//			int intent =          BleUtils.toUint8(bb.get());
-//			_list[i] = new MultiSwitchItem(crownstoneId, switchState, timeout, intent);
 			_list[i] = new MultiSwitchItem(bb);
 		}
+		return true;
 	}
 
 	/**

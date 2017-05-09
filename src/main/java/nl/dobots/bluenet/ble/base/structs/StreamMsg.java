@@ -5,6 +5,7 @@ import android.util.Log;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.Locale;
 
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.utils.BleLog;
@@ -57,6 +58,8 @@ public class StreamMsg {
 
 	private static final String TAG = StreamMsg.class.getCanonicalName();
 
+	private static final int STREAM_MSG_HEADER_SIZE = 4;
+
 	// the type of the stream, see @BluenetConfig for a list of possible types
 	private int type;
 	// type of operation (read, write, notify)
@@ -65,6 +68,16 @@ public class StreamMsg {
 	private int length;
 	// the payload, the layout of the payload is defined by the type
 	private byte[] payload;
+
+	/**
+	 * Create an empty, invalid, ble stream message
+	 */
+	public StreamMsg() {
+		type = -1;
+		opCode = -1;
+		length = 0;
+		payload = null;
+	}
 
 	/**
 	 * Create a ble stream message from the type, op code, length and payload
@@ -96,20 +109,37 @@ public class StreamMsg {
 		this.payload = payload;
 	}
 
+//	/**
+//	 * Creates a ble stream message by parsing the byte array
+//	 * @param bytes byte array containing a stream message
+//	 */
+//	public StreamMsg(byte[] bytes) {
+//		fromArray(bytes);
+//	}
+
 	/**
-	 * Creates a ble stream message by parsing the byte array
+	 * Load data from a byte array
 	 * @param bytes byte array containing a stream message
+	 * @return true when parsing was successful
 	 */
-	public StreamMsg(byte[] bytes) {
+	public boolean fromArray(byte[] bytes) {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 		getLogger().LOGv("streammsg", BleUtils.bytesToString(bytes));
+		if (bytes.length < STREAM_MSG_HEADER_SIZE) {
+			return false;
+		}
 		type = BleUtils.toUint8(bb.get());
 		opCode = BleUtils.toUint8(bb.get());
 		length = bb.getShort();
 		getLogger().LOGd("streammsg", "type=" + type + " opCode=" + opCode + " length=" + length);
+		if (bytes.length < STREAM_MSG_HEADER_SIZE + length) {
+			length = 0;
+			return false;
+		}
 		payload = new byte[length];
 		bb.get(payload);
+		return true;
 	}
 
 	/**
@@ -118,7 +148,7 @@ public class StreamMsg {
 	 * @return byte array representation of the ble stream message
 	 */
 	public byte[] toArray() {
-		ByteBuffer bb = ByteBuffer.allocate(4 + payload.length);
+		ByteBuffer bb = ByteBuffer.allocate(STREAM_MSG_HEADER_SIZE + payload.length);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
 		bb.put((byte) type);
@@ -134,7 +164,7 @@ public class StreamMsg {
 	 * For debug purposes, create a string representation of the ble stream message
 	 */
 	public String toString() {
-		return String.format("{type: %d, opCode: %d, length: %d, payload: %s}", type, opCode, length, Arrays.toString(payload));
+		return String.format(Locale.ENGLISH, "{type: %d, opCode: %d, length: %d, payload: %s}", type, opCode, length, BleUtils.bytesToString(payload));
 	}
 
 	/**

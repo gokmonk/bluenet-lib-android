@@ -43,31 +43,39 @@ public class MeshCommandPacket implements MeshPayload {
 
 	private byte[] _payload;
 
-	protected MeshCommandPacket(int messageType, int... ids) {
+	public MeshCommandPacket() {
+		_messageType = -1;
+		_numberOfIds = 0;
+		_ids = null;
+	}
+
+	public MeshCommandPacket(int messageType, int... ids) {
 		_messageType = messageType;
 		_numberOfIds = ids.length;
 		_ids = ids;
 	}
 
-	public MeshCommandPacket(int messageType, byte[] payload, int... ids) {
-		_messageType = messageType;
-		_numberOfIds = ids.length;
-		_ids = ids;
-		_payload = payload;
-	}
-
-	public MeshCommandPacket(byte[] bytes) {
+	@Override
+	public boolean fromArray(byte[] bytes) {
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
+		if (bytes.length < COMMAND_PACKET_HEADER_SIZE) {
+			return false;
+		}
 		_messageType = BleUtils.toUint16(bb.getShort());
 		_numberOfIds = BleUtils.toUint8(bb.get());
+		if (bytes.length < COMMAND_PACKET_HEADER_SIZE + _numberOfIds * CROWNSTONE_ID_SIZE) {
+			_numberOfIds = 0;
+			return false;
+		}
 		_ids = new int[_numberOfIds];
 		for (int i = 0; i < _numberOfIds; i++) {
 			_ids[i] = BleUtils.toUint16(bb.getShort());
 		}
 		_payload = new byte[bb.remaining()];
 		bb.get(_payload);
+		return true;
 	}
 
 	@Override

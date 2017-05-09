@@ -22,7 +22,14 @@ import nl.dobots.bluenet.ble.cfg.BluenetConfig;
  */
 public class MeshStateReplyPacket extends MeshCommandReplyPacket {
 
+	// TODO: this only holds 1 state reply packet at the moment
+
 	private StateMsg _stateMsg;
+
+	public MeshStateReplyPacket() {
+		super();
+		_stateMsg = null;
+	}
 
 	public MeshStateReplyPacket(StateMsg message, long messageNumber) {
 		super(BluenetConfig.MESH_REPLY_CONFIG, messageNumber);
@@ -30,9 +37,20 @@ public class MeshStateReplyPacket extends MeshCommandReplyPacket {
 		setPayload(_stateMsg.toArray());
 	}
 
-	public MeshStateReplyPacket(byte[] bytes) {
-		super(bytes);
-		_stateMsg = new StateMsg(getPayload());
+//	public MeshStateReplyPacket(byte[] bytes) {
+//	}
+
+	@Override
+	public boolean fromArray(byte[] bytes) {
+		if (!super.fromArray(bytes)) {
+			return false;
+		}
+		_stateMsg = new StateMsg();
+		if (!_stateMsg.fromArray(getPayload())) {
+			_stateMsg = null;
+			return false;
+		}
+		return true;
 	}
 
 	public StateMsg getReplyItem() {

@@ -24,15 +24,28 @@ public class MeshControlPacket extends MeshCommandPacket {
 
 	private ControlMsg _controlMsg;
 
+	public MeshControlPacket() {
+		super();
+		_controlMsg = null;
+	}
+
 	public MeshControlPacket(ControlMsg message, int... ids) {
 		super(BluenetConfig.MESH_CMD_CONTROL, ids);
 		_controlMsg = message;
 		setPayload(message.toArray());
 	}
 
-	public MeshControlPacket(byte[] bytes) {
-		super(bytes);
-		_controlMsg = new ControlMsg(getPayload());
+	@Override
+	public boolean fromArray(byte[] bytes) {
+		if (!super.fromArray(bytes)) {
+			return false;
+		}
+		_controlMsg = new ControlMsg();
+		if (!_controlMsg.fromArray(getPayload())) {
+			_controlMsg = null;
+			return false;
+		}
+		return true;
 	}
 
 	@Override

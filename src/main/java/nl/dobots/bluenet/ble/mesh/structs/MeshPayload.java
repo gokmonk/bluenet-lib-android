@@ -21,4 +21,7 @@ public interface MeshPayload {
 
 	byte[] toArray();
 
+	boolean fromArray(byte[] bytes);
+
+//	boolean isValidMessage();
 }
