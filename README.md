@@ -157,5 +157,5 @@ The copyrights (2014-2015) for the code belongs to the team of Distributed Organ
 * Authors: Dominik Egger, Anne van Rossum, Bart van Vliet, Marc Hulscher, Peet van Tooren
 * Date: 16. Jul. 2015
 * License: LGPL v3+, Apache, or MIT, your choice
-* Almende B.V., http://www.almende.com and DoBots B.V., http://www.dobots.nl
+* Crownstone B.V. https://crownstone.rocks
 * Rotterdam, The Netherlands
