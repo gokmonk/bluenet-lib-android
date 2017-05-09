@@ -695,7 +695,8 @@ public class BleExt extends Logging implements IWriteCallback {
 
 	@Override
 	public void onWrite() {
-		rescheduleConnectionKeepAlive();
+		// Do not automatically keep the connection alive!
+//		rescheduleConnectionKeepAlive();
 	}
 
 	/**
