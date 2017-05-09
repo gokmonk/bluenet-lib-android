@@ -525,8 +525,11 @@ public class BleCore extends Logging {
 
 		// initialize is done if both bluetooth and location services are ready
 		if (_bluetoothReady && _locationServicesReady) {
-			_initializeCallback.onSuccess();
-			_initializeCallback = null;
+			// TODO: got a NullPointerException (on _initializeCallback) here after disabling location service and waiting for a while, how is that possible?
+			if (_initializeCallback != null) {
+				_initializeCallback.onSuccess();
+				_initializeCallback = null;
+			}
 		}
 
 	}
