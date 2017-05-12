@@ -28,9 +28,9 @@ import nl.dobots.bluenet.utils.BleUtils;
  * of the message will then be forwarded to all other nodes in the mesh network.
  *
  * The mesh message has the following fields:
- * 		* Handle: the _handle on which the message should be sent, see MeshMessageTypes for details
- * 		* Length: the _length in bytes of the _payload
- * 		* Payload: the _payload data of the mesh message, this layout depends on the type
+ * 		* Handle: the handle on which the message should be sent, see MeshMessageTypes for details
+ * 		* Length: the length in bytes of the _payload
+ * 		* Payload: the payload data of the mesh message, this layout depends on the type
  *
  * The format is:
  * 		--------------------------------------------------
@@ -65,10 +65,21 @@ public class MeshControlMsg {
 
 	/**
 	 * Create a mesh message from the parameters to be written to devices mesh characteristic
-	 * @param handle _handle on which the message is sent in the mesh network
-	 * @param length _length of data, includes target, type and _payload
-	 * @param payload _payload of the mesh message, i.e. the data to be sent into the mesh
+	 * @param handle handle on which the message is sent in the mesh network
+	 * @param payload payload of the mesh message, i.e. the data to be sent into the mesh
 	 */
+	public MeshControlMsg(int handle, MeshPayload payload) {
+		this._handle = handle;
+		setPayload(payload);
+	}
+
+	/**
+	 * Create a mesh message from the parameters to be written to devices mesh characteristic
+	 * @param handle handle on which the message is sent in the mesh network
+	 * @param length length of data, includes target, type and _payload
+	 * @param payload payload of the mesh message, i.e. the data to be sent into the mesh
+	 */
+	@Deprecated
 	public MeshControlMsg(int handle, int length, byte[] payload) {
 		this._handle = handle;
 		this._length = length;
@@ -168,19 +179,39 @@ public class MeshControlMsg {
 //	}
 
 	/**
-	 * Get the mesh message's _payload
-	 * @return _payload
+	 * Get the mesh message's payload
+	 * @return payload
 	 */
 	public byte[] getPayload() {
 		return _payload;
 	}
 
 	/**
-	 * Set a new message _payload
-	 * @param payload new _payload
+	 * Set a new message payload
+	 * @param payload new payload
 	 */
+	@Deprecated
 	public void setPayload(byte[] payload) {
 		this._payload = payload;
+	}
+
+	/**
+	 * Set a new message payload
+	 * @param payload new payload
+	 */
+	public boolean setPayload(MeshPayload payload) {
+		if (payload == null) {
+			_payload = null;
+			_length = 0;
+			return false;
+		}
+		_payload = payload.toArray();
+		if (_payload == null) {
+			_length = 0;
+			return false;
+		}
+		_length = _payload.length;
+		return true;
 	}
 
 }

@@ -107,8 +107,8 @@ public class MeshCrownstoneStatePacket implements MeshPayload {
 		}
 	}
 
-	// 1B head + 1B tail + 1B size
-	private static final int CROWNSTONE_STATE_PACKET_HEADER_SIZE = 3;
+	// 1B head + 1B tail + 1B size + 5B reserved
+	private static final int CROWNSTONE_STATE_PACKET_HEADER_SIZE = 8;
 	// 2B Crownstone ID + 1B switch state + 1B event bitmask + 4B power usage + 4B accumulated energy
 	private static final int CROWNSTONE_STATE_ITEM_SIZE = 12; // bytes
 	// max capacity of the list
@@ -142,6 +142,8 @@ public class MeshCrownstoneStatePacket implements MeshPayload {
 		_head = BleUtils.toUint8(bb.get());
 		_tail = BleUtils.toUint8(bb.get());
 		_size = BleUtils.toUint8(bb.get());
+		byte[] reserved = new byte[5];
+		bb.get(reserved);
 		if (_head > MAX_LIST_ELEMENTS ||
 				_tail > MAX_LIST_ELEMENTS ||
 				_size > MAX_LIST_ELEMENTS ||
@@ -169,6 +171,8 @@ public class MeshCrownstoneStatePacket implements MeshPayload {
 		bb.put((byte)_head);
 		bb.put((byte)_tail);
 		bb.put((byte)_size);
+		byte[] reserved = new byte[5];
+		bb.put(reserved);
 
 		for (int i = 0; i < _size; i++) {
 			_list[i].toArray(bb);

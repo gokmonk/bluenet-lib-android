@@ -2,9 +2,11 @@ package nl.dobots.bluenet.ble.mesh.structs.cmd;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Locale;
 
+import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.mesh.structs.MeshPayload;
 import nl.dobots.bluenet.ibeacon.BleIbeaconFilter;
 import nl.dobots.bluenet.utils.BleUtils;
@@ -39,7 +41,8 @@ public class MeshCommandPacket implements MeshPayload {
 
 	private int _numberOfIds;
 
-	private int[] _ids;
+//	private int[] _ids;
+	private ArrayList<Integer> _ids;
 
 	private byte[] _payload;
 
@@ -52,7 +55,11 @@ public class MeshCommandPacket implements MeshPayload {
 	public MeshCommandPacket(int messageType, int... ids) {
 		_messageType = messageType;
 		_numberOfIds = ids.length;
-		_ids = ids;
+//		_ids = ids;
+		_ids = new ArrayList<>(_numberOfIds);
+		for (int id: ids) {
+			_ids.add(id);
+		}
 	}
 
 	@Override
@@ -69,9 +76,13 @@ public class MeshCommandPacket implements MeshPayload {
 			_numberOfIds = 0;
 			return false;
 		}
-		_ids = new int[_numberOfIds];
+//		_ids = new int[_numberOfIds];
+//		for (int i = 0; i < _numberOfIds; i++) {
+//			_ids[i] = BleUtils.toUint16(bb.getShort());
+//		}
+		_ids = new ArrayList<>(_numberOfIds);
 		for (int i = 0; i < _numberOfIds; i++) {
-			_ids[i] = BleUtils.toUint16(bb.getShort());
+			_ids.add(BleUtils.toUint16(bb.getShort()));
 		}
 		_payload = new byte[bb.remaining()];
 		bb.get(_payload);
@@ -80,15 +91,25 @@ public class MeshCommandPacket implements MeshPayload {
 
 	@Override
 	public byte[] toArray() {
+		if (_ids == null || _payload == null) {
+			return null;
+		}
 		ByteBuffer bb = ByteBuffer.allocate(COMMAND_PACKET_HEADER_SIZE +
 				_numberOfIds * CROWNSTONE_ID_SIZE + _payload.length);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
 		bb.putShort((short)_messageType);
 		bb.put((byte)_numberOfIds);
-		for (int i = 0; i < _numberOfIds; i++) {
-			bb.putShort((short)_ids[i]);
+//		for (int i = 0; i < _numberOfIds; i++) {
+//			bb.putShort((short)_ids[i]);
+//		}
+		if (_numberOfIds != _ids.size()) {
+			return null;
 		}
+		for (int i = 0; i < _numberOfIds; i++) {
+			bb.putShort(_ids.get(i).shortValue());
+		}
+
 		bb.put(_payload);
 
 		return bb.array();
@@ -102,13 +123,24 @@ public class MeshCommandPacket implements MeshPayload {
 		_payload = payload;
 	}
 
+	public void addId(int id) {
+		if (_ids == null) {
+			_ids = new ArrayList<>();
+			_numberOfIds = 0;
+		}
+		_ids.add(id);
+		_numberOfIds++;
+	}
+
 	protected String payloadToString() {
 		return BleUtils.bytesToString(_payload);
 	}
 
 	@Override
 	public String toString() {
+//		return String.format(Locale.ENGLISH, "{messageType: %d, numIds: %d [%s], payload: %s}",
+//				_messageType, _numberOfIds, Arrays.toString(_ids), payloadToString());
 		return String.format(Locale.ENGLISH, "{messageType: %d, numIds: %d [%s], payload: %s}",
-				_messageType, _numberOfIds, Arrays.toString(_ids), payloadToString());
+				_messageType, _numberOfIds, Arrays.toString(_ids.toArray()), payloadToString());
 	}
 }

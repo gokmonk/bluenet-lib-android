@@ -94,8 +94,8 @@ public class MeshMultiSwitchPacket implements MeshPayload {
 		}
 	}
 
-	// 1B number of ids
-	private static final int MULTI_SWITCH_PACKET_HEADER_SIZE = 1;
+	// 1B number of ids + 1B reserved
+	private static final int MULTI_SWITCH_PACKET_HEADER_SIZE = 2;
 	// 2B Crownstone ID + 1B switch state + 2B timeout + 1B intent
 	private static final int MULTI_SWITCH_ITEM_SIZE = 6;
 	// max capacity of the list
@@ -127,6 +127,7 @@ public class MeshMultiSwitchPacket implements MeshPayload {
 			return false;
 		}
 		_size = BleUtils.toUint8(bb.get());
+		byte reserved = bb.get();
 		if (_size > MAX_LIST_ELEMENTS || bytes.length < MULTI_SWITCH_PACKET_HEADER_SIZE + _size * MULTI_SWITCH_ITEM_SIZE) {
 //			BleLog.getInstance().LOGe(TAG, "Invalid length: " + _size);
 //			BleLog.getInstance().LOGe(TAG, "from mesh message: " + BleUtils.bytesToString(bytes));
@@ -149,6 +150,7 @@ public class MeshMultiSwitchPacket implements MeshPayload {
 		ByteBuffer bb = ByteBuffer.allocate(MULTI_SWITCH_PACKET_HEADER_SIZE + _size * MULTI_SWITCH_ITEM_SIZE);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 		bb.put((byte)_size);
+		bb.put((byte) 0); // Reserved
 		for (int i = 0; i < _size; i++) {
 			_list[i].toArray(bb);
 		}

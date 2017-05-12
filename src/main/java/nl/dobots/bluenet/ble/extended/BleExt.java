@@ -1403,6 +1403,53 @@ public class BleExt extends Logging implements IWriteCallback {
 		return hasCharacteristic(BluenetConfig.CHAR_SETUP_SESSION_NONCE_UUID, null);
 	}
 
+	////////////////////////
+	// Crownstone service //
+	////////////////////////
+
+	/**
+	 * Function to write the given control message to the device.
+	 * <p>
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 *
+	 * @param controlMsg  the control message to be written to the device
+	 * @param callback    the callback which will be informed about success or failure
+	 */
+	public void writeControl(ControlMsg controlMsg, final IStatusCallback callback) {
+		if (isConnected(callback)) {
+			getLogger().LOGd(TAG, "Write control: ", controlMsg.toString());
+			if (hasControlCharacteristic(callback)) {
+				_bleBase.sendCommand(_targetAddress, controlMsg, callback);
+			}
+		}
+	}
+
+	/**
+	 * Function to write the given control message to the device. Connects to the device if not already
+	 * connected, and/or delays the disconnect if necessary.
+	 * <p>
+	 *
+	 * @param address     the MAC address of the device to which the switch value should be written
+	 * @param controlMsg  the control message to be written to the device
+	 * @param callback    the callback which will be informed about success or failure
+	 */
+	public void writeControl(final String address, final ControlMsg controlMsg, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "Write control msg...");
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						writeControl(controlMsg, execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
+
 	///////////////////
 	// Power service //
 	///////////////////
@@ -1419,7 +1466,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	public void writeSwitch(final int value, final IStatusCallback callback) {
 		if (isConnected(callback)) {
 			getLogger().LOGd(TAG, "Set switch to %d", value);
-			if (hasControlCharacteristic(null)) {
+			if (hasControlCharacteristic(callback)) {
 				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_SWITCH, 1, new byte[]{(byte) value}), callback);
 			}
 		}

@@ -25,7 +25,7 @@ public class MeshControlPacket extends MeshCommandPacket {
 	private ControlMsg _controlMsg;
 
 	public MeshControlPacket() {
-		super();
+		super(BluenetConfig.MESH_CMD_CONTROL);
 		_controlMsg = null;
 	}
 
@@ -51,5 +51,11 @@ public class MeshControlPacket extends MeshCommandPacket {
 	@Override
 	protected String payloadToString() {
 		return _controlMsg.toString();
+	}
+
+	public boolean setControlPacket(ControlMsg message) {
+		_controlMsg = message;
+		setPayload(message.toArray());
+		return true;
 	}
 }
