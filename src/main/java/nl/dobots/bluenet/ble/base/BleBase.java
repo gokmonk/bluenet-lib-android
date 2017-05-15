@@ -2146,6 +2146,7 @@ public class BleBase extends BleCore {
 			@Override
 			public void onData(final JSONObject json) {
 				byte[] data = getValue(json);
+				getLogger().LOGv(TAG, "get session nonce (setup=%b): %s", _setupMode, BleUtils.bytesToString(data));
 				if (_setupMode) {
 					_encryptionSessionData = BleBaseEncryption.getSessionData(data, false);
 				}
