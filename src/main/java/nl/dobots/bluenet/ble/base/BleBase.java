@@ -292,13 +292,7 @@ public class BleBase extends BleCore {
 					// The callbacks can be called multiple times
 					@Override
 					public void onSuccess(byte[] result) {
-						int companyID = BleUtils.byteArrayToShort(result, 0);
-						if (companyID == BluenetConfig.APPLE_COMPANY_ID) {
-							parseIBeaconData(json, result);
-						}
-						if (companyID == BluenetConfig.DOBOTS_COMPANY_ID) {
-							parseDoBotsData(json, result);
-						}
+						parseIBeaconData(json, result);
 					}
 
 					@Override
@@ -311,12 +305,7 @@ public class BleBase extends BleCore {
 					// The callbacks can be called multiple times
 					@Override
 					public void onSuccess(byte[] result) {
-						int serviceUUID = BleUtils.byteArrayToShort(result, 0);
-						if (serviceUUID == BluenetConfig.CROWNSTONE_PLUG_SERVICE_DATA_UUID ||
-								serviceUUID == BluenetConfig.CROWNSTONE_BUILTIN_SERVICE_DATA_UUID ||
-								serviceUUID == BluenetConfig.GUIDESTONE_SERVICE_DATA_UUID) {
-							parseServiceData(json, result);
-						}
+						parseServiceData(json, result);
 					}
 
 					@Override
@@ -422,6 +411,9 @@ public class BleBase extends BleCore {
 		ByteBuffer bb = ByteBuffer.wrap(serviceData);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
+		if (bb.remaining() < 2) {
+			return;
+		}
 		int serviceUUID = bb.getShort();
 
 		if (serviceUUID == BluenetConfig.CROWNSTONE_PLUG_SERVICE_DATA_UUID) {
@@ -460,25 +452,32 @@ public class BleBase extends BleCore {
 		ByteBuffer bb = ByteBuffer.wrap(manufacData);
 
 		bb.order(ByteOrder.LITTLE_ENDIAN);
+
+		if (bb.remaining() < 2) {
+			return;
+		}
 		int companyId = BleUtils.toUint16(bb.getShort());
+		if (companyId != BluenetConfig.APPLE_COMPANY_ID) {
+			return;
+		}
 
 		// ibeacon data is in big endian format
 		bb.order(ByteOrder.BIG_ENDIAN);
 		// advertisement id is actually two separate bits, first bit is the iBeacon type (0x02),
 		// the second is the iBeacon length (0x15), but they are fixed to these values, so we can
 		// compare them together
+		if (bb.remaining() < 2) {
+			return;
+		}
 		int advertisementId = BleUtils.toUint16(bb.getShort());
 
-		if (companyId == BluenetConfig.APPLE_COMPANY_ID && advertisementId == BluenetConfig.IBEACON_ADVERTISEMENT_ID) {
+		if (advertisementId == BluenetConfig.IBEACON_ADVERTISEMENT_ID && bb.remaining() >= 16+2+2+1) {
 			BleCore.addProperty(scanResult, BleTypes.PROPERTY_IS_IBEACON, true);
 			BleCore.addProperty(scanResult, BleTypes.PROPERTY_PROXIMITY_UUID, new UUID(bb.getLong(), bb.getLong()));
 			BleCore.addProperty(scanResult, BleTypes.PROPERTY_MAJOR, BleUtils.toUint16(bb.getShort()));
 			BleCore.addProperty(scanResult, BleTypes.PROPERTY_MINOR, BleUtils.toUint16(bb.getShort()));
 			BleCore.addProperty(scanResult, BleTypes.PROPERTY_CALIBRATED_RSSI, bb.get());
-		} else {
-			BleCore.addProperty(scanResult, BleTypes.PROPERTY_IS_IBEACON, false);
 		}
-
 	}
 
 	/**
