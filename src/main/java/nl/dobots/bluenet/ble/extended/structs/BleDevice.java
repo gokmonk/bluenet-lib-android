@@ -40,7 +40,7 @@ public class BleDevice {
 	// to change the log level
 	private static final int LOG_LEVEL = Log.WARN;
 
-	private static final String TAG = BleDevice.class.getCanonicalName();
+	public static final String TAG = BleDevice.class.getCanonicalName();
 
 	// to be checked, obtained from http://data.altbeacon.org/android-distance.json
 	// device specific constants, these ones are for a Nexus 4/5
@@ -133,6 +133,7 @@ public class BleDevice {
 		_name = json.optString(BleTypes.PROPERTY_NAME, "No Name");
 		_rssi = json.getInt(BleTypes.PROPERTY_RSSI);
 		_type = determineDeviceType(json);
+		_crownstoneMode = CrownstoneMode.unknown;
 
 		if (json.has(BleTypes.PROPERTY_IS_IBEACON) && json.getBoolean(BleTypes.PROPERTY_IS_IBEACON)) {
 			_isIBeacon = true;
@@ -153,6 +154,11 @@ public class BleDevice {
 			} else {
 				_crownstoneMode = CrownstoneMode.normal;
 			}
+		}
+		if (json.has(BleTypes.PROPERTY_IS_DFU_MODE) && json.getBoolean(BleTypes.PROPERTY_IS_DFU_MODE)) {
+			_crownstoneMode = CrownstoneMode.dfu;
+//			// Force removal of service data?
+//			_serviceData = null;
 		}
 
 		validateCrownstone();
@@ -430,12 +436,20 @@ public class BleDevice {
 		// TODO: if in dfu mode: validate differently
 		getLogger().LOGv(TAG, "validateCrownstone " + getAddress());
 
+		if (isDfuMode()) {
+			getLogger().LOGv(TAG, "validate crownstone in dfu mode!");
+			_lastCrownstoneId = -1;
+			_lastRandom = null;
+			_isValidatedCrownstone = true;
+			return;
+		}
+
 		if (!isStone() || _serviceData == null) {
 			getLogger().LOGv(TAG, "no service data or no crownstone");
 			return;
 		}
 		if (isSetupMode()) {
-			getLogger().LOGv(TAG, "validated crownstone in setup mode!");
+			getLogger().LOGv(TAG, "validate crownstone in setup mode!");
 			_lastCrownstoneId = -1;
 			_lastRandom = null;
 			_isValidatedCrownstone = true;
@@ -534,14 +548,22 @@ public class BleDevice {
 		_numSimilarCrownstoneIds = old._numSimilarCrownstoneIds;
 		_rssiHistory             = old._rssiHistory;
 
+
 		// If we didn't get any service data, we probably received an advertisement with no scan response
 		// In this case, use the old service data
 		if (_serviceData == null) {
-			_serviceData    = old._serviceData;
-			_type           = old._type;
-			_crownstoneMode = old._crownstoneMode;
-			_name           = old._name;
+			// In dfu mode, only copy the old type.
+			if (_crownstoneMode == CrownstoneMode.dfu) {
+				_type = old._type;
+			}
+			else {
+				_serviceData = old._serviceData;
+				_type = old._type;
+				_crownstoneMode = old._crownstoneMode;
+				_name = old._name;
+			}
 		}
+
 
 		updateRssiValue(System.currentTimeMillis(), getRssi());
 	}

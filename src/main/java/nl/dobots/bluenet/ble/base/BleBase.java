@@ -11,7 +11,6 @@ import org.json.JSONObject;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -313,6 +312,18 @@ public class BleBase extends BleCore {
 						getLogger().LOGv(TAG, "json: " + json.toString());
 					}
 				});
+				parseAdvertisement(advertisement, 0x06, new IByteArrayCallback() {
+					// The callbacks can be called multiple times
+					@Override
+					public void onSuccess(byte[] result) {
+						parseServiceClass(json, result);
+					}
+
+					@Override
+					public void onError(int error) {
+						getLogger().LOGv(TAG, "json: " + json.toString());
+					}
+				});
 
 				BleDevice device;
 				try {
@@ -477,6 +488,28 @@ public class BleBase extends BleCore {
 			BleCore.addProperty(scanResult, BleTypes.PROPERTY_MAJOR, BleUtils.toUint16(bb.getShort()));
 			BleCore.addProperty(scanResult, BleTypes.PROPERTY_MINOR, BleUtils.toUint16(bb.getShort()));
 			BleCore.addProperty(scanResult, BleTypes.PROPERTY_CALIBRATED_RSSI, bb.get());
+		}
+	}
+
+	private void parseServiceClass(JSONObject json, byte[] serviceUuidBytes) {
+		// Parse "Incomplete List of 128-bit Service Class UUIDs"
+//		getLogger().LOGw(TAG, "128-bit service class uuid: " + BleUtils.bytesToString(serviceUuidBytes));
+		// 128-bit service class uuid: [35, 209, 188, 234, 95, 120, 35, 21, 222, 239, 18, 18, 48, 21, 0, 0]
+		ByteBuffer bb = ByteBuffer.wrap(serviceUuidBytes);
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+		if (bb.remaining() < 16) {
+			return;
+		}
+		long leastSigBits= bb.getLong();
+		long mostSigBits = bb.getLong();
+		UUID serviceUuid = new UUID(mostSigBits, leastSigBits);
+//		getLogger().LOGw(TAG, "UUID: " + serviceUuid.toString());
+		UUID dfuServiceUuid = UUID.fromString(BluenetConfig.DFU_SERVICE_UUID);
+//		getLogger().LOGw(TAG, "DFU UUID: " + dfuServiceUuid.toString());
+//		getLogger().LOGw(TAG, "match: " + dfuServiceUuid.equals(serviceUuid));
+
+		if (dfuServiceUuid.equals(serviceUuid)) {
+			BleCore.addProperty(json, BleTypes.PROPERTY_IS_DFU_MODE, true);
 		}
 	}
 

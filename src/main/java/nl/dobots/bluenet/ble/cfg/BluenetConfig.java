@@ -17,6 +17,11 @@ public class BluenetConfig {
 	public static final int BLE_MAX_MULTIPART_NOTIFICATION_LENGTH = 512;
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Dfu service
+	public static final String DFU_SERVICE_UUID =                       "00001530-1212-EFDE-1523-785FEABCD123";
+	public static final String DFU_CONTROL_UUID =                       "00001531-1212-EFDE-1523-785FEABCD123";
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Crownstone Service
 	public static final String CROWNSTONE_SERVICE_UUID =                "24f00000-7d10-4805-bfc1-7663a01c3bff";
 	// Crownstone Service - Characteristics
@@ -270,7 +275,7 @@ public class BluenetConfig {
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// DoBots
+	// Crownstone
 	public static final short DOBOTS_COMPANY_ID =                       (short)0x038E;
 	public static final short CROWNSTONE_PLUG_SERVICE_DATA_UUID =       (short)0xC001;
 	public static final short CROWNSTONE_BUILTIN_SERVICE_DATA_UUID =    (short)0xC002;

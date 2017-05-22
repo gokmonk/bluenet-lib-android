@@ -486,7 +486,8 @@ public class BleExt extends Logging implements IWriteCallback {
 							if (!device.isIBeacon()) return;
 							break;
 						case anyStone:
-							if (!device.isStone()) return;
+							// TODO: how to deal with stones in dfu mode?
+							if (!device.isStone() && !device.isDfuMode()) return;
 							break;
 						case crownstonePlug:
 							if (!device.isCrownstonePlug()) return;
@@ -507,13 +508,8 @@ public class BleExt extends Logging implements IWriteCallback {
 				}
 
 
-				// Update the device list, this triggers recalculation of the average RSSI (and
-				// distance estimation if it is a beacon).
-				// If there was an iBeacon match, it was already updated before.
-				// [20-01-2017] Bart: since the ibeacon ranging has its own device map now, it should always update here.
-//				if (!iBeaconMatch) {
+				// Update the device list, this triggers recalculation of the average RSSI (and distance estimation if it is a beacon).
 				device = updateDevice(device);
-//				}
 
 				// report the updated device
 				if (callback != null) {
@@ -942,7 +938,23 @@ public class BleExt extends Logging implements IWriteCallback {
 	 * @return true if control characteristic is available, false otherwise
 	 */
 	public boolean hasControlCharacteristic(IBaseCallback callback) {
-		return hasCharacteristic(BluenetConfig.CHAR_CONTROL_UUID, callback);
+		return hasControlCharacteristic(callback, false);
+	}
+
+	/**
+	 * Helper function to check if the command control characteristic is avialable
+	 *
+	 * @param callback the callback to be informed about an error
+	 * @param allowSetupCharacteristic whether it's also ok to use the control characteristic in setup mode
+	 * @return true if control characteristic is available, false otherwise
+	 */
+	public boolean hasControlCharacteristic(IBaseCallback callback, boolean allowSetupCharacteristic) {
+		if (allowSetupCharacteristic && hasCharacteristic(BluenetConfig.CHAR_SETUP_CONTROL_UUID, null)) {
+			return true;
+		}
+		else {
+			return hasCharacteristic(BluenetConfig.CHAR_CONTROL_UUID, callback);
+		}
 	}
 
 	/**
@@ -2128,30 +2140,30 @@ public class BleExt extends Logging implements IWriteCallback {
 		if (isConnected(callback)) {
 			int value = BluenetConfig.FACTORY_RESET_CODE;
 			getLogger().LOGd(TAG, "Write factory reset with %d", value);
-			if (hasControlCharacteristic(callback)) {
-				getLogger().LOGd(TAG, "use control characteristic");
-				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_FACTORY_RESET, 4, BleUtils.intToByteArray(value)), new IStatusCallback() {
-					@Override
-					public void onSuccess() {
-						disconnectAndClose(true, new IStatusCallback() {
-							@Override
-							public void onSuccess() {
-								callback.onSuccess();
-							}
+//			if (hasControlCharacteristic(callback, true)) {
+//				getLogger().LOGd(TAG, "use control characteristic");
+			_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_FACTORY_RESET, 4, BleUtils.intToByteArray(value)), new IStatusCallback() {
+				@Override
+				public void onSuccess() {
+					disconnectAndClose(true, new IStatusCallback() {
+						@Override
+						public void onSuccess() {
+							callback.onSuccess();
+						}
 
-							@Override
-							public void onError(int error) {
-								callback.onSuccess();
-							}
-						});
-					}
+						@Override
+						public void onError(int error) {
+							callback.onSuccess();
+						}
+					});
+				}
 
-					@Override
-					public void onError(int error) {
-						callback.onError(error);
-					}
-				});
-			}
+				@Override
+				public void onError(int error) {
+					callback.onError(error);
+				}
+			});
+//			}
 		}
 	}
 

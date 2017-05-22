@@ -51,17 +51,15 @@ public class BleDeviceMap extends HashMap<String, BleDevice> {
 	public synchronized BleDevice updateDevice(BleDevice device) {
 		if (contains(device)) {
 			BleDevice old = getDevice(device.getAddress());
-//			old.update(device);
-//			old.validateCrownstone();
-//			return old;
+			// Update rssi and perform validation
+			// Keep old data, as not every device has the service data
 			device.copyFromOld(old);
 			device.validateCrownstone();
 			put(device.getAddress(), device);
 			return device;
-		} else {
-			put(device.getAddress(), device);
-			return device;
 		}
+		put(device.getAddress(), device);
+		return device;
 	}
 
 	/**

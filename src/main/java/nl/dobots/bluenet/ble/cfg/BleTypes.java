@@ -23,4 +23,6 @@ public class BleTypes extends BleCoreTypes {
 	public static final String PROPERTY_IS_FRIDGE = "isFridge";
 
 	public static final String PROPERTY_SERVICE_DATA = "serviceData";
+
+	public static final String PROPERTY_IS_DFU_MODE = "isDfuMode";
 }
