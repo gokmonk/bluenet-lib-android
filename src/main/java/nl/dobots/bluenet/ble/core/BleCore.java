@@ -762,6 +762,8 @@ public class BleCore extends Logging {
 	 * @param timeout timeout of the connect. if connection is not successful within timeout,
 	 *                abort and trigger the callback's onError
 	 * @param callback the callback to be notified about success or failure
+	 *                     onData: status is "connected" when successful.
+	 *                     onError: only errors that concern the connection state.
 	 */
 	public void connectDevice(String address, int timeout, IDataCallback callback) {
 		getLogger().LOGd(TAG, "Connecting to %s with %d ms timeout ...", address, timeout);

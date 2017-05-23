@@ -159,6 +159,7 @@ public class CrownstoneSetup {
 				break;
 			}
 			case 13: {
+				// Clear cache, as we know that the services will change.
 				_bleExt.disconnectAndClose(true, _defaultCallback);
 				break;
 			}

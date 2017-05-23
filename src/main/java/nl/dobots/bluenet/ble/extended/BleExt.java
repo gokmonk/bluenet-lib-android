@@ -76,7 +76,8 @@ public class BleExt extends Logging implements IWriteCallback {
 	// default time used for delayed disconnects
 	public static final int DELAYED_DISCONNECT_TIME = 5000; // 5 seconds
 
-	private int _numRetries = 3;
+	private int _numConnectRetries = 3;
+	private int _numOtherRetries = 1;
 
 	private BleBase _bleBase;
 
@@ -213,7 +214,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	}
 
 	public void setNumRetries(int numRetries) {
-		_numRetries = numRetries;
+		_numConnectRetries = numRetries;
 	}
 
 	public void setConnectTimeout(int timeoutMs) {
@@ -598,7 +599,7 @@ public class BleExt extends Logging implements IWriteCallback {
 
 			_connectionState = BleDeviceConnectionState.connecting;
 
-			IDataCallback dataCallback = new IDataCallback() {
+			IDataCallback connectCallback = new IDataCallback() {
 				@Override
 				public void onData(JSONObject json) {
 					String status = BleCore.getStatus(json);
@@ -629,7 +630,7 @@ public class BleExt extends Logging implements IWriteCallback {
 //			} else if (_bleBase.isDisconnected(_targetAddress)) {
 //				_bleBase.reconnectDevice(_targetAddress, 30, dataCallback);
 			if (_bleBase.isClosed(_targetAddress) || _bleBase.isDisconnected(_targetAddress)) {
-				_bleBase.connectDevice(_targetAddress, _connectTimeout, dataCallback);
+				_bleBase.connectDevice(_targetAddress, _connectTimeout, connectCallback);
 			}
 		} else if (checkConnectionState(BleDeviceConnectionState.connected, null)) {
 			if (_targetAddress.equals(address)) {
@@ -834,7 +835,12 @@ public class BleExt extends Logging implements IWriteCallback {
 
 						@Override
 						public void onError(int error) {
-							if (error == BleErrors.ERROR_SERVICE_NOT_FOUND) {
+							if (!retry(error)) {
+								callback.onError(error);
+							}
+							else {
+								// TODO: only retry 1 time
+								// Clear cache in hope that the cache was wrong
 								disconnectAndClose(true, new IStatusCallback() {
 									@Override
 									public void onSuccess() {
@@ -846,8 +852,6 @@ public class BleExt extends Logging implements IWriteCallback {
 										callback.onError(error);
 									}
 								});
-							} else {
-								callback.onError(error);
 							}
 						}
 					});
@@ -984,7 +988,7 @@ public class BleExt extends Logging implements IWriteCallback {
 		connect(address, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
-				handleRetrySuccess();
+				handleConnectRetrySuccess();
 				/* [05.01.16] I am sometimes getting the behaviour that the connect first succeeds
 				 *   and then a couple ms later I receive a disconnect again. In such a case, delaying
 				 *   the discover leads to the library trying to discover services although a disconnect
@@ -1190,26 +1194,41 @@ public class BleExt extends Logging implements IWriteCallback {
 		}
 	}
 
-	private void handleRetrySuccess() {
-		_retries = 0;
+	private void handleConnectRetrySuccess() {
+		_connectRetries = 0;
 	}
 
-	private int _retries = 0;
+	private void handleOtherRetrySuccess() {
+		_otherRetries = 0;
+	}
+
+	private int _connectRetries = 0;
+	private int _otherRetries = 0;
 
 	private boolean retry(int error) {
 
 		// check if error is retriable ...
 		switch (error) {
+			case BleErrors.ERROR_SERVICE_NOT_FOUND:
 			case BleErrors.ERROR_CHARACTERISTIC_READ_FAILED:
-			case BleErrors.ERROR_CHARACTERISTIC_WRITE_FAILED:
-//			case BleErrors.ERROR_CONNECT_FAILED:
-			case 133: {
-				if (_retries < _numRetries) {
-					_retries++;
-					getLogger().LOGw(TAG, "retry: %d (error=%d)", _retries, error);
+			case BleErrors.ERROR_CHARACTERISTIC_WRITE_FAILED: {
+				if (_otherRetries < _numOtherRetries) {
+					_otherRetries++;
+					getLogger().LOGw(TAG, "retry: %d (error=%d)", _otherRetries, error);
 					return true;
 				} else {
-					_retries = 0;
+					_otherRetries = 0;
+					return false;
+				}
+			}
+//			case BleErrors.ERROR_CONNECT_FAILED:
+			case 133: {
+				if (_connectRetries < _numConnectRetries) {
+					_connectRetries++;
+					getLogger().LOGw(TAG, "connect retry: %d (error=%d)", _connectRetries, error);
+					return true;
+				} else {
+					_connectRetries = 0;
 					return false;
 				}
 			}
@@ -1224,13 +1243,13 @@ public class BleExt extends Logging implements IWriteCallback {
 
 //	private boolean retry(final String address, final IExecuteCallback function, final IStatusCallback callback) {
 //
-//		if (_retries < _numRetries) {
-//			_retries++;
-//			getLogger().LOGw(TAG, "retry: %d", _retries);
+//		if (_connectRetries < _numConnectRetries) {
+//			_connectRetries++;
+//			getLogger().LOGw(TAG, "retry: %d", _connectRetries);
 //			connectAndExecute(address, function, callback);
 //			return true;
 //		} else {
-//			_retries = 0;
+//			_connectRetries = 0;
 //			return false;
 //		}
 //
@@ -1281,7 +1300,7 @@ public class BleExt extends Logging implements IWriteCallback {
 				if (disconnect && resumeDelayedDisconnect[0]) {
 					delayedDisconnect(null);
 				}
-				handleRetrySuccess();
+//				handleConnectRetrySuccess();
 				executeSuccess[0] = true;
 			}
 
@@ -1336,6 +1355,7 @@ public class BleExt extends Logging implements IWriteCallback {
 
 				@Override
 				public void onSuccess() {
+					handleConnectRetrySuccess();
 					// call execute function
 					function.execute(execStatusCallback);
 				}
@@ -1343,6 +1363,7 @@ public class BleExt extends Logging implements IWriteCallback {
 				@Override
 				public void onError(final int error) {
 					// todo: do we need to disconnect and close here?
+					// Clear cache, because ??
 					disconnectAndClose(true, new IStatusCallback() {
 
 						private void done() {
@@ -2129,7 +2150,7 @@ public class BleExt extends Logging implements IWriteCallback {
 
 	/**
 	 * Function to factory reset the device. This will erase all settings on the device, and
-	 * boots it in setup mode.
+	 * boots it in setup mode. Disconnects and clears cache on success.
 	 * <p>
 	 * Note: needs to be already connected or an error is created! Use overloaded function
 	 * with address otherwise
@@ -2145,6 +2166,7 @@ public class BleExt extends Logging implements IWriteCallback {
 			_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_FACTORY_RESET, 4, BleUtils.intToByteArray(value)), new IStatusCallback() {
 				@Override
 				public void onSuccess() {
+					// Clear cache, as we know that the services will change.
 					disconnectAndClose(true, new IStatusCallback() {
 						@Override
 						public void onSuccess() {
@@ -2229,7 +2251,7 @@ public class BleExt extends Logging implements IWriteCallback {
 				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_DISCONNECT, 0, new byte[0]), new IStatusCallback() {
 					@Override
 					public void onSuccess() {
-						disconnectAndClose(true, new IStatusCallback() {
+						disconnectAndClose(false, new IStatusCallback() {
 							@Override
 							public void onSuccess() {
 								callback.onSuccess();
@@ -2278,22 +2300,46 @@ public class BleExt extends Logging implements IWriteCallback {
 
 	/**
 	 * Function to reset / reboot the device to the bootloader, so that a new device firmware
-	 * can be uploaded
+	 * can be uploaded. Disconnects and clears cache on success.
 	 * <p>
 	 * Note: needs to be already connected or an error is created! Use overloaded function
 	 * with address otherwise
 	 *
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void resetToBootloader(IStatusCallback callback) {
+	public void resetToBootloader(final IStatusCallback callback) {
+
+		final IStatusCallback resetCallback = new IStatusCallback() {
+			@Override
+			public void onSuccess() {
+				// Clear cache, as we know that the services will change.
+				disconnectAndClose(true, new IStatusCallback() {
+					@Override
+					public void onSuccess() {
+						callback.onSuccess();
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onSuccess();
+					}
+				});
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		};
+
 		if (isConnected(callback)) {
 			getLogger().LOGd(TAG, "Reset to bootloader");
 			if (hasControlCharacteristic(null)) {
-				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_GOTO_DFU), callback);
+				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_GOTO_DFU), resetCallback);
 			} else if (hasCharacteristic(BluenetConfig.CHAR_RESET_UUID, null)) {
-				_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, callback);
+				_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, resetCallback);
 			} else if (isSetupMode() && hasCharacteristic(BluenetConfig.CHAR_SETUP_GOTO_DFU_UUID, null)) {
-				_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, callback);
+				_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, resetCallback);
 			}
 		}
 	}
@@ -2355,6 +2401,7 @@ public class BleExt extends Logging implements IWriteCallback {
 								switch (BleUtils.toUint8(data[0])) {
 									case 1: {
 										// Success!
+										// Clear cache, as we know that the services will change.
 										disconnectAndClose(true, new IStatusCallback() {
 											@Override
 											public void onSuccess() {
