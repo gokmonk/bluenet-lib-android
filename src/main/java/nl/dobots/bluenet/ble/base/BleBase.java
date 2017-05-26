@@ -545,6 +545,7 @@ public class BleBase extends BleCore {
 						}
 
 						if (serviceUuid.equals(BluenetConfig.SETUP_SERVICE_UUID)) {
+							getLogger().LOGd(TAG, "setupMode = true");
 							_setupMode = true;
 						}
 					}
@@ -1984,7 +1985,7 @@ public class BleBase extends BleCore {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void writeReset(String address, int value, final IStatusCallback callback) {
-
+		getLogger().LOGd(TAG, "writeReset: " + value + " setupMode=" + _setupMode);
 		if (_setupMode) {
 			writeReset(address, value, BluenetConfig.SETUP_SERVICE_UUID,
 					BluenetConfig.CHAR_SETUP_GOTO_DFU_UUID, callback);
@@ -1998,11 +1999,13 @@ public class BleBase extends BleCore {
 	 * Write the reset value to the reset characteristic
 	 * @param address the address of the device
 	 * @param value reset value, can be either RESET_DEFAULT or RESET_BOOTLOADER
+	 * @param serviceUuid service UUID to write to
+	 * @param characteristicUuid characteristic UUID to write to
 	 * @param callback the callback which will be informed about success or failure
 	 */
-	public void writeReset(String address, int value, String serviceUuid, String characteristicUuid, final IStatusCallback callback) {
-			getLogger().LOGd(TAG, "reset: write %d at service %s and characteristic %s", value, BluenetConfig.GENERAL_SERVICE_UUID, BluenetConfig.CHAR_RESET_UUID);
-			write(address, serviceUuid, characteristicUuid, new byte[]{(byte) value},
+	private void writeReset(String address, int value, String serviceUuid, String characteristicUuid, final IStatusCallback callback) {
+			getLogger().LOGd(TAG, "reset: write %d at service %s and characteristic %s", value, serviceUuid, characteristicUuid);
+			write(address, serviceUuid, characteristicUuid, new byte[]{(byte) value}, BleBaseEncryption.ACCESS_LEVEL_ENCRYPTION_DISABLED,
 					new IStatusCallback() {
 
 						@Override
@@ -2280,7 +2283,7 @@ public class BleBase extends BleCore {
 	}
 
 	public void readHardwareRevision(final String address, final IByteArrayCallback callback) {
-		getLogger().LOGd(TAG, "readFirmwareRevision");
+		getLogger().LOGd(TAG, "readHardwareRevision");
 		read(address, BluenetConfig.DEVICE_INFO_SERVICE_UUID, BluenetConfig.CHAR_HARDWARE_REVISION_UUID, false, new IDataCallback() {
 			@Override
 			public void onData(JSONObject json) {
@@ -2295,5 +2298,23 @@ public class BleBase extends BleCore {
 			}
 		});
 	}
+
+	public void readBootloaderRevision(final String address, final IByteArrayCallback callback) {
+		getLogger().LOGd(TAG, "readBootloaderRevision");
+		read(address, BluenetConfig.DEVICE_INFO_SERVICE_UUID, BluenetConfig.CHAR_SOFTWARE_REVISION_UUID, false, new IDataCallback() {
+			@Override
+			public void onData(JSONObject json) {
+				byte[] bytes = getValue(json);
+				getLogger().LOGd(TAG, "bootloader version: %s", new String(bytes));
+				callback.onSuccess(bytes);
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
+
 
 }

@@ -826,6 +826,19 @@ public class BleExt extends Logging implements IWriteCallback {
 			public void onSuccess() {
 				getLogger().LOGd(TAG, "... discovery done");
 
+				BleDevice dev = _devices.getDevice(_targetAddress);
+				if (dev != null && dev.isDfuMode()) {
+					getLogger().LOGd(TAG, "device is probably in dfu mode");
+				}
+				if (hasCharacteristic(BluenetConfig.DFU_CONTROL_UUID, null)) {
+					getLogger().LOGd(TAG, "device has dfu control char");
+				}
+				//if (dev != null && dev.isDfuMode() && hasCharacteristic(BluenetConfig.DFU_CONTROL_UUID, null)) {
+				if (hasCharacteristic(BluenetConfig.DFU_CONTROL_UUID, null)) {
+					callback.onSuccess();
+					return;
+				}
+
 				if (readSessionNonce && _bleBase.isEncryptionEnabled()) {
 					_bleBase.readSessionNonce(_targetAddress, new IDataCallback() {
 						@Override
@@ -894,13 +907,16 @@ public class BleExt extends Logging implements IWriteCallback {
 	 * @return true if the device has the characteristic, false otherwise
 	 */
 	public boolean hasCharacteristic(String characteristicUuid, IBaseCallback callback) {
+
 		if (_detectedCharacteristics.indexOf(characteristicUuid) == -1) {
 			if (callback != null) {
 				getLogger().LOGe(TAG, "characteristic not found");
 				callback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
 			}
+			getLogger().LOGd(TAG, "hasCharacteristic? " + characteristicUuid + " false");
 			return false;
 		}
+		getLogger().LOGd(TAG, "hasCharacteristic? " + characteristicUuid + " true");
 		return true;
 	}
 
@@ -2334,12 +2350,25 @@ public class BleExt extends Logging implements IWriteCallback {
 
 		if (isConnected(callback)) {
 			getLogger().LOGd(TAG, "Reset to bootloader");
-			if (hasControlCharacteristic(null)) {
+			if (hasCharacteristic(BluenetConfig.DFU_CONTROL_UUID, null)) {
+				getLogger().LOGd(TAG, "Already in bootloader!");
+				callback.onSuccess(); // Don't disconnect
+				return;
+			}
+			// First try to use the general service
+			if (hasCharacteristic(BluenetConfig.CHAR_RESET_UUID, null)) {
+				_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, resetCallback);
+			}
+			// Then try to use the setup reset characteristic
+			else if (isSetupMode() && hasCharacteristic(BluenetConfig.CHAR_SETUP_GOTO_DFU_UUID, null)) {
+				_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, resetCallback);
+			}
+			// Else try to use the control characteristic
+			else if (hasControlCharacteristic(null, true)) {
 				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_GOTO_DFU), resetCallback);
-			} else if (hasCharacteristic(BluenetConfig.CHAR_RESET_UUID, null)) {
-				_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, resetCallback);
-			} else if (isSetupMode() && hasCharacteristic(BluenetConfig.CHAR_SETUP_GOTO_DFU_UUID, null)) {
-				_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, resetCallback);
+			}
+			else {
+				callback.onError(BleErrors.ERROR_SERVICE_NOT_FOUND);
 			}
 		}
 	}
@@ -3177,6 +3206,28 @@ public class BleExt extends Logging implements IWriteCallback {
 					@Override
 					public void execute(final IExecStatusCallback execCallback) {
 						readHardwareRevision(execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
+	public void readBootloaderRevision(final IByteArrayCallback callback) {
+		if (isConnected(callback)) {
+			getLogger().LOGd(TAG, "readBootloaderRevision");
+			_bleBase.readBootloaderRevision(_targetAddress, callback);
+		}
+	}
+
+	public void readBootloaderRevision(final String address, final IIntegerCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "Reading bootloader revision ...");
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						readBootloaderRevision(execCallback);
 					}
 				}, new SimpleExecStatusCallback(callback));
 			}

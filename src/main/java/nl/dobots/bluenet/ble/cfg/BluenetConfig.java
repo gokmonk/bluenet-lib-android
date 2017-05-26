@@ -16,10 +16,14 @@ public class BluenetConfig {
 	public static final int BLE_DEVICE_ADDRESS_LENGTH = 6;
 	public static final int BLE_MAX_MULTIPART_NOTIFICATION_LENGTH = 512;
 
+	//
+	// UUID string should be written with lower case!
+	//
+
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Dfu service
-	public static final String DFU_SERVICE_UUID =                       "00001530-1212-EFDE-1523-785FEABCD123";
-	public static final String DFU_CONTROL_UUID =                       "00001531-1212-EFDE-1523-785FEABCD123";
+	public static final String DFU_SERVICE_UUID =                       "00001530-1212-efde-1523-785feabcd123";
+	public static final String DFU_CONTROL_UUID =                       "00001531-1212-efde-1523-785feabcd123";
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Crownstone Service
@@ -96,13 +100,13 @@ public class BluenetConfig {
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Device Information Service
-//	public static final String DEVICE_INFO_SERVICE_UUID =               "0x180A";
-	public static final String DEVICE_INFO_SERVICE_UUID =               "0000180A-0000-1000-8000-00805F9B34FB";
+//	public static final String DEVICE_INFO_SERVICE_UUID =               "0x180a";
+	public static final String DEVICE_INFO_SERVICE_UUID =               "0000180a-0000-1000-8000-00805f9b34fb";
 	// Device Information Service - Characteristics
-//	public static final String CHAR_HARDWARE_REVISION_UUID =            "0x2A27";
-//	public static final String CHAR_SOFTWARE_REVISION_UUID =            "0x2A26";
-	public static final String CHAR_HARDWARE_REVISION_UUID =            "00002A27-0000-1000-8000-00805F9B34FB";
-	public static final String CHAR_SOFTWARE_REVISION_UUID =            "00002A26-0000-1000-8000-00805F9B34FB";
+//	public static final String CHAR_HARDWARE_REVISION_UUID =            "0x2a27";
+//	public static final String CHAR_SOFTWARE_REVISION_UUID =            "0x2a26";
+	public static final String CHAR_HARDWARE_REVISION_UUID =            "00002a27-0000-1000-8000-00805f9b34fb";
+	public static final String CHAR_SOFTWARE_REVISION_UUID =            "00002a26-0000-1000-8000-00805f9b34fb";
 
 
 
