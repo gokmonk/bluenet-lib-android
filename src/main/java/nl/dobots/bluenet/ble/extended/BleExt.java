@@ -17,6 +17,7 @@ import java.util.HashMap;
 
 import nl.dobots.bluenet.ble.base.BleBase;
 import nl.dobots.bluenet.ble.base.BleBaseEncryption;
+import nl.dobots.bluenet.ble.base.BleConfiguration;
 import nl.dobots.bluenet.ble.core.BleCoreTypes;
 import nl.dobots.bluenet.ble.extended.callbacks.EventListener;
 import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
@@ -811,11 +812,31 @@ public class BleExt extends Logging implements IWriteCallback {
 	 * read the services and characteristics from the device and not the cache
 	 *
 	 * @param callback the callback used to report discovered services and characteristics
+	 * @param readSessionNonce true to read the session nonce after discovery
 	 */
 	public void discoverServices(final IDiscoveryCallback callback, final boolean readSessionNonce) {
+		discoverServices(callback, true, false);
+	}
+
+	/**
+	 * Discover the available services and characteristics of the connected device. The callbacks
+	 * onDiscovery function will be called with service UUID and characteristic UUID for each
+	 * discovered characteristic. Once the discovery completes, the onSuccess is called or the onError
+	 * if an error occurs
+	 * <p>
+	 * Note: if you get wrong services and characteristics returned, try to clear the cache by calling
+	 * close with parameter clearCache set to true. this makes sure that next discover will really
+	 * read the services and characteristics from the device and not the cache
+	 *
+	 * @param callback the callback used to report discovered services and characteristics
+	 * @param readSessionNonce true to read the session nonce after discovery
+	 * @param forceDiscover  set to true to force a new discovery,
+	 *						 if false and cached discovery found, return the lib cache
+	 */
+	public void discoverServices(final IDiscoveryCallback callback, final boolean readSessionNonce, boolean forceDiscover) {
 		getLogger().LOGd(TAG, "discovering services ...");
 		_detectedCharacteristics.clear();
-		_bleBase.discoverServices(_targetAddress, new IDiscoveryCallback() {
+		_bleBase.discoverServices(_targetAddress, forceDiscover, new IDiscoveryCallback() {
 			@Override
 			public void onDiscovery(String serviceUuid, String characteristicUuid) {
 				onCharacteristicDiscovered(serviceUuid, characteristicUuid);
@@ -2350,26 +2371,56 @@ public class BleExt extends Logging implements IWriteCallback {
 
 		if (isConnected(callback)) {
 			getLogger().LOGd(TAG, "Reset to bootloader");
-			if (hasCharacteristic(BluenetConfig.DFU_CONTROL_UUID, null)) {
-				getLogger().LOGd(TAG, "Already in bootloader!");
-				callback.onSuccess(); // Don't disconnect
-				return;
-			}
-			// First try to use the general service
-			if (hasCharacteristic(BluenetConfig.CHAR_RESET_UUID, null)) {
-				_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, resetCallback);
-			}
-			// Then try to use the setup reset characteristic
-			else if (isSetupMode() && hasCharacteristic(BluenetConfig.CHAR_SETUP_GOTO_DFU_UUID, null)) {
-				_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, resetCallback);
-			}
-			// Else try to use the control characteristic
-			else if (hasControlCharacteristic(null, true)) {
-				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_GOTO_DFU), resetCallback);
-			}
-			else {
-				callback.onError(BleErrors.ERROR_SERVICE_NOT_FOUND);
-			}
+			_bleBase.refreshDeviceCache(_targetAddress, new IStatusCallback() {
+				@Override
+				public void onSuccess() {
+					getLogger().LOGd(TAG, "Refreshed device cache. Discover service..");
+					discoverServices(new IDiscoveryCallback() {
+						@Override
+						public void onDiscovery(String serviceUuid, String characteristicUuid) {
+
+						}
+
+						@Override
+						public void onSuccess() {
+							getLogger().LOGd(TAG, "Discovered services.");
+							if (hasCharacteristic(BluenetConfig.DFU_CONTROL_UUID, null)) {
+								getLogger().LOGd(TAG, "Already in bootloader!");
+								callback.onSuccess(); // Don't disconnect
+//								resetCallback.onSuccess();
+								return;
+							}
+							// First try to use the general service
+							if (hasCharacteristic(BluenetConfig.CHAR_RESET_UUID, null)) {
+								_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, resetCallback);
+							}
+							// Then try to use the setup reset characteristic
+							else if (isSetupMode() && hasCharacteristic(BluenetConfig.CHAR_SETUP_GOTO_DFU_UUID, null)) {
+								_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, resetCallback);
+							}
+							// Else try to use the control characteristic
+							else if (hasControlCharacteristic(null, true)) {
+								_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_GOTO_DFU), resetCallback);
+							}
+							else {
+								callback.onError(BleErrors.ERROR_SERVICE_NOT_FOUND);
+							}
+						}
+
+						@Override
+						public void onError(int error) {
+							getLogger().LOGd(TAG, "Failed to discover services");
+							callback.onError(error);
+						}
+					}, true, true);
+				}
+
+				@Override
+				public void onError(int error) {
+					getLogger().LOGd(TAG, "Failed to refresh device cache");
+					callback.onError(error);
+				}
+			});
 		}
 	}
 
@@ -3214,8 +3265,10 @@ public class BleExt extends Logging implements IWriteCallback {
 
 	public void readBootloaderRevision(final IByteArrayCallback callback) {
 		if (isConnected(callback)) {
-			getLogger().LOGd(TAG, "readBootloaderRevision");
-			_bleBase.readBootloaderRevision(_targetAddress, callback);
+			if (hasCharacteristic(BluenetConfig.DFU_CONTROL_UUID, callback)) {
+				getLogger().LOGd(TAG, "readBootloaderRevision");
+				_bleBase.readBootloaderRevision(_targetAddress, callback);
+			}
 		}
 	}
 

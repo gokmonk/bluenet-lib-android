@@ -889,7 +889,7 @@ public class BleCore extends Logging {
 	 *
 	 * @param address the MAC address of the device for which the services should be discovered
 	 * @param forceDiscover, set to true to force a new discovery,
-	 *						 if false and cached discovery found, return the cach
+	 *						 if false and cached discovery found, return the lib cache (not same as previously mentioned cache)
 	 * @param callback callback to be invoked about discovered services and characteristics, or error
 	 */
 	public void discoverServices(String address, boolean forceDiscover, IDataCallback callback) {
@@ -1483,7 +1483,7 @@ public class BleCore extends Logging {
 	 *
 	 * @param gatt the bluetooth gatt server of the device
 	 */
-	private void refreshDeviceCache(final BluetoothGatt gatt) {
+	private boolean refreshDeviceCache(final BluetoothGatt gatt) {
 		getLogger().LOGd(TAG, "refreshDeviceCache");
 		/*
 		 * If the device is bonded this is up to the Service Changed characteristic to notify Android that the services has changed.
@@ -1496,17 +1496,64 @@ public class BleCore extends Logging {
 			/*
 			 * There is a refresh() method in BluetoothGatt class but for now it's hidden. We will call it using reflections.
 			 */
+		boolean success = false;
 		try {
 			final Method refresh = gatt.getClass().getMethod("refresh");
 			if (refresh != null) {
-				final boolean success = (Boolean) refresh.invoke(gatt);
+				success = (Boolean) refresh.invoke(gatt);
 				getLogger().LOGd(TAG, "Refreshing result: " + success);
 			}
 		} catch (Exception e) {
 			getLogger().LOGe(TAG, "An exception occurred while refreshing device", e);
 			getLogger().LOGe(TAG, "Refreshing failed");
+			return false;
 		}
 //		}
+		return success;
+	}
+
+	/**
+	 * Refresh the cache of discovered services and characteristics of a connected device
+	 *
+	 * @param address the MAC address of the device
+	 * @param callback the callback to be informed about success or failure
+	 */
+	public boolean refreshDeviceCache(String address, IStatusCallback callback) {
+
+		getLogger().LOGd(TAG, "refreshing device cache ...");
+
+		if (!isInitialized()) {
+			getLogger().LOGe(TAG, ".. not initialized");
+			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
+			return false;
+		}
+
+		Connection connection = _connections.get(address);
+		if (connection == null) {
+			getLogger().LOGe(TAG, ".. never connected");
+			callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
+			return false;
+		}
+
+		if (connection.getConnectionState() != ConnectionState.CONNECTED) {
+			getLogger().LOGe(TAG, ".. not connected?");
+			callback.onError(BleErrors.ERROR_NOT_CONNECTED);
+			return false;
+		}
+
+		BluetoothGatt gatt = connection.getGatt();
+
+		if (gatt == null) {
+			getLogger().LOGe(TAG, "gatt == null");
+			return false;
+		}
+		boolean success = refreshDeviceCache(gatt);
+		if (!success) {
+			callback.onError(BleErrors.ERROR_REFRESH_FAILED);
+			return false;
+		}
+		callback.onSuccess();
+		return true;
 	}
 
 	/**

@@ -522,13 +522,15 @@ public class BleBase extends BleCore {
 	 * Note: if you get wrong services and characteristics returned, try to clear the cache by calling
 	 * closeDevice with parameter clearCache set to true. this makes sure that next discover will really
 	 * read the services and characteristics from the device and not the cache
- 	 * @param address the MAC address of the device
+	 * @param address the MAC address of the device
+	 * @param forceDiscover, set to true to force a new discovery,
+	 *						 if false and cached discovery found, return the lib cache (not same as previously mentioned cache)
 	 * @param callback the callback used to report discovered services and characteristics
 	 */
-	public void discoverServices(String address, final IDiscoveryCallback callback) {
+	public void discoverServices(String address, boolean forceDiscover, final IDiscoveryCallback callback) {
 		_setupMode = false;
 
-		super.discoverServices(address, new IDataCallback() {
+		super.discoverServices(address, forceDiscover, new IDataCallback() {
 			@Override
 			public void onData(JSONObject json) {
 				try {
@@ -562,6 +564,23 @@ public class BleBase extends BleCore {
 				callback.onError(error);
 			}
 		});
+	}
+
+	/**
+	 * Discover the available services and characteristics of the device. Parse the received
+	 * JSON object and call the callbacks onDiscovery function with service UUID and characteristic
+	 * UUID for each discovered characteristic. Once the discovery completes, the onSuccess is
+	 * called or the onError if an error occurs
+	 *
+	 * Note: if you get wrong services and characteristics returned, try to clear the cache by calling
+	 * closeDevice with parameter clearCache set to true. this makes sure that next discover will really
+	 * read the services and characteristics from the device and not the cache
+ 	 * @param address the MAC address of the device
+	 * @param callback the callback used to report discovered services and characteristics
+	 */
+	public void discoverServices(String address, final IDiscoveryCallback callback) {
+		// by default, return cached discovery if present, otherwise start new discovery
+		discoverServices(address, false, callback);
 	}
 
 	/**
