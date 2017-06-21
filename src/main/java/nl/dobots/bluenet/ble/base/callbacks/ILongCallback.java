@@ -1,9 +1,7 @@
 package nl.dobots.bluenet.ble.base.callbacks;
 
-import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
-
 /**
- * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
+ * Copyright (c) 2017 Bart van Vliet <bart@dobots.nl>. All rights reserved.
  * <p/>
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 3, as
@@ -15,15 +13,14 @@ import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
  * version 3 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  * <p/>
- * Created on 28-7-15
+ * Created on 21-6-2017
  *
- * Status callback used for connectAndExecute calls. will call the onSuccess depending on the
- * function that is executed
+ * Return a long result on success
  *
- * @author Dominik Egger
+ * @author Bart van Vliet
  */
-public interface IExecStatusCallback extends IBaseCallback, IStatusCallback, IIntegerCallback, ILongCallback, IBooleanCallback, IByteArrayCallback {
+public interface ILongCallback extends IBaseCallback {
 
-	void onExecuteSuccess(boolean disconnect);
+	void onSuccess(long result);
 
 }

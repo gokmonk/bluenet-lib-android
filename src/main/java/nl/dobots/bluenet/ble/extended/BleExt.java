@@ -1333,6 +1333,12 @@ public class BleExt extends Logging implements IWriteCallback {
 			}
 
 			@Override
+			public void onSuccess(long value) {
+				callback.onSuccess(value);
+				onExecuteSuccess(true);
+			}
+
+			@Override
 			public void onSuccess(byte[] result) {
 				callback.onSuccess(result);
 				onExecuteSuccess(true);

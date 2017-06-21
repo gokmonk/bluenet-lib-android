@@ -4,6 +4,7 @@ import java.nio.charset.Charset;
 
 import nl.dobots.bluenet.ble.base.callbacks.IConfigurationCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
+import nl.dobots.bluenet.ble.base.callbacks.ILongCallback;
 import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.structs.ConfigurationMsg;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
@@ -1285,7 +1286,7 @@ public class BleConfiguration {
 	 * @param address the MAC address of the device
 	 * @param callback the callback which will get the value on success, or an error otherwise
 	 */
-	public void getPwmPeriod(String address, final IIntegerCallback callback) {
+	public void getPwmPeriod(String address, final ILongCallback callback) {
 		_bleBase.getConfiguration(address, BluenetConfig.CONFIG_PWM_PERIOD, new IConfigurationCallback() {
 			@Override
 			public void onSuccess(ConfigurationMsg configuration) {
@@ -1293,7 +1294,7 @@ public class BleConfiguration {
 					_bleBase.getLogger().LOGe(TAG, "Wrong length parameter: %d", configuration.getLength());
 					onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
 				} else {
-					int pwmPeriod = configuration.getIntValue();
+					long pwmPeriod = BleUtils.toUint32(configuration.getIntValue());
 					_bleBase.getLogger().LOGd(TAG, "pwm period: %d", pwmPeriod);
 					callback.onSuccess(pwmPeriod);
 				}
@@ -1311,7 +1312,7 @@ public class BleConfiguration {
 	/**
 	 * Write the relay high duration to the configuration
 	 * @param address the MAC address of the device
-	 * @param value new relay high duration in ms (uint 16)
+	 * @param value new relay high duration in ms (uint_16)
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void setRelayHighDuration(String address, int value, final IStatusCallback callback) {
