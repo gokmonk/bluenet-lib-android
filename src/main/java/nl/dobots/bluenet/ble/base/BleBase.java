@@ -187,6 +187,9 @@ public class BleBase extends BleCore {
 				getLogger().LOGi(TAG, "Use setup encryption key");
 				encryptionKeys = new SetupEncryptionKey(_setupEncryptionKey);
 			}
+			if (encryptionKeys == null) {
+				return false;
+			}
 
 			// Just use highest available key
 			EncryptionKeys.KeyAccessLevelPair keyAccessLevelPair = encryptionKeys.getHighestKey();
@@ -1868,11 +1871,16 @@ public class BleBase extends BleCore {
 		});
 	}
 
-	private void sendCommand(String address, ControlMsg command, String serviceUuid, String characteristicUuid,
+//	private void sendCommand(String address, ControlMsg command, String serviceUuid, String characteristicUuid,
+//							 final IStatusCallback callback) {
+//		sendCommand(address, command, serviceUuid, characteristicUuid, BleBaseEncryption.ACCESS_LEVEL_HIGHEST_AVAILABLE, callback);
+//	}
+
+	private void sendCommand(String address, ControlMsg command, String serviceUuid, String characteristicUuid, char accessLevel,
 							 final IStatusCallback callback) {
 		byte[] bytes = command.toArray();
 		getLogger().LOGd(TAG, "control command: write %s at service %s and characteristic %s", BleUtils.bytesToString(bytes), BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONTROL_UUID);
-		write(address, serviceUuid, characteristicUuid, bytes,
+		write(address, serviceUuid, characteristicUuid, bytes, accessLevel,
 				new IStatusCallback() {
 
 					@Override
@@ -1908,10 +1916,24 @@ public class BleBase extends BleCore {
 	 * @param callback callback function to be called on success or error
 	 */
 	public void sendCommand(String address, ControlMsg command, final IStatusCallback callback) {
+		sendCommand(address, command, BleBaseEncryption.ACCESS_LEVEL_HIGHEST_AVAILABLE, callback);
+	}
+
+	/**
+	 * Send the give command to the control characteristic. the device then executes the command defined
+	 * by the command parameter
+	 * Note: this function selects the appropriate characteristic/service automatically depending
+	 * on whether the Crownstone is in Setup or Normal operation mode
+	 * @param address the address of the device
+	 * @param command command to be executed on the device
+	 * @param accessLevel access level to use (see BleBaseEncryption)
+	 * @param callback callback function to be called on success or error
+	 */
+	public void sendCommand(String address, ControlMsg command, char accessLevel, final IStatusCallback callback) {
 		if (_setupMode) {
-			sendCommand(address, command, BluenetConfig.SETUP_SERVICE_UUID, BluenetConfig.CHAR_SETUP_CONTROL_UUID, callback);
+			sendCommand(address, command, BluenetConfig.SETUP_SERVICE_UUID, BluenetConfig.CHAR_SETUP_CONTROL_UUID, accessLevel, callback);
 		} else {
-			sendCommand(address, command, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONTROL_UUID, callback);
+			sendCommand(address, command, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONTROL_UUID, accessLevel, callback);
 		}
 	}
 
