@@ -815,7 +815,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	 * @param readSessionNonce true to read the session nonce after discovery
 	 */
 	public void discoverServices(final IDiscoveryCallback callback, final boolean readSessionNonce) {
-		discoverServices(callback, true, false);
+		discoverServices(callback, readSessionNonce, false);
 	}
 
 	/**
@@ -916,6 +916,57 @@ public class BleExt extends Logging implements IWriteCallback {
 		// todo: might have to store both service and characteristic uuid, because the characteristic
 		//       UUID is not unique!
 		_detectedCharacteristics.add(characteristicUuid);
+	}
+
+	/**
+	 * Function to refresh the device cache and force discover services. Must already be connected.
+	 *
+	 * @param callback called when successful or failed
+	 */
+	public void refreshServices(final IStatusCallback callback) {
+		refreshServices(true, callback);
+	}
+
+	/**
+	 * Function to refresh the device cache and force discover services. Must already be connected.
+	 *
+	 * @param readSessionNonce true to read the session nonce after discovery
+	 * @param callback called when successful or failed
+	 */
+	public void refreshServices(final boolean readSessionNonce, final IStatusCallback callback) {
+		getLogger().LOGi(TAG, "Refresh services");
+		if (!isConnected(callback)) {
+			return;
+		}
+		_bleBase.refreshDeviceCache(_targetAddress, new IStatusCallback() {
+			@Override
+			public void onSuccess() {
+				getLogger().LOGd(TAG, "Refreshed device cache. Discover services..");
+				discoverServices(new IDiscoveryCallback() {
+					@Override
+					public void onDiscovery(String serviceUuid, String characteristicUuid) {
+
+					}
+
+					@Override
+					public void onSuccess() {
+						getLogger().LOGd(TAG, "Discovered services.");
+						callback.onSuccess();
+					}
+
+					@Override
+					public void onError(int error) {
+						getLogger().LOGd(TAG, "Failed to discover services");
+						callback.onError(error);
+					}
+				}, readSessionNonce, true);
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
 	}
 
 	/**
@@ -1328,6 +1379,7 @@ public class BleExt extends Logging implements IWriteCallback {
 
 		final boolean resumeDelayedDisconnect[] = new boolean[]{clearDelayedDisconnect()};
 		final boolean executeSuccess[] = new boolean[]{false};
+		final boolean executeFailed[] = new boolean[]{false};
 
 		// TODO: if function.execute was successful ignore the connect errors. Need a class variable for that.
 
@@ -1371,9 +1423,11 @@ public class BleExt extends Logging implements IWriteCallback {
 					delayedDisconnect(null);
 				}
 				if (error == BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND) {
+					executeFailed[0] = true;
 					callback.onError(error);
 				} else {
 					if (!retry(error)) {
+						executeFailed[0] = true;
 						callback.onError(error);
 					} else {
 						connectAndExecute(address, function, callback, readSessionNonce);
@@ -1404,7 +1458,7 @@ public class BleExt extends Logging implements IWriteCallback {
 					disconnectAndClose(true, new IStatusCallback() {
 
 						private void done() {
-							if (!executeSuccess[0]) {
+							if (!executeSuccess[0] && !executeFailed[0]) { // Callback was already called!
 								if (!retry(error)) {
 									callback.onError(error);
 								} else {
@@ -2345,6 +2399,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	 * @param callback the callback which will be informed about success or failure
 	 */
 	public void resetToBootloader(final IStatusCallback callback) {
+		getLogger().LOGi(TAG, "Reset to bootloader");
 
 		final IStatusCallback resetCallback = new IStatusCallback() {
 			@Override
@@ -2369,59 +2424,37 @@ public class BleExt extends Logging implements IWriteCallback {
 			}
 		};
 
-		if (isConnected(callback)) {
-			getLogger().LOGd(TAG, "Reset to bootloader");
-			_bleBase.refreshDeviceCache(_targetAddress, new IStatusCallback() {
-				@Override
-				public void onSuccess() {
-					getLogger().LOGd(TAG, "Refreshed device cache. Discover service..");
-					discoverServices(new IDiscoveryCallback() {
-						@Override
-						public void onDiscovery(String serviceUuid, String characteristicUuid) {
-
-						}
-
-						@Override
-						public void onSuccess() {
-							getLogger().LOGd(TAG, "Discovered services.");
-							if (hasCharacteristic(BluenetConfig.DFU_CONTROL_UUID, null)) {
-								getLogger().LOGd(TAG, "Already in bootloader!");
-								callback.onSuccess(); // Don't disconnect
-//								resetCallback.onSuccess();
-								return;
-							}
-							// First try to use the general service
-							if (hasCharacteristic(BluenetConfig.CHAR_RESET_UUID, null)) {
-								_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, resetCallback);
-							}
-							// Then try to use the setup reset characteristic
-							else if (isSetupMode() && hasCharacteristic(BluenetConfig.CHAR_SETUP_GOTO_DFU_UUID, null)) {
-								_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, resetCallback);
-							}
-							// Else try to use the control characteristic
-							else if (hasControlCharacteristic(null, true)) {
-								_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_GOTO_DFU), resetCallback);
-							}
-							else {
-								callback.onError(BleErrors.ERROR_SERVICE_NOT_FOUND);
-							}
-						}
-
-						@Override
-						public void onError(int error) {
-							getLogger().LOGd(TAG, "Failed to discover services");
-							callback.onError(error);
-						}
-					}, true, true);
+		refreshServices(true, new IStatusCallback() {
+			@Override
+			public void onSuccess() {
+				if (hasCharacteristic(BluenetConfig.DFU_CONTROL_UUID, null)) {
+					getLogger().LOGd(TAG, "Already in bootloader!");
+					callback.onSuccess(); // Don't disconnect
+//					resetCallback.onSuccess();
+					return;
 				}
-
-				@Override
-				public void onError(int error) {
-					getLogger().LOGd(TAG, "Failed to refresh device cache");
-					callback.onError(error);
+				// First try to use the general service
+				if (hasCharacteristic(BluenetConfig.CHAR_RESET_UUID, null)) {
+					_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, resetCallback);
 				}
-			});
-		}
+				// Then try to use the setup reset characteristic
+				else if (isSetupMode() && hasCharacteristic(BluenetConfig.CHAR_SETUP_GOTO_DFU_UUID, null)) {
+					_bleBase.writeReset(_targetAddress, BluenetConfig.RESET_DFU, resetCallback);
+				}
+				// Else try to use the control characteristic
+				else if (hasControlCharacteristic(null, true)) {
+					_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_GOTO_DFU), resetCallback);
+				}
+				else {
+					callback.onError(BleErrors.ERROR_SERVICE_NOT_FOUND);
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
 	}
 
 	/**
@@ -2437,7 +2470,7 @@ public class BleExt extends Logging implements IWriteCallback {
 		getHandler().post(new Runnable() {
 			@Override
 			public void run() {
-				getLogger().LOGd(TAG, "Reset to bootloader");
+				getLogger().LOGi(TAG, "Reset to bootloader " + address);
 				connectAndExecute(address, new IExecuteCallback() {
 					@Override
 					public void execute(final IExecStatusCallback execCallback) {
@@ -2447,6 +2480,108 @@ public class BleExt extends Logging implements IWriteCallback {
 			}
 		});
 	}
+
+
+	/**
+	 * Reset the device when in dfu mode (bootloader). Must be already connected!
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void resetBootloader(final IStatusCallback callback) {
+		getLogger().LOGi(TAG, "Reset bootloader");
+
+		// Refresh services in case the cache is wrong.
+		// Don't read session nonce: bootloader doesn't have that.
+		refreshServices(false, new IStatusCallback() {
+
+			// When done: clear cache, as the services will probably change.
+			private void done() {
+				disconnectAndClose(true, new IStatusCallback() {
+					@Override
+					public void onSuccess() {
+						callback.onSuccess();
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onSuccess();
+					}
+				});
+			}
+
+			@Override
+			public void onSuccess() {
+				if (!hasCharacteristic(BluenetConfig.DFU_CONTROL_UUID, callback)) {
+					return;
+				}
+
+				_bleBase.subscribe(_targetAddress, BluenetConfig.DFU_SERVICE_UUID, BluenetConfig.DFU_CONTROL_UUID,
+						new IIntegerCallback() {
+							@Override
+							public void onSuccess(int result) {
+								BleLog.getInstance().LOGi(TAG, "Subscribed to dfu control: " + result);
+								byte[] val = new byte[1];
+								val[0] = 0x06;
+								_bleBase.write(_targetAddress, BluenetConfig.DFU_SERVICE_UUID, BluenetConfig.DFU_CONTROL_UUID, val, BleBaseEncryption.ACCESS_LEVEL_ENCRYPTION_DISABLED, new IStatusCallback() {
+									@Override
+									public void onSuccess() {
+										done();
+									}
+
+									@Override
+									public void onError(int error) {
+										// Treat as if it was a success..
+										done();
+									}
+								});
+							}
+
+							@Override
+							public void onError(int error) {
+								BleLog.getInstance().LOGi(TAG, "error: " + error);
+								callback.onError(error);
+							}
+						},
+						new IDataCallback() {
+							@Override
+							public void onData(JSONObject json) {
+								BleLog.getInstance().LOGd(TAG, "onData: " + json);
+							}
+
+							@Override
+							public void onError(int error) {
+								BleLog.getInstance().LOGd(TAG, "onError datacallback: " + error);
+							}
+						});
+			}
+
+			@Override
+			public void onError(int error) {
+				BleLog.getInstance().LOGi(TAG, "error: " + error);
+				callback.onError(error);
+			}
+		});
+	}
+
+	/**
+	 * Reset the device when in dfu mode (bootloader)
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void resetBootloader(final String address, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGi(TAG, "Reset bootloader " + address);
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						resetBootloader(execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback), false); // Don't read session nonce: bootloader doesn't have that
+			}
+		});
+	}
+
+
 
 
 	private void recoverReadWrite(final IStatusCallback callback) {
