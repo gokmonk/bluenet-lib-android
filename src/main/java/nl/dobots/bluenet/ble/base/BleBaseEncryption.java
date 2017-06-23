@@ -47,7 +47,6 @@ public class BleBaseEncryption {
 	public static final char ACCESS_LEVEL_GUEST =               2;
 	public static final char ACCESS_LEVEL_SETUP =               100;
 	public static final char ACCESS_LEVEL_NOT_SET =             201;
-	@Deprecated
 	public static final char ACCESS_LEVEL_HIGHEST_AVAILABLE =   202;
 	public static final char ACCESS_LEVEL_ENCRYPTION_DISABLED = 255;
 
