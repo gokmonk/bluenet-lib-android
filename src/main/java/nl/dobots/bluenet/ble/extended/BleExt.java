@@ -3354,6 +3354,29 @@ public class BleExt extends Logging implements IWriteCallback {
 		});
 	}
 
+	public void writeSetTime(long timeStamp, final IStatusCallback callback) {
+		if (isConnected(callback)) {
+			getLogger().LOGd(TAG, "writeSetTime: " + timeStamp);
+			_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_SET_TIME, 4, BleUtils.uint32ToByteArray(timeStamp)), callback);
+		}
+	}
+
+	public void writeSetTime(final String address, final long timeStamp, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "Writing time ...");
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						writeSetTime(timeStamp, execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
+
 	public void readFirmwareRevision(final IByteArrayCallback callback) {
 		if (isConnected(callback)) {
 			getLogger().LOGd(TAG, "readFirmwareRevision");

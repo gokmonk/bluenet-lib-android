@@ -124,10 +124,10 @@ public class BleUtils {
 
 	public static byte[] uint32ToByteArray(long num) {
 		byte[] bytes = new byte[4];
-		bytes[3] = (byte) (num & 0xFF000000L);
-		bytes[2] = (byte) (num & 0x00FF0000L);
-		bytes[1] = (byte) (num & 0x0000FF00L);
-		bytes[0] = (byte) (num & 0x000000FFL);
+		bytes[0] = (byte) ((num >> 0) & 0xFF);
+		bytes[1] = (byte) ((num >> 8) & 0xFF);
+		bytes[2] = (byte) ((num >> 16) & 0xFF);
+		bytes[3] = (byte) ((num >> 24) & 0xFF);
 		return bytes;
 	}
 

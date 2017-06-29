@@ -244,6 +244,33 @@ public class BleBaseState {
 		});
 	}
 
+	private void parseTime(StateMsg state, IIntegerCallback callback) {
+		if (state.getType() == BluenetConfig.STATE_TIME) {
+			if (state.getLength() != 4) {
+				getLogger().LOGe(TAG, "Wrong length parameter: %d", state.getLength());
+				callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+			} else {
+				int timeStamp = state.getIntValue();
+				getLogger().LOGd(TAG, "time: %s", timeStamp);
+				callback.onSuccess(timeStamp);
+			}
+		}
+	}
+
+	public void getTime(String address, final IIntegerCallback callback) {
+		_bleBase.getState(address, BluenetConfig.STATE_TIME, new IStateCallback() {
+			@Override
+			public void onSuccess(StateMsg state) {
+				parseTime(state, callback);
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
+
 	public void getErrorStateNotifications(String address, final IIntegerCallback statusCallback,
 	                                        final IIntegerCallback callback) {
 		_bleBase.getStateNotifications(address, BluenetConfig.STATE_ERRORS, statusCallback,

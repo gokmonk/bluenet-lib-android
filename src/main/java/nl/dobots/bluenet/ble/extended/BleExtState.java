@@ -172,6 +172,33 @@ public class BleExtState {
 		});
 	}
 
+	public void getTime(final IIntegerCallback callback) {
+		_bleExt.getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				if (_bleExt.isConnected(callback) && _bleExt.hasStateCharacteristics(callback)) {
+					getLogger().LOGd(TAG, "getTime");
+					_bleBaseState.getTime(_bleExt.getTargetAddress(), callback);
+				}
+			}
+		});
+	}
+
+	public void getTime(final String address, final IIntegerCallback callback) {
+		_bleExt.getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGv(TAG, "Get time ...");
+				_bleExt.connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						getTime(execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// Notifications
 	////////////////////////////////////////////////////////////////////////////////////////////////
