@@ -291,9 +291,6 @@ public class BleCore extends Logging {
 					case BluetoothAdapter.STATE_ON: {
 						_bluetoothReady = true;
 
-						// if bluetooth is turned on inform state callback about the change
-						sendEvent(BleCoreTypes.EVT_BLUETOOTH_ON);
-
 						if (Build.VERSION.SDK_INT >= 21) {
 							_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
 							_scanSettings = new ScanSettings.Builder()
@@ -301,6 +298,9 @@ public class BleCore extends Logging {
 									.build();
 							_scanFilters = new ArrayList<>();
 						}
+
+						// if bluetooth is turned on inform state callback about the change
+						sendEvent(BleCoreTypes.EVT_BLUETOOTH_ON);
 
 						// if bluetooth state turns on because of a reset, then reset was completed
 						if (_resettingBle) {
@@ -1152,6 +1152,12 @@ public class BleCore extends Logging {
 			return;
 		}
 
+		if (_bluetoothAdapter.getState() != BluetoothAdapter.STATE_ON) {
+			getLogger().LOGe(TAG, "startEndlessScan ... error: ble not on");
+			callback.onError(BleErrors.ERROR_BLUETOOTH_NOT_ENABLED);
+			return;
+		}
+
 		if (Build.VERSION.SDK_INT >= 23) {
 			if (!isLocationServicesEnabled()) {
 				getLogger().LOGe(TAG, "startEndlessScan ... error: location services disabled");
@@ -1186,6 +1192,11 @@ public class BleCore extends Logging {
 				}
 			}
 			getLogger().LOGd(TAG, "BluetoothLeScanner.startScan");
+			if (_leScanner == null) {
+				getLogger().LOGw(TAG, "startEndlessScan ... error: scanner is not initialized");
+				callback.onError(BleErrors.ERROR_SCAN_FAILED);
+				return;
+			}
 			_leScanner.startScan(_scanFilters, _scanSettings, _coreScanCallback);
 		} else {
 			getLogger().LOGd(TAG, "BluetoothAdapter.startLeScan");
@@ -1254,6 +1265,13 @@ public class BleCore extends Logging {
 		}
 
 		if (!_bluetoothAdapter.isEnabled()) {
+			getLogger().LOGe(TAG, "stopEndlessScan ... error: ble disabled");
+			if (callback != null) callback.onError(BleErrors.ERROR_BLUETOOTH_NOT_ENABLED);
+			return;
+		}
+
+		if (_bluetoothAdapter.getState() != BluetoothAdapter.STATE_ON) {
+			getLogger().LOGe(TAG, "stopEndlessScan ... error: ble not on");
 			if (callback != null) callback.onError(BleErrors.ERROR_BLUETOOTH_NOT_ENABLED);
 			return;
 		}
