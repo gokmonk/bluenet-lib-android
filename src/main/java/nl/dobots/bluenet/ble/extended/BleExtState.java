@@ -172,6 +172,27 @@ public class BleExtState {
 		});
 	}
 
+
+	public static int setStateErrorBit(char bitPos, int errorBitmask) {
+        return errorBitmask | (1 << bitPos);
+    }
+	public static boolean isStateError(char bitPos, int errorBitmask) {
+		return ((errorBitmask & (1L << bitPos)) != 0);
+	}
+	public static boolean isErrorOvercurrent(int errorBitmask) {
+		return isStateError(BluenetConfig.STATE_ERROR_POS_OVERCURRENT, errorBitmask);
+	}
+	public static boolean isErrorOvercurrentDimmer(int errorBitmask) {
+		return isStateError(BluenetConfig.STATE_ERROR_POS_OVERCURRENT_DIMMER, errorBitmask);
+	}
+	public static boolean isErrorChipTemperature(int errorBitmask) {
+		return isStateError(BluenetConfig.STATE_ERROR_POS_TEMP_CHIP, errorBitmask);
+	}
+	public static boolean isErrorDimmberTemperature(int errorBitmask) {
+		return isStateError(BluenetConfig.STATE_ERROR_POS_TEMP_DIMMER, errorBitmask);
+	}
+
+
 	public void getTime(final IIntegerCallback callback) {
 		_bleExt.getHandler().post(new Runnable() {
 			@Override

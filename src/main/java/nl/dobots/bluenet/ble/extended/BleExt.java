@@ -3328,18 +3328,21 @@ public class BleExt extends Logging implements IWriteCallback {
 		});
 	}
 
-	public void writeResetStateErrors(final IStatusCallback callback) {
+	public void writeResetStateErrors(int stateErrorsBitmask, final IStatusCallback callback) {
 		if (isConnected(callback)) {
-			getLogger().LOGd(TAG, "write reset state errors");
+			getLogger().LOGi(TAG, "write reset state errors: " + Integer.toBinaryString(stateErrorsBitmask));
 			ByteBuffer bb = ByteBuffer.allocate(4);
 			bb.order(ByteOrder.LITTLE_ENDIAN);
-			int resetErrorBitmask = 0xFFFFFFFF;
-			bb.putInt(resetErrorBitmask);
+			bb.putInt(stateErrorsBitmask);
 			_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_RESET_STATE_ERRORS, 4, bb.array()), callback);
 		}
 	}
 
 	public void writeResetStateErrors(final String address, final IStatusCallback callback) {
+		writeResetStateErrors(address, 0xFFFFFFFF, callback);
+	}
+
+	public void writeResetStateErrors(final String address, final int stateErrorsBitmask, final IStatusCallback callback) {
 		getHandler().post(new Runnable() {
 			@Override
 			public void run() {
@@ -3347,7 +3350,7 @@ public class BleExt extends Logging implements IWriteCallback {
 				connectAndExecute(address, new IExecuteCallback() {
 					@Override
 					public void execute(final IExecStatusCallback execCallback) {
-						writeResetStateErrors(execCallback);
+						writeResetStateErrors(stateErrorsBitmask, execCallback);
 					}
 				}, new SimpleExecStatusCallback(callback));
 			}
