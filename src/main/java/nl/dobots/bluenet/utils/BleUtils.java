@@ -96,6 +96,23 @@ public class BleUtils {
 		return bb.getShort(offset);
 	}
 
+	public static float byteArrayToFloat(byte[] bytes) {
+		return byteArrayToFloat(bytes, 0);
+	}
+
+	public static float byteArrayToFloat(byte[] bytes, int offset) {
+		ByteBuffer bb = ByteBuffer.wrap(bytes);
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+		return bb.getFloat(offset);
+	}
+
+	public static byte[] intToByteArray(int val) {
+		ByteBuffer bb = ByteBuffer.allocate(4);
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+		bb.putInt(val);
+		return bb.array();
+	}
+
 	public static byte[] shortToByteArray(int value) {
 		ByteBuffer bb = ByteBuffer.allocate(2);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
@@ -103,10 +120,10 @@ public class BleUtils {
 		return bb.array();
 	}
 
-	public static byte[] intToByteArray(int val) {
+	public static byte[] floatToByteArray(float value) {
 		ByteBuffer bb = ByteBuffer.allocate(4);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
-		bb.putInt(val);
+		bb.putFloat(value);
 		return bb.array();
 	}
 

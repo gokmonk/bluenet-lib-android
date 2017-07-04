@@ -240,6 +240,10 @@ public class StreamMsg {
 		return BleUtils.byteArrayToInt(getPayload());
 	}
 
+	public float getFloatValue() {
+		return BleUtils.byteArrayToFloat(getPayload());
+	}
+
 //	public Integer getValue() {
 //		switch (getLength()) {
 //			case 1:

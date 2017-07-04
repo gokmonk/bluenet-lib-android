@@ -27,16 +27,25 @@ public class SimpleExecStatusCallback implements IExecStatusCallback {
 
 	private static final String TAG = SimpleExecStatusCallback.class.getCanonicalName();
 
+	private IStatusCallback    _statusCallback;
+	private IByteArrayCallback _byteArrayCallback;
+	private IBooleanCallback   _booleanCallback;
 	private IIntegerCallback   _integerCallback;
 	private ILongCallback      _longCallback;
-	private IStatusCallback    _statusCallback;
-	private IBooleanCallback   _booleanCallback;
-	private IByteArrayCallback _byteArrayCallback;
+	private IFloatCallback     _floatCallback;
 
 	public SimpleExecStatusCallback() {}
 
 	public SimpleExecStatusCallback(IStatusCallback statusCallback) {
 		_statusCallback = statusCallback;
+	}
+
+	public SimpleExecStatusCallback(IByteArrayCallback byteArrayCallback) {
+		_byteArrayCallback = byteArrayCallback;
+	}
+
+	public SimpleExecStatusCallback(IBooleanCallback booleanCallback) {
+		_booleanCallback = booleanCallback;
 	}
 
 	public SimpleExecStatusCallback(IIntegerCallback integerCallback) {
@@ -47,18 +56,32 @@ public class SimpleExecStatusCallback implements IExecStatusCallback {
 		_longCallback = longCallback;
 	}
 
-	public SimpleExecStatusCallback(IBooleanCallback booleanCallback) {
-		_booleanCallback = booleanCallback;
+	public SimpleExecStatusCallback(IFloatCallback floatCallback) {
+		_floatCallback = floatCallback;
 	}
 
-	public SimpleExecStatusCallback(IByteArrayCallback byteArrayCallback) {
-		_byteArrayCallback = byteArrayCallback;
+	@Override
+	public void onSuccess() {
+		if (_statusCallback != null) {
+			_statusCallback.onSuccess();
+		} else {
+			BleLog.getInstance().LOGw(TAG, "Stub, Wrong usage?!");
+		}
 	}
 
 	@Override
 	public void onSuccess(byte[] result) {
 		if (_byteArrayCallback != null) {
 			_byteArrayCallback.onSuccess(result);
+		} else {
+			BleLog.getInstance().LOGw(TAG, "Stub, Wrong usage?!");
+		}
+	}
+
+	@Override
+	public void onSuccess(boolean value) {
+		if (_booleanCallback != null) {
+			_booleanCallback.onSuccess(value);
 		} else {
 			BleLog.getInstance().LOGw(TAG, "Stub, Wrong usage?!");
 		}
@@ -83,31 +106,29 @@ public class SimpleExecStatusCallback implements IExecStatusCallback {
 	}
 
 	@Override
-	public void onSuccess(boolean value) {
-		if (_booleanCallback != null) {
-			_booleanCallback.onSuccess(value);
+	public void onSuccess(float result) {
+		if (_floatCallback != null) {
+			_floatCallback.onSuccess(result);
 		} else {
 			BleLog.getInstance().LOGw(TAG, "Stub, Wrong usage?!");
 		}
 	}
 
-	@Override
-	public void onSuccess() {
-		if (_statusCallback != null) {
-			_statusCallback.onSuccess();
-		} else {
-			BleLog.getInstance().LOGw(TAG, "Stub, Wrong usage?!");
-		}
-	}
 
 	@Override
 	public void onError(int error) {
-		if (_integerCallback != null) {
-			_integerCallback.onError(error);
-		} else if (_statusCallback != null) {
+		if (_statusCallback != null) {
 			_statusCallback.onError(error);
+		} else if (_byteArrayCallback != null) {
+			_byteArrayCallback.onError(error);
 		} else if (_booleanCallback != null) {
 			_booleanCallback.onError(error);
+		} else if (_integerCallback != null) {
+			_integerCallback.onError(error);
+		} else if (_longCallback != null) {
+			_longCallback.onError(error);
+		} else if (_floatCallback != null) {
+			_floatCallback.onError(error);
 		} else {
 			BleLog.getInstance().LOGw(TAG, "Stub, Wrong usage?!");
 		}

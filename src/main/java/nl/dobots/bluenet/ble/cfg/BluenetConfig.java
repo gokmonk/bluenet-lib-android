@@ -194,6 +194,11 @@ public class BluenetConfig {
 	public static final char CONFIG_POWER_ZERO =                        47;   //! 0x2F
 	public static final char CONFIG_POWER_AVG_WINDOW =                  48;   //! 0x30
 	public static final char CONFIG_MESH_ACCESS_ADDRESS =               49;   //! 0x31
+	public static final char CONFIG_CURRENT_THRESHOLD =                 50;   //! 0x32
+	public static final char CONFIG_CURRENT_THRESHOLD_DIMMER =          51;   //! 0x33
+	public static final char CONFIG_DIMMER_TEMP_UP =                    52;   //! 0x34
+	public static final char CONFIG_DIMMER_TEMP_DOWN =                  53;   //! 0x35
+
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
