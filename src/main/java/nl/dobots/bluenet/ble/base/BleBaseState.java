@@ -2,6 +2,7 @@ package nl.dobots.bluenet.ble.base;
 
 import android.util.Log;
 
+import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
 import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
@@ -9,6 +10,7 @@ import nl.dobots.bluenet.ble.base.structs.StateMsg;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.utils.BleLog;
+import nl.dobots.bluenet.utils.BleUtils;
 
 /**
  * Copyright (c) 2016 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -244,6 +246,22 @@ public class BleBaseState {
 		});
 	}
 
+	public void getErrorStateNotifications(String address, final IIntegerCallback statusCallback,
+	                                       final IIntegerCallback callback) {
+		_bleBase.getStateNotifications(address, BluenetConfig.STATE_ERRORS, statusCallback,
+				new IStateCallback() {
+					@Override
+					public void onSuccess(StateMsg state) {
+						parseErrorState(state, callback);
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				});
+	}
+
 	private void parseTime(StateMsg state, IIntegerCallback callback) {
 		if (state.getType() == BluenetConfig.STATE_TIME) {
 			if (state.getLength() != 4) {
@@ -271,20 +289,30 @@ public class BleBaseState {
 		});
 	}
 
-	public void getErrorStateNotifications(String address, final IIntegerCallback statusCallback,
-	                                        final IIntegerCallback callback) {
-		_bleBase.getStateNotifications(address, BluenetConfig.STATE_ERRORS, statusCallback,
-				new IStateCallback() {
-					@Override
-					public void onSuccess(StateMsg state) {
-						parseErrorState(state, callback);
-					}
+	public void parseSchedule(StateMsg state, IByteArrayCallback callback) {
+		if (state.getType() == BluenetConfig.STATE_SCHEDULE) {
+			byte[] bytes = state.getPayload();
+			getLogger().LOGd(TAG, "schedule: " + BleUtils.bytesToString(bytes));
+			callback.onSuccess(bytes);
+		}
+		else {
+			getLogger().LOGw(TAG, "invalid state type: " + state.getType());
+			callback.onError(BleErrors.ERROR_WRONG_PAYLOAD_TYPE);
+		}
+	}
 
-					@Override
-					public void onError(int error) {
-						callback.onError(error);
-					}
-				});
+	public void getSchedule(String address, final IByteArrayCallback callback) {
+		_bleBase.getState(address, BluenetConfig.STATE_SCHEDULE, new IStateCallback() {
+			@Override
+			public void onSuccess(StateMsg state) {
+				parseSchedule(state, callback);
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
 	}
 
 	private BleLog getLogger() {

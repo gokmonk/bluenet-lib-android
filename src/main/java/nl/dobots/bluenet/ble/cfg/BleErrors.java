@@ -56,6 +56,7 @@ public class BleErrors {
 	public static final int ERROR_WRONG_PAYLOAD_SIZE = 244;
 	public static final int ERROR_MSG_PARSING = 245;
 	public static final int ERROR_REFRESH_FAILED = 246;
+	public static final int ERROR_WRONG_PAYLOAD_TYPE = 247;
 
 
 	// BleBase

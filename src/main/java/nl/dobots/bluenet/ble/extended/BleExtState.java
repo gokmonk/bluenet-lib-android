@@ -8,6 +8,7 @@ import java.util.HashMap;
 
 import nl.dobots.bluenet.ble.base.BleBase;
 import nl.dobots.bluenet.ble.base.BleBaseState;
+import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IExecStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
 import nl.dobots.bluenet.ble.base.callbacks.SimpleExecStatusCallback;
@@ -214,6 +215,33 @@ public class BleExtState {
 					@Override
 					public void execute(final IExecStatusCallback execCallback) {
 						getTime(execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
+	public void getSchedule(final IByteArrayCallback callback) {
+		_bleExt.getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				if (_bleExt.isConnected(callback) && _bleExt.hasStateCharacteristics(callback)) {
+					getLogger().LOGd(TAG, "getSchedule");
+					_bleBaseState.getSchedule(_bleExt.getTargetAddress(), callback);
+				}
+			}
+		});
+	}
+
+	public void getSchedule(final String address, final IByteArrayCallback callback) {
+		_bleExt.getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGv(TAG, "Get schedule ...");
+				_bleExt.connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						getSchedule(execCallback);
 					}
 				}, new SimpleExecStatusCallback(callback));
 			}
