@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Locale;
 
+import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
 /**
@@ -24,6 +25,7 @@ import nl.dobots.bluenet.utils.BleUtils;
  * @author Bart van Vliet
  */
 public class ScheduleListPacket {
+	private static final String TAG = ScheduleListPacket.class.getCanonicalName();
 	public static final int HEADER_SIZE = 1;
 	public static final int MAX_LIST_ELEMENTS = 10;
 
@@ -43,12 +45,13 @@ public class ScheduleListPacket {
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
 		if (bytes.length < HEADER_SIZE) {
+			BleLog.getInstance().LOGd(TAG, "invalid size: " + bytes.length);
 			return false;
 		}
 		_size = BleUtils.toUint8(bb.get());
 
 		if (_size > MAX_LIST_ELEMENTS || bytes.length < HEADER_SIZE + _size * ScheduleEntryPacket.ENTRY_SIZE) {
-//			BleLog.getInstance().LOGe(TAG, "Invalid length: " + _size);
+			BleLog.getInstance().LOGd(TAG, "invalid size: " + bytes.length);
 			_size = 0;
 			return false;
 		}
@@ -56,6 +59,7 @@ public class ScheduleListPacket {
 		for (int i=0; i < _size; i++) {
 			_list[i] = new ScheduleEntryPacket();
 			if (!_list[i].fromArray(bb)) {
+				BleLog.getInstance().LOGd(TAG, "invalid entry: " + i + " buffer position:" + bb.position());
 				_size = 0;
 				return false;
 			}
@@ -76,7 +80,7 @@ public class ScheduleListPacket {
 	public String toString() {
 		String str = "Schedule list:";
 		for (int i=0; i<_size; ++i) {
-			str += "\n";
+			str += "\n" + i + " ";
 			str += _list[i].toString();
 		}
 		if (_size == 0) {

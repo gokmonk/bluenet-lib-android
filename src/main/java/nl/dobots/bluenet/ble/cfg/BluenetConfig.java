@@ -129,7 +129,7 @@ public class BluenetConfig {
 	public static final char CMD_ENABLE_SCANNER =                       12;   // 0x0C
 	public static final char CMD_SCAN_DEVICES =                         13;   // 0x0D
 	public static final char CMD_USER_FEEDBACK =                        14;   // 0x0E
-	public static final char CMD_SCHEDULE_ENTRY =                       15;   // 0x0F
+	public static final char CMD_SCHEDULE_ENTRY_SET =                   15;   // 0x0F
 	public static final char CMD_RELAY =                                16;   // 0x10
 	public static final char CMD_VALIDATE_SETUP =                       17;   // 0x11
 	public static final char CMD_REQUEST_SERVICE_DATA =                 18;   // 0x12
@@ -140,6 +140,7 @@ public class BluenetConfig {
 	public static final char CMD_RESET_STATE_ERRORS =                   23;   // 0x17
 	public static final char CMD_KEEP_ALIVE_MESH =                      24;   // 0x18
 	public static final char CMD_MULTI_SWITCH =                         25;   // 0x19
+	public static final char CMD_SCHEDULE_ENTRY_CLEAR =                 26;   // 0x1A
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////

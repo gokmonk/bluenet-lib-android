@@ -6,6 +6,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Locale;
 
+import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
 /**
@@ -26,6 +27,7 @@ import nl.dobots.bluenet.utils.BleUtils;
  * @author Bart van Vliet
  */
 public class ScheduleEntryPacket {
+	private static final String TAG = ScheduleEntryPacket.class.getCanonicalName();
 	public static final int ENTRY_SIZE = 1+1+1+4+2+3;
 
 	public static final int REPEAT_MINUTES = 0;
@@ -36,7 +38,7 @@ public class ScheduleEntryPacket {
 	public static final int ACTION_FADE = 1;
 	public static final int ACTION_TOGGLE = 2;
 
-	public int _id;
+	public int _reserved;
 	public int _repeatType;
 	public int _actionType;
 	public byte _overrideMask;
@@ -54,12 +56,18 @@ public class ScheduleEntryPacket {
 	public ScheduleEntryPacket() {
 	}
 
-	public ScheduleEntryPacket(int id, int repeatType, int actionType, byte overrideMask, long timestamp) {
-		_id = id;
+	public ScheduleEntryPacket(int reserved, int repeatType, int actionType, byte overrideMask, long timestamp) {
+		_reserved = reserved;
 		_repeatType = repeatType;
 		_actionType = actionType;
 		_overrideMask = overrideMask;
 		_timestamp = timestamp;
+	}
+
+	/* Returns whether this entry is active or not
+	 */
+	public boolean isActive() {
+		return (_timestamp != 0);
 	}
 
 	public boolean fromArray(byte[] bytes) {
@@ -70,27 +78,38 @@ public class ScheduleEntryPacket {
 
 	public boolean fromArray(ByteBuffer bb) {
 		if (bb.remaining() < ENTRY_SIZE) {
-			Log.d("ScheduleEntryPacket", "size");
+			BleLog.getInstance().LOGd(TAG, "remaining bytes: " + bb.remaining());
 			return false;
 		}
-		_id = BleUtils.toUint8(bb.get());
+		_reserved = BleUtils.toUint8(bb.get());
 		byte type = bb.get();
 		_repeatType = type & 0x0F;
 		_actionType = (type & 0xF0) >> 4;
 		_overrideMask = bb.get();
 		_timestamp = BleUtils.toUint32(bb.getInt());
 
+		boolean repeatSuccess = true;
 		switch (_repeatType) {
 			case REPEAT_MINUTES:{
 				_minutes = BleUtils.toUint16(bb.getShort());
+				if (_minutes == 0) {
+					BleLog.getInstance().LOGw(TAG, "repeat minutes: " + _minutes);
+					repeatSuccess = false;
+				}
 				break;
 			}
 			case REPEAT_DAY: {
 				_dayOfWeekMask = bb.get();
-				_dayOfWeekNext = bb.get();
-				if (_dayOfWeekNext < 0 || _dayOfWeekNext > 6) {
-					Log.d("ScheduleEntryPacket", "dayOfWeekNext");
-					return false;
+				bb.get(); // Not used
+				// If every day is 1, then the "all days" bit should be set instead
+				// TODO: neater code
+				if ((_dayOfWeekMask & 127) == 127) {
+					BleLog.getInstance().LOGw(TAG, "dayOfWeekMask: " + _dayOfWeekMask);
+					_dayOfWeekMask = BleUtils.intToByteArray(128)[0];
+				}
+				if (_dayOfWeekMask == 0) {
+					BleLog.getInstance().LOGd(TAG, "invalid dayOfWeekMask: " + _dayOfWeekMask);
+					repeatSuccess = false;
 				}
 				break;
 			}
@@ -99,9 +118,16 @@ public class ScheduleEntryPacket {
 				break;
 			}
 			default:
-				return false;
+				bb.getShort(); // Not used
+				BleLog.getInstance().LOGd(TAG, "uknown repeat type: " + _repeatType);
+				repeatSuccess = false;
+		}
+		if (!repeatSuccess && _timestamp != 0) {
+			BleLog.getInstance().LOGd(TAG, "timestamp: " + _timestamp);
+			return false;
 		}
 
+		boolean actionSuccess = true;
 		switch (_actionType) {
 			case ACTION_SWITCH: {
 				_switchVal = BleUtils.toUint8(bb.get());
@@ -119,7 +145,14 @@ public class ScheduleEntryPacket {
 				break;
 			}
 			default:
-				return false;
+				bb.get(); // Not used
+				bb.getShort(); // Not used
+				BleLog.getInstance().LOGd(TAG, "uknown action type: " + _repeatType);
+				actionSuccess = false;
+		}
+		if (!actionSuccess && _timestamp != 0) {
+			BleLog.getInstance().LOGd(TAG, "timestamp: " + _timestamp);
+			return false;
 		}
 		return true;
 	}
@@ -127,7 +160,7 @@ public class ScheduleEntryPacket {
 	public byte[] toArray() {
 		ByteBuffer bb = ByteBuffer.allocate(ENTRY_SIZE);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
-		bb.put((byte)_id);
+		bb.put((byte)_reserved);
 		int type = _repeatType + (_actionType << 4);
 		bb.put((byte)type);
 		bb.put(_overrideMask);
@@ -205,11 +238,10 @@ public class ScheduleEntryPacket {
 			}
 		}
 
-		return String.format(Locale.ENGLISH, "id=%d repeateType=%d actionType=%d override=%d timestamp=%d repeat=%s action=%s" ,
-				_id,
+		return String.format(Locale.ENGLISH, "repeatType=%d actionType=%d override=%d timestamp=%d repeat=%s action=%s" ,
 				_repeatType,
 				_actionType,
-				_overrideMask,
+				BleUtils.toUint8(_overrideMask),
 				_timestamp,
 				repeatStr,
 				actionStr
