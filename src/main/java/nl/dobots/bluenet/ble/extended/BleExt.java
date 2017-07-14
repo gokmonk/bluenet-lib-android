@@ -745,7 +745,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	}
 
 	/**
-	 * Helper function to check the connection state. calles the callbacks onError function
+	 * Helper function to check the connection state. calls the callbacks onError function
 	 * with an ERROR_WRONG_STATE if the current state does not match the one provided as a parameter
 	 *
 	 * @param state    the required state, is checked against the current state
@@ -1515,6 +1515,50 @@ public class BleExt extends Logging implements IWriteCallback {
 		}
 //		}
 //		return false;
+	}
+
+	/**
+	 * Check if ble is disconnected: ready to be used to connect or to start scanning.
+	 * This means it will also return false when it currently is connecting, connected, or disconnecting.
+	 *
+	 * @param callback callback to be notified with an error if we are not disconnected. provide
+	 *                 null if no notification is necessary, in which case the return value
+	 *                 should be enough.
+	 * @return true when disconnect, false when connecting, connected, or disconnecting
+	 */
+	public boolean isDisconnected(IBaseCallback callback) {
+		switch (_connectionState) {
+			case connecting:
+			case connected:
+			case disconnecting: {
+				if (callback != null) {
+					callback.onError(BleErrors.ERROR_WRONG_STATE);
+				}
+				return false;
+			}
+			default:
+				return true;
+		}
+	}
+
+	/**
+	 * Check if ble is initialized: ready to be used to connect or to start scanning.
+	 * This means it will also return false when it currently is connecting, connected, disconnecting or scanning.
+	 *
+	 * @param callback callback to be notified with an error if we are not disconnected. provide
+	 *                 null if no notification is necessary, in which case the return value
+	 *                 should be enough.
+	 * @return true when initialized, false when uninitialized, connecting, connected, disconnecting, or scanning
+	 */
+	public boolean isInitialized(IBaseCallback callback) {
+		if (checkConnectionState(BleDeviceConnectionState.initialized, null)) {
+			return true;
+		} else {
+			if (callback != null) {
+				callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
+			}
+			return false;
+		}
 	}
 
 	/**
