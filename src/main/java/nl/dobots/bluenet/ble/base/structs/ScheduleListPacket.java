@@ -77,6 +77,13 @@ public class ScheduleListPacket {
 		return bb.array();
 	}
 
+	public ScheduleEntryPacket getEntry(int index) {
+		if (index > _size) {
+			return null;
+		}
+		return _list[index];
+	}
+
 	public String toString() {
 		String str = "Schedule list:";
 		for (int i=0; i<_size; ++i) {

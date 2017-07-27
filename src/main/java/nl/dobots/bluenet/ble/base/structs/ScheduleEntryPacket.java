@@ -31,23 +31,36 @@ public class ScheduleEntryPacket {
 	public static final int ENTRY_SIZE = 1+1+1+4+2+3;
 
 	public static final int REPEAT_MINUTES = 0;
-	public static final int REPEAT_DAY = 1;
-	public static final int REPEAT_ONCE = 2;
+	public static final int REPEAT_DAY     = 1;
+	public static final int REPEAT_ONCE    = 2;
 
 	public static final int ACTION_SWITCH = 0;
-	public static final int ACTION_FADE = 1;
+	public static final int ACTION_FADE   = 1;
 	public static final int ACTION_TOGGLE = 2;
+
+	public static final int OVERRIDE_BIT_POS_ALL      = 0;
+	public static final int OVERRIDE_BIT_POS_LOCATION = 1;
+
+	public static final int WEEKDAY_BIT_POS_SUNDAY    = 0;
+	public static final int WEEKDAY_BIT_POS_MONDAY    = 1;
+	public static final int WEEKDAY_BIT_POS_TUESDAY   = 2;
+	public static final int WEEKDAY_BIT_POS_WEDNESDAY = 3;
+	public static final int WEEKDAY_BIT_POS_THURSDAY  = 4;
+	public static final int WEEKDAY_BIT_POS_FRIDAY    = 5;
+	public static final int WEEKDAY_BIT_POS_SATURDAY  = 6;
+	public static final int WEEKDAY_BIT_POS_ALL_DAYS  = 7;
+	public static final int WEEKDAY_MASK_ALL_DAYS     = 0x7F; // 01111111
+
 
 	public int _reserved;
 	public int _repeatType;
 	public int _actionType;
-	public byte _overrideMask;
+	public int _overrideMask;
 	public long _timestamp;
 
 	// Repeat
 	public int _minutes;
-	public byte _dayOfWeekMask;
-	public byte _dayOfWeekNext;
+	public int _dayOfWeekMask;
 
 	// Action
 	public int _switchVal;
@@ -56,7 +69,7 @@ public class ScheduleEntryPacket {
 	public ScheduleEntryPacket() {
 	}
 
-	public ScheduleEntryPacket(int reserved, int repeatType, int actionType, byte overrideMask, long timestamp) {
+	public ScheduleEntryPacket(int reserved, int repeatType, int actionType, int overrideMask, long timestamp) {
 		_reserved = reserved;
 		_repeatType = repeatType;
 		_actionType = actionType;
@@ -68,6 +81,20 @@ public class ScheduleEntryPacket {
 	 */
 	public boolean isActive() {
 		return (_timestamp != 0);
+	}
+
+	public void setInactive() {
+		_timestamp = 0;
+	}
+
+	/* Sets a bit in the day of week mask. Use the WEEKDAY_BIT_POS_* values.
+	 */
+	public void setWeekdayBit(int bitPos) {
+		_dayOfWeekMask |= (1 << bitPos);
+		// If all days are set, set all days bit as well.
+		if ((_dayOfWeekMask & WEEKDAY_MASK_ALL_DAYS) == WEEKDAY_MASK_ALL_DAYS) {
+			_dayOfWeekMask |= (1 << WEEKDAY_BIT_POS_ALL_DAYS);
+		}
 	}
 
 	public boolean fromArray(byte[] bytes) {
@@ -85,7 +112,7 @@ public class ScheduleEntryPacket {
 		byte type = bb.get();
 		_repeatType = type & 0x0F;
 		_actionType = (type & 0xF0) >> 4;
-		_overrideMask = bb.get();
+		_overrideMask = BleUtils.toUint8(bb.get());
 		_timestamp = BleUtils.toUint32(bb.getInt());
 
 		boolean repeatSuccess = true;
@@ -99,7 +126,7 @@ public class ScheduleEntryPacket {
 				break;
 			}
 			case REPEAT_DAY: {
-				_dayOfWeekMask = bb.get();
+				_dayOfWeekMask = BleUtils.toUint8(bb.get());
 				bb.get(); // Not used
 				// If every day is 1, then the "all days" bit should be set instead
 				// TODO: neater code
@@ -163,7 +190,7 @@ public class ScheduleEntryPacket {
 		bb.put((byte)_reserved);
 		int type = _repeatType + (_actionType << 4);
 		bb.put((byte)type);
-		bb.put(_overrideMask);
+		bb.put((byte)_overrideMask);
 		bb.put(BleUtils.uint32ToByteArray(_timestamp));
 		switch (_repeatType) {
 			case REPEAT_MINUTES:{
@@ -171,8 +198,8 @@ public class ScheduleEntryPacket {
 				break;
 			}
 			case REPEAT_DAY: {
-				bb.put(_dayOfWeekMask);
-				bb.put(_dayOfWeekNext);
+				bb.put((byte)_dayOfWeekMask);
+				bb.put((byte)0); // Not used
 				break;
 			}
 			case REPEAT_ONCE:
@@ -211,8 +238,8 @@ public class ScheduleEntryPacket {
 				break;
 			}
 			case REPEAT_DAY: {
-				int daysofWeekMask = BleUtils.toUint8(_dayOfWeekMask);
-				repeatStr += "weekdays mask: " + Integer.toBinaryString(0x100 | daysofWeekMask).substring(1) + " next day: " + _dayOfWeekNext;
+				int daysofWeekMask = _dayOfWeekMask;
+				repeatStr += "weekdays mask: " + Integer.toBinaryString(0x100 | daysofWeekMask).substring(1);
 				break;
 			}
 			case REPEAT_ONCE:
@@ -241,7 +268,7 @@ public class ScheduleEntryPacket {
 		return String.format(Locale.ENGLISH, "repeatType=%d actionType=%d override=%d timestamp=%d repeat=%s action=%s" ,
 				_repeatType,
 				_actionType,
-				BleUtils.toUint8(_overrideMask),
+				_overrideMask,
 				_timestamp,
 				repeatStr,
 				actionStr
