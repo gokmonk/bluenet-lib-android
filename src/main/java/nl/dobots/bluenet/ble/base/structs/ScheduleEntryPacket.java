@@ -91,10 +91,48 @@ public class ScheduleEntryPacket {
 	 */
 	public void setWeekdayBit(int bitPos) {
 		_dayOfWeekMask |= (1 << bitPos);
-		// If all days are set, set all days bit as well.
-		if ((_dayOfWeekMask & WEEKDAY_MASK_ALL_DAYS) == WEEKDAY_MASK_ALL_DAYS) {
-			_dayOfWeekMask |= (1 << WEEKDAY_BIT_POS_ALL_DAYS);
+	}
+
+	public boolean isValidPacketToSet() {
+		if (_timestamp == 0) {
+			return false;
 		}
+		switch (_repeatType) {
+			case REPEAT_MINUTES:{
+				if (_minutes == 0) {
+					return false;
+				}
+				break;
+			}
+			case REPEAT_DAY: {
+				if (_dayOfWeekMask == 0) {
+					return false;
+				}
+				break;
+			}
+			case REPEAT_ONCE: {
+				break;
+			}
+			default:
+				return false;
+		}
+		switch (_actionType) {
+			case ACTION_SWITCH: {
+				break;
+			}
+			case ACTION_FADE: {
+				if (_fadeDuration <= 0) {
+					return false;
+				}
+				break;
+			}
+			case ACTION_TOGGLE: {
+				break;
+			}
+			default:
+				return false;
+		}
+		return true;
 	}
 
 	public boolean fromArray(byte[] bytes) {
@@ -128,11 +166,10 @@ public class ScheduleEntryPacket {
 			case REPEAT_DAY: {
 				_dayOfWeekMask = BleUtils.toUint8(bb.get());
 				bb.get(); // Not used
-				// If every day is 1, then the "all days" bit should be set instead
-				// TODO: neater code
-				if ((_dayOfWeekMask & 127) == 127) {
-					BleLog.getInstance().LOGw(TAG, "dayOfWeekMask: " + _dayOfWeekMask);
-					_dayOfWeekMask = BleUtils.intToByteArray(128)[0];
+				// If every day is 1, then the "all days" bit should be set too
+				if ((_dayOfWeekMask & WEEKDAY_MASK_ALL_DAYS) == WEEKDAY_MASK_ALL_DAYS) {
+					BleLog.getInstance().LOGd(TAG, "dayOfWeekMask: " + _dayOfWeekMask);
+					setWeekdayBit(WEEKDAY_BIT_POS_ALL_DAYS);
 				}
 				if (_dayOfWeekMask == 0) {
 					BleLog.getInstance().LOGd(TAG, "invalid dayOfWeekMask: " + _dayOfWeekMask);
@@ -198,6 +235,10 @@ public class ScheduleEntryPacket {
 				break;
 			}
 			case REPEAT_DAY: {
+				// If every day is set, then the "all days" bit should be set too
+				if ((_dayOfWeekMask & WEEKDAY_MASK_ALL_DAYS) == WEEKDAY_MASK_ALL_DAYS) {
+					setWeekdayBit(WEEKDAY_BIT_POS_ALL_DAYS);
+				}
 				bb.put((byte)_dayOfWeekMask);
 				bb.put((byte)0); // Not used
 				break;
