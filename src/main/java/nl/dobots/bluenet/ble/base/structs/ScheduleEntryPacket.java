@@ -87,10 +87,34 @@ public class ScheduleEntryPacket {
 		_timestamp = 0;
 	}
 
-	/* Sets a bit in the day of week mask. Use the WEEKDAY_BIT_POS_* values.
+	/**
+	 * Returns true when given bit position is set in override mask.
+	 * Use the OVERRIDE_BIT_POS_* values.
+	 */
+	public boolean isIgnoreBitSet(int bitPos) {
+		return (_overrideMask & (1 << bitPos)) != 0;
+	}
+
+	/**
+	 * Returns true when given bit position is set in day of week mask.
+	 * Use the WEEKDAY_BIT_POS_* values.
+	 */
+	public boolean isWeekdayBitSet(int bitPos) {
+		return (_dayOfWeekMask & (1 << bitPos)) != 0;
+	}
+
+	/**
+	 * Sets a bit in the day of week mask. Use the WEEKDAY_BIT_POS_* values.
 	 */
 	public void setWeekdayBit(int bitPos) {
 		_dayOfWeekMask |= (1 << bitPos);
+	}
+
+	/**
+	 * Returns true if given day is set, or all bit is set in day of week mask.
+	 */
+	public boolean isWeekdayActive(int bitPos) {
+		return (_dayOfWeekMask & (1 << WEEKDAY_BIT_POS_ALL_DAYS)) != 0 || isWeekdayBitSet(bitPos);
 	}
 
 	public boolean isValidPacketToSet() {
@@ -186,8 +210,7 @@ public class ScheduleEntryPacket {
 				BleLog.getInstance().LOGd(TAG, "uknown repeat type: " + _repeatType);
 				repeatSuccess = false;
 		}
-		if (!repeatSuccess && _timestamp != 0) {
-			BleLog.getInstance().LOGd(TAG, "timestamp: " + _timestamp);
+		if (!repeatSuccess && isActive()) {
 			return false;
 		}
 
@@ -214,8 +237,7 @@ public class ScheduleEntryPacket {
 				BleLog.getInstance().LOGd(TAG, "uknown action type: " + _repeatType);
 				actionSuccess = false;
 		}
-		if (!actionSuccess && _timestamp != 0) {
-			BleLog.getInstance().LOGd(TAG, "timestamp: " + _timestamp);
+		if (!actionSuccess && isActive()) {
 			return false;
 		}
 		return true;
