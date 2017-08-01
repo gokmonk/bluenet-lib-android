@@ -384,7 +384,6 @@ public class BleCore extends Logging {
 		ActivityCompat.requestPermissions(activity,
 				new String[] {Manifest.permission.ACCESS_COARSE_LOCATION},
 				PERMISSIONS_REQUEST_LOCATION);
-
 	}
 
 	/**

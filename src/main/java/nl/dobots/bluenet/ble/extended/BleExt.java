@@ -874,11 +874,23 @@ public class BleExt extends Logging implements IWriteCallback {
 							}
 							else {
 								// TODO: only retry 1 time
-								// Clear cache in hope that the cache was wrong
-								disconnectAndClose(true, new IStatusCallback() {
+//								// Clear cache in hope that the cache was wrong
+//								disconnectAndClose(true, new IStatusCallback() {
+//									@Override
+//									public void onSuccess() {
+//										connectAndDiscover(_targetAddress, callback, true);
+//									}
+//
+//									@Override
+//									public void onError(int error) {
+//										callback.onError(error);
+//									}
+//								});
+								// Refresh services, in hope that the cache was wrong
+								refreshServices(readSessionNonce, new IStatusCallback() {
 									@Override
 									public void onSuccess() {
-										connectAndDiscover(_targetAddress, callback, true);
+										callback.onSuccess();
 									}
 
 									@Override
@@ -1109,6 +1121,9 @@ public class BleExt extends Logging implements IWriteCallback {
 										 * the callback.onError() was called twice. This avoids that behaviour.
 										 */
 								break;
+							case BleErrors.ERROR_SERVICE_NOT_FOUND: {
+								break;
+							}
 							default:
 								callback.onError(error);
 						}
