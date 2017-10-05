@@ -80,6 +80,7 @@ public class CrownstoneSetup {
 	}
 
 	private void setupStep(final int step) {
+		_bleExt.getLogger().LOGi(TAG, "setupStep " + step);
 		if (_cancel) {
 			_statusCallback.onError(BleErrors.ERROR_SETUP_CANCELED);
 			return;
@@ -184,7 +185,7 @@ public class CrownstoneSetup {
 							 int iBeaconMinor, IProgressCallback progressCallback, IStatusCallback statusCallback) {
 
 		if (_bleExt.isConnected(statusCallback)) {
-			_bleExt.getLogger().LOGd(TAG, "executeSetup");
+			_bleExt.getLogger().LOGi(TAG, "executeSetup");
 
 			_targetAddress = _bleExt.getTargetAddress();
 			_crownstoneId = crownstoneId;

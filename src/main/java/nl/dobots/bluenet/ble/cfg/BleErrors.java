@@ -58,6 +58,7 @@ public class BleErrors {
 	public static final int ERROR_REFRESH_FAILED = 246;
 	public static final int ERROR_WRONG_PAYLOAD_TYPE = 247;
 	public static final int ERROR_FULL = 248;
+	public static final int ERROR_TIMEOUT = 249;
 
 
 	// BleBase

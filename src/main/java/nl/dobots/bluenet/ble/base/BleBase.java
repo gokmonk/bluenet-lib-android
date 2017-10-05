@@ -45,6 +45,7 @@ import nl.dobots.bluenet.ble.core.BleCoreTypes;
 import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
 import nl.dobots.bluenet.ble.extended.callbacks.IBleDeviceCallback;
 import nl.dobots.bluenet.ble.extended.structs.BleDevice;
+import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
 public class BleBase extends BleCore {
@@ -755,20 +756,34 @@ public class BleBase extends BleCore {
 
 		final MultiPartNotificationCallback notificationCB = new MultiPartNotificationCallback(callback, decrypt);
 
+		final Runnable timeoutRunnable = new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "timeout!");
+				// TODO
+				subscribers.remove(notificationCB);
+				statusCallback.onError(BleErrors.ERROR_TIMEOUT);
+			}
+		};
+
 		if (subscribers.isEmpty()) {
 			subscribers.add(notificationCB);
+			_handler.postDelayed(timeoutRunnable, 3000);
 			if (!super.subscribe(address, serviceUuid, characteristicUuid, new IStatusCallback() {
 				@Override
 				public void onError(int error) {
+					subscribers.remove(notificationCB);
+					_handler.removeCallbacks(timeoutRunnable);
 					statusCallback.onError(error);
 				}
 
 				@Override
 				public void onSuccess() {
+					_handler.removeCallbacks(timeoutRunnable);
 					statusCallback.onSuccess(subscribers.indexOf(notificationCB));
 				}
 			}, notificationCallback)) {
-				subscribers.remove(notificationCB);
+//				subscribers.remove(notificationCB); // Remove in onError() instead
 			}
 		} else {
 			subscribers.add(notificationCB);
@@ -1224,18 +1239,42 @@ public class BleBase extends BleCore {
 	 * @param callback callback function to be called with the read configuration object
 	 */
 	public void getConfiguration(final String address, final int configurationType, final IConfigurationCallback callback) {
-
+		getLogger().LOGd(TAG, "getConfiguration " + address + " type: " + configurationType);
 		final int[] subscriberId = new int[1];
+
+		final Runnable timeoutRunnable = new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "timed out");
+				// First unsubscribe
+				unsubscribeConfiguration(address, subscriberId[0], new IStatusCallback() {
+					@Override
+					public void onSuccess() {
+						callback.onError(BleErrors.ERROR_TIMEOUT);
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onError(BleErrors.ERROR_TIMEOUT);;
+					}
+				});
+			}
+		};
 
 		subscribeConfiguration(address,
 				new IIntegerCallback() {
 					@Override
 					public void onSuccess(int result) {
+						getLogger().LOGd(TAG, "successfully subscribed");
 						subscriberId[0] = result;
 						selectConfiguration(address, configurationType, new IStatusCallback() {
 							@Override
 							public void onSuccess() {
+								getLogger().LOGd(TAG, "successfully selected config type");
 								// yippi, wait for configuration to come in on notification
+
+								// But only wait for 5s
+								_handler.postDelayed(timeoutRunnable, 5000);
 							}
 
 							@Override
@@ -1256,6 +1295,10 @@ public class BleBase extends BleCore {
 				new IConfigurationCallback() {
 					@Override
 					public void onSuccess(final ConfigurationMsg configuration) {
+						getLogger().LOGd(TAG, "received the config");
+						// Stop the timeout
+						_handler.removeCallbacks(timeoutRunnable);
+
 						// need to wait until unsubscribe is completed before returning the data
 						// otherwise if a new read/write is started before the unsubscribe
 						// completed the command will get lost
@@ -2269,6 +2312,7 @@ public class BleBase extends BleCore {
 
 			@Override
 			public void onError(int error) {
+				getLogger().LOGd(TAG, "onError");
 				callback.onError(error);
 			}
 		};
