@@ -59,6 +59,8 @@ public class BleErrors {
 	public static final int ERROR_WRONG_PAYLOAD_TYPE = 247;
 	public static final int ERROR_FULL = 248;
 	public static final int ERROR_TIMEOUT = 249;
+	public static final int ERROR_CANCELLED = 249;
+	public static final int ERROR_BUSY = 250;
 
 
 	// BleBase
