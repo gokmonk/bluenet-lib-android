@@ -260,6 +260,7 @@ public class BleScanService extends Service {
 	}
 
 	private void initBluetooth() {
+		getLogger().LOGi(TAG, "initBluetooth");
 		_ble.init(this, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
@@ -895,7 +896,7 @@ public class BleScanService extends Service {
 
 	public void onPermissionDenied() {
 //		onEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
-		if (++permissionRetryCount < 3) {
+		if (++permissionRetryCount < 2) {
 			onPermissionsMissing();
 		} else {
 			sendEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);

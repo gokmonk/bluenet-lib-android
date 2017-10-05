@@ -37,8 +37,8 @@ public class BluetoothPermissionRequest extends AppCompatActivity {
 		public void onServiceConnected(ComponentName name, IBinder service) {
 			// get the service from the binder
 			BleScanService.BleScanBinder binder = (BleScanService.BleScanBinder) service;
-			// get the service and request for bluetooth permission
 			_service = binder.getService();
+			Log.i(TAG, "request permissions");
 			_service.requestPermissions(BluetoothPermissionRequest.this);
 		}
 
@@ -66,9 +66,10 @@ public class BluetoothPermissionRequest extends AppCompatActivity {
 							@Override
 							public void run() {
 								AlertDialog.Builder builder = new AlertDialog.Builder(BluetoothPermissionRequest.this);
-								builder.setTitle("Fatal Error")
-										.setMessage("Cannot scan for devices without permissions. Please " +
-												"grant permissions or uninstall the app again!")
+								builder.setTitle("Location permission required")
+										.setMessage("Can't scan for bluetooth devices without location service permission."
+												+ "Give this app permission in the Android settings menu."
+										)
 										.setNeutralButton("OK", new DialogInterface.OnClickListener() {
 											@Override
 											public void onClick(DialogInterface dialog, int which) {
@@ -85,6 +86,7 @@ public class BluetoothPermissionRequest extends AppCompatActivity {
 					@Override
 					public void onSuccess() {
 						// permission was granted
+						Log.i(TAG, "permission granted");
 						_service.onPermissionGranted();
 						finish();
 					}
