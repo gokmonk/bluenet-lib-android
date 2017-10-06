@@ -26,7 +26,7 @@ import nl.dobots.bluenet.ble.base.callbacks.IPowerSamplesCallback;
 import nl.dobots.bluenet.ble.core.callbacks.IScanCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IStateCallback;
 import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
-import nl.dobots.bluenet.ble.core.callbacks.ISubscribeCallback;
+import nl.dobots.bluenet.ble.core.callbacks.INotificationCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IWriteCallback;
 import nl.dobots.bluenet.ble.base.structs.ControlMsg;
 import nl.dobots.bluenet.ble.base.structs.ConfigurationMsg;
@@ -45,7 +45,6 @@ import nl.dobots.bluenet.ble.core.BleCoreTypes;
 import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
 import nl.dobots.bluenet.ble.extended.callbacks.IBleDeviceCallback;
 import nl.dobots.bluenet.ble.extended.structs.BleDevice;
-import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
 public class BleBase extends BleCore {
@@ -74,7 +73,7 @@ public class BleBase extends BleCore {
 	 * gatt notifications (or errors) will then be delegated based on the characteristic uuid to all
 	 * subscribers of that uuid
 	 */
-	ISubscribeCallback notificationCallback = new ISubscribeCallback() {
+	INotificationCallback notificationCallback = new INotificationCallback() {
 		@Override
 		public void onData(UUID uuidService, UUID uuidCharacteristic, JSONObject data) {
 			for (IDataCallback callback : getSubscribers(uuidCharacteristic)) {

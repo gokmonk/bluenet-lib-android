@@ -21,7 +21,7 @@ import java.util.UUID;
  *
  * @author Dominik Egger
  */
-public interface ISubscribeCallback {
+public interface INotificationCallback {
 
 	void onData(UUID uuidService, UUID uuidCharacteristic, JSONObject data);
 	void onError(UUID uuidService, UUID uuidCharacteristic, int error);

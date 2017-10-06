@@ -61,6 +61,9 @@ public class BleErrors {
 	public static final int ERROR_TIMEOUT = 249;
 	public static final int ERROR_CANCELLED = 249;
 	public static final int ERROR_BUSY = 250;
+    public static final int ERROR_WRONG_ACTION = 251;
+    public static final int ERROR_ALREADY_SUBSCRIBED = 252;
+    public static final int ERROR_DESCRIPTOR_WRITE_FAILED = 253;
 
 
 	// BleBase

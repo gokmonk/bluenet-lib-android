@@ -28,7 +28,6 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.ParcelUuid;
-import android.os.SystemClock;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -50,7 +49,7 @@ import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.core.callbacks.IDataCallback;
 import nl.dobots.bluenet.ble.core.callbacks.IScanCallback;
 import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
-import nl.dobots.bluenet.ble.core.callbacks.ISubscribeCallback;
+import nl.dobots.bluenet.ble.core.callbacks.INotificationCallback;
 import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 import nl.dobots.bluenet.utils.Logging;
@@ -134,7 +133,12 @@ public class BleCore extends Logging {
 	private enum ActionType {
 		NONE,
 		CONNECT,
-		DISCONNECT
+		DISCONNECT,
+        DISCOVER,
+        READ,
+        WRITE,
+        SUBSCRIBE,
+        UNSUBSCRIBE,
 	}
 
 	/**
@@ -161,6 +165,10 @@ public class BleCore extends Logging {
 		private ConnectionState _connectionState = ConnectionState.DISCONNECTED;
 		// keep track of discovery state
 		private DiscoveryState _discoveryState = DiscoveryState.UNDISCOVERED;
+
+        // keeps track of the list of callbacks which are listening to notifications, 1 callback per
+        // characteristic
+        private HashMap<UUID, INotificationCallback> _notificationCallbacks = new HashMap<>();
 
 		/**
 		 * Return the BluetoothGatt object used by this connection to talk to the device
@@ -209,6 +217,10 @@ public class BleCore extends Logging {
 		public void setDiscoveryState(DiscoveryState discoveryState) {
 			_discoveryState = discoveryState;
 		}
+
+		public HashMap<UUID, INotificationCallback> getNotificationCallbacks() {
+            return _notificationCallbacks;
+        }
 
 		public synchronized boolean setCallback(IBaseCallback callback, ActionType actionType) {
 			if (_callback != null) {
@@ -278,6 +290,24 @@ public class BleCore extends Logging {
 			return true;
 		}
 
+		public synchronized boolean resolve(JSONObject data) {
+            if (!preResolve()) {
+                return false;
+            }
+
+            if (_callback instanceof IDataCallback) {
+                IDataCallback callback = (IDataCallback)_callback;
+                cleanup();
+                callback.onData(data);
+            }
+            else {
+                IBaseCallback callback = _callback;
+                cleanup();
+                callback.onError(BleErrors.ERROR_WRONG_PAYLOAD_TYPE);
+            }
+            return true;
+        }
+
 		private boolean preResolve() {
 			if (_callback == null) {
 				getLogger().LOGw(TAG, "Not busy!");
@@ -304,7 +334,8 @@ public class BleCore extends Logging {
 		}
 	}
 
-	// a list of connections for different devices
+	// A list of connections for different devices.
+    // A connection is only removed from the list when the device is closed.
 	private HashMap<String, Connection> _connections = new HashMap<>();
 
 	// flag to indicate if currently scanning for devices
@@ -322,18 +353,19 @@ public class BleCore extends Logging {
 //	private IDataCallback _connectionCallback = null;
 	// discovery callback is used when discovering services and triggers for every discovered
 	// characteristic
-	private IDataCallback _discoveryCallback = null;
+//	private IDataCallback _discoveryCallback = null;
 	// callback when a characteristic is read (success or failure)
-	private IDataCallback _characteristicsReadCallback = null;
+//	private IDataCallback _characteristicsReadCallback = null;
 	// callback when a characteristic is written (success or failure)
-	private IStatusCallback _characteristicsWriteCallback = null;
+//	private IStatusCallback _characteristicsWriteCallback = null;
 	// callback returns if subscribing to a characteristic is successful or failed
-	private IStatusCallback _subscribeCallback = null;
+//	private IStatusCallback _subscribeCallback = null;
 	// callback returns if unsubscribing from a characteristic is successful or failed
-	private IStatusCallback _unsubscribeCallback = null;
-	// keeps track of the list of callbacks which are listening to notifications, 1 callback per
-	// characteristic
-	private HashMap<UUID, ISubscribeCallback> _notificationCallbacks = new HashMap<>();
+//	private IStatusCallback _unsubscribeCallback = null;
+
+//	// keeps track of the list of callbacks which are listening to notifications, 1 callback per
+//	// characteristic
+//	private HashMap<UUID, INotificationCallback> _notificationCallbacks = new HashMap<>();
 
 	// timeout handler to check for function timeouts, e.g. bluetooth enable, connect, reconnect, etc.
 	private Handler _timeoutHandler;
@@ -732,15 +764,15 @@ public class BleCore extends Logging {
 		_bluetoothReady = false;
 		_locationServicesReady = false;
 //		_connectionCallback = null;
-		_discoveryCallback = null;
+//		_discoveryCallback = null;
 		_initializeCallback = null;
 		_eventCallback = null;
 		_scanCallback = null;
-		_characteristicsReadCallback = null;
-		_characteristicsWriteCallback = null;
-		_subscribeCallback = null;
-		_unsubscribeCallback = null;
-		_notificationCallbacks.clear();
+//		_characteristicsReadCallback = null;
+//		_characteristicsWriteCallback = null;
+//		_subscribeCallback = null;
+//		_unsubscribeCallback = null;
+//		_notificationCallbacks.clear();
 	}
 
 	/**
@@ -793,38 +825,26 @@ public class BleCore extends Logging {
 
 	/**
 	 * Check if the device is connected
-	 *
-	 * @param address MAC address of the device
-	 * @return true if connected, false otherwise
-	 */
-	public boolean isConnected(String address) {
-		Connection connection = _connections.get(address);
-		return connection.getConnectionState() == ConnectionState.CONNECTED;
-	}
-
-	/**
-	 * Check if the device is connected
 	 * @param address MAC ddress of the device
 	 * @return true if connected, false if not initialized or if not connected
 	 */
 	public boolean isDeviceConnected(String address) {
-
-		if (!isInitialized()) return false;
-
+		if (!isInitialized()) {
+            return false;
+        }
 		Connection connection = _connections.get(address);
-		return !(connection == null ||
-				connection.getConnectionState() != ConnectionState.CONNECTED);
+		return (connection != null && connection.getConnectionState() == ConnectionState.CONNECTED);
 	}
 
 	/**
 	 * Check if the device is disconnected
 	 *
 	 * @param address MAC address of the device
-	 * @return true if disconnected, false otherwise
+	 * @return true if disconnected or closed, false otherwise
 	 */
 	public boolean isDisconnected(String address) {
 		Connection connection = _connections.get(address);
-		return connection.getConnectionState() == ConnectionState.DISCONNECTED;
+		return (connection == null || connection.getConnectionState() == ConnectionState.DISCONNECTED);
 	}
 
 	/**
@@ -872,7 +892,7 @@ public class BleCore extends Logging {
 					gatt.close();
 				}
 				else {
-					getLogger().LOGe(TAG, "gatt == null");
+					getLogger().LOGe(TAG, "Huh? gatt == null");
 				}
 				_connections.remove(address);
 				connection.reject(BleErrors.ERROR_TIMEOUT);
@@ -902,7 +922,7 @@ public class BleCore extends Logging {
 	 *                     onError: only errors that concern the connection state.
 	 */
 	public void connectDevice(String address, int timeout, final IStatusCallback callback) {
-		getLogger().LOGd(TAG, "Connecting to %s with %d ms timeout ...", address, timeout);
+		getLogger().LOGd(TAG, "Connecting to %s with %d ms timeout", address, timeout);
 
 		if (!isInitialized()) {
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
@@ -929,12 +949,15 @@ public class BleCore extends Logging {
 		Connection connection = new Connection();
 		_connections.put(address, connection);
 		if (!connection.setCallback(connectCallback, ActionType.CONNECT)) {
+            getLogger().LOGw(TAG, "busy");
 			connectCallback.onError(BleErrors.ERROR_BUSY);
 		}
 
 		BluetoothDevice device = _bluetoothAdapter.getRemoteDevice(address);
+        getLogger().LOGd(TAG, "gatt.connect");
 		BluetoothGatt gatt = device.connectGatt(_context, false, new BluetoothGattCallbackExt());
 		connection.setGatt(gatt);
+        // Resolve when the connection state changes. See BluetoothGattCallbackExt.onConnectionStateChange
 	}
 
 
@@ -951,49 +974,53 @@ public class BleCore extends Logging {
 	 */
 	public void disconnectDevice(String address, IStatusCallback callback) {
 
-		getLogger().LOGd(TAG, "disconnecting device ...");
+		getLogger().LOGd(TAG, "disconnectDevice " + address);
 
 		if (!isInitialized()) {
-			getLogger().LOGe(TAG, ".. not initialized");
+			getLogger().LOGe(TAG, "not initialized");
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return;
 		}
 
 		Connection connection = _connections.get(address);
 		if (connection == null) {
-			getLogger().LOGe(TAG, ".. never connected");
+			getLogger().LOGe(TAG, "never connected");
 //			callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
 			callback.onSuccess();
 			return;
 		}
 
-		if (!connection.setCallback(callback)) {
+		if (!connection.setCallback(callback, ActionType.DISCONNECT)) {
+            getLogger().LOGw(TAG, "busy");
 			callback.onError(BleErrors.ERROR_BUSY);
 			return;
 		}
 
 		switch (connection.getConnectionState()) {
 			case DISCONNECTED:
-				connection.resolve();
+                connection.resolve();
 				return;
 			case DISCONNECTING:
 			case CONNECTING:
-				getLogger().LOGe(TAG, "Wrong state: " + connection.getConnectionState().name());
+				getLogger().LOGe(TAG, "Huh? Wrong state: " + connection.getConnectionState().name());
 				connection.reject(BleErrors.ERROR_WRONG_STATE);
 				return;
 		}
 
-		// Start disconnecting
-		connection.setConnectionState(ConnectionState.DISCONNECTING);
-		BluetoothGatt gatt = connection.getGatt();
-		if (gatt != null) {
-			gatt.disconnect();
-			getLogger().LOGd(TAG, "disconnecting device ... done");
-		}
-		else {
-			getLogger().LOGe(TAG, "gatt == null");
-			connection.reject(BleErrors.ERROR_DEVICE_NOT_FOUND);
-		}
+        // Start disconnecting
+        connection.setConnectionState(ConnectionState.DISCONNECTING);
+        BluetoothGatt gatt = connection.getGatt();
+
+		if (gatt == null) {
+            getLogger().LOGe(TAG, "Huh? gatt == null");
+            // TODO: remove connection from _connections?
+            connection.reject(BleErrors.ERROR_DEVICE_NOT_FOUND);
+            return;
+        }
+
+        getLogger().LOGd(TAG, "gatt.disconnect");
+        gatt.disconnect();
+        // Resolve when the connection state changes. See BluetoothGattCallbackExt.onConnectionStateChange
 	}
 
 	/**
@@ -1008,46 +1035,54 @@ public class BleCore extends Logging {
 	 * @param clearCache if true, clear the cache of discovered services, false otherwise.
 	 * @param callback callback to be informed about success or failure
 	 */
-	public boolean closeDevice(String address, boolean clearCache, IStatusCallback callback) {
+	public void closeDevice(String address, boolean clearCache, IStatusCallback callback) {
 
-		getLogger().LOGd(TAG, "closing device ...");
+		getLogger().LOGd(TAG, "closeDevice " + address);
 
 		if (!isInitialized()) {
-			getLogger().LOGe(TAG, ".. not initialized");
+			getLogger().LOGe(TAG, "not initialized");
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
-			return false;
+			return;
 		}
 
 		Connection connection = _connections.get(address);
 		if (connection == null) {
-			getLogger().LOGe(TAG, ".. never connected");
-			callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
-			return false;
+			getLogger().LOGe(TAG, "never connected");
+//            callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
+            callback.onSuccess();
+            return;
 		}
 
+        if (!connection.setCallback(callback, ActionType.DISCONNECT)) {
+            getLogger().LOGw(TAG, "busy");
+            callback.onError(BleErrors.ERROR_BUSY);
+            return;
+        }
+
 		if (connection.getConnectionState() != ConnectionState.DISCONNECTED) {
-			getLogger().LOGe(TAG, ".. still connected?");
-			callback.onError(BleErrors.ERROR_NOT_CONNECTED);
-			return false;
+			getLogger().LOGe(TAG, "still connected?");
+            connection.reject(BleErrors.ERROR_WRONG_STATE);
+			return;
 		}
 
 		BluetoothGatt gatt = connection.getGatt();
 
-		if (gatt != null) {
-			if (clearCache) {
-				refreshDeviceCache(gatt);
-			}
+		if (gatt == null) {
+            getLogger().LOGe(TAG, "Huh? gatt == null");
+            // TODO: remove connection from _connections?
+            connection.reject(BleErrors.ERROR_DEVICE_NOT_FOUND);
+            return;
+        }
 
-			gatt.close();
-			_connections.remove(address);
-		} else {
-			getLogger().LOGe(TAG, "gatt == null");
-		}
+        if (clearCache) {
+            // TODO: what if refreshDeviceCache returns false
+            refreshDeviceCache(gatt);
+        }
 
-		getLogger().LOGd(TAG, "closing device ... done");
-
-		callback.onSuccess();
-		return true;
+        getLogger().LOGd(TAG, "gatt.close");
+        gatt.close();
+        _connections.remove(address);
+        connection.resolve();
 	}
 
 	/**
@@ -1057,56 +1092,58 @@ public class BleCore extends Logging {
 	 * @param clearCache true if the discovery cache should be cleared, false otherwise
 	 * @param callback callback to be informed about success or failure
 	 */
-	public boolean disconnectAndCloseDevice(final String address, final boolean clearCache, final IDataCallback callback) {
+	public void disconnectAndCloseDevice(final String address, final boolean clearCache, final IStatusCallback callback) {
 
-		return disconnectDevice(address, new IDataCallback() {
+		disconnectDevice(address, new IStatusCallback() {
 
-			// only report the first error, i.e. if disconnect and close fail,
-			// only report error of disconnect and skip error of close
-			private void close(final boolean reportError) {
-				closeDevice(address, clearCache, new IStatusCallback() {
-					@Override
-					public void onSuccess() {
-						JSONObject returnJson = new JSONObject();
-						setStatus(returnJson, "closed");
-						callback.onData(returnJson);
-					}
-
-					@Override
-					public void onError(int error) {
-						if (reportError) {
-							callback.onError(error);
-						}
-					}
-				});
-			}
+//			// only report the first error, i.e. if disconnect and close fail,
+//			// only report error of disconnect and skip error of close
+//			private void close(final boolean reportError) {
+//				closeDevice(address, clearCache, new IStatusCallback() {
+//					@Override
+//					public void onSuccess() {
+//						JSONObject returnJson = new JSONObject();
+//						setStatus(returnJson, "closed");
+//						callback.onData(returnJson);
+//					}
+//
+//					@Override
+//					public void onError(int error) {
+//						if (reportError) {
+//							callback.onError(error);
+//						}
+//					}
+//				});
+//			}
 
 			@Override
-			public void onData(JSONObject json) {
-				String status = getStatus(json);
-				if (status == "disconnected") {
-					callback.onData(json);
-					close(true);
-				} else {
-					getLogger().LOGe(TAG, "wrong status received: %s", status);
-				}
+			public void onSuccess() {
+//				String status = getStatus(json);
+//				if (status == "disconnected") {
+//					callback.onData(json);
+//					close(true);
+//				} else {
+//					getLogger().LOGe(TAG, "wrong status received: %s", status);
+//				}
+                closeDevice(address, clearCache, callback);
 			}
 
 			@Override
 			public void onError(int error) {
-				// [05.01.16] only report error if close fails, otherwise, we get an error
-				//   from the disconnect, and then a success from the close, which is
-				//   more confusing than not getting any report back from the disconnect
-//				callback.onError(error);
-				// also try to close even if disconnect fails, but don't report
-				// the error if it fails
-				if (error != BleErrors.ERROR_NEVER_CONNECTED) {
-					close(true);
-				} else {
-					// [03.01.17] if never connected, we also don't need to close otherwise it
-					//   the close will just throw another never connected error
-					callback.onError(error);
-				}
+//				// [05.01.16] only report error if close fails, otherwise, we get an error
+//				//   from the disconnect, and then a success from the close, which is
+//				//   more confusing than not getting any report back from the disconnect
+////				callback.onError(error);
+//				// also try to close even if disconnect fails, but don't report
+//				// the error if it fails
+//				if (error != BleErrors.ERROR_NEVER_CONNECTED) {
+//					close(true);
+//				} else {
+//					// [03.01.17] if never connected, we also don't need to close otherwise it
+//					//   the close will just throw another never connected error
+//					callback.onError(error);
+//				}
+                callback.onError(error);
 			}
 		});
 	}
@@ -1140,25 +1177,31 @@ public class BleCore extends Logging {
 	 * @param callback callback to be invoked about discovered services and characteristics, or error
 	 */
 	public void discoverServices(String address, boolean forceDiscover, IDataCallback callback) {
-		getLogger().LOGd(TAG, "Discovering services ...");
-		_discoveryCallback = callback;
+		getLogger().LOGd(TAG, "Discover services");
+//		_discoveryCallback = callback;
 
 		if (!isInitialized()) {
-			getLogger().LOGe(TAG, ".. not initialized");
+			getLogger().LOGe(TAG, "not initialized");
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return;
 		}
 
 		Connection connection = _connections.get(address);
 		if (connection == null) {
-			getLogger().LOGe(TAG, ".. never connected");
+			getLogger().LOGe(TAG, "never connected");
 			callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
 			return;
 		}
 
+		if (!connection.setCallback(callback, ActionType.DISCOVER)) {
+            getLogger().LOGw(TAG, "busy");
+            callback.onError(BleErrors.ERROR_BUSY);
+            return;
+        }
+
 		if (connection.getConnectionState() != ConnectionState.CONNECTED) {
-			getLogger().LOGe(TAG, ".. not connected");
-			callback.onError(BleErrors.ERROR_NOT_CONNECTED);
+			getLogger().LOGe(TAG, "not connected");
+			connection.reject(BleErrors.ERROR_NOT_CONNECTED);
 			return;
 		}
 
@@ -1167,30 +1210,29 @@ public class BleCore extends Logging {
 		BluetoothGatt gatt = connection.getGatt();
 
 		if (gatt == null) {
-			// todo: report error?
-			getLogger().LOGe(TAG, "gatt == null");
-			callback.onError(BleErrors.ERROR_NOT_CONNECTED);
+			getLogger().LOGe(TAG, "Huh? gatt == null");
+            connection.reject(BleErrors.ERROR_DEVICE_NOT_FOUND);
 			return;
 		}
 
 		switch (connection.getDiscoveryState()) {
 			case DISCOVERING:
-				getLogger().LOGd(TAG, ".. already running");
-				callback.onError(BleErrors.ERROR_ALREADY_DISCOVERING);
+				getLogger().LOGe(TAG, "Huh? already discovering");
+				connection.reject(BleErrors.ERROR_ALREADY_DISCOVERING);
 				return;
 			case DISCOVERED:
 				if (!forceDiscover) {
-					getLogger().LOGd(TAG, ".. already done, return existing discovery");
+					getLogger().LOGd(TAG, "use cached discovery");
 					json = getDiscovery(gatt);
-					callback.onData(json);
+					connection.resolve(json);
 					return;
 				}
 				// else go to discovery, no break needed!
 			default:
-				getLogger().LOGd(TAG, ".. start discovery");
-				connection.setDiscoveryState(DiscoveryState.DISCOVERING);
-				gatt.discoverServices();
-				break;
+                getLogger().LOGd(TAG, "start discovery");
+                connection.setDiscoveryState(DiscoveryState.DISCOVERING);
+                gatt.discoverServices();
+                // Resolve in BluetoothGattCallbackExt.onServicesDiscovered
 		}
 	}
 
@@ -1234,42 +1276,49 @@ public class BleCore extends Logging {
 	 * @param address the MAC address of the device
 	 * @param callback the callback to be informed about success or failure
 	 */
-	public boolean refreshDeviceCache(String address, IStatusCallback callback) {
-
-		getLogger().LOGd(TAG, "refreshing device cache ...");
+	public void refreshDeviceCache(String address, IStatusCallback callback) {
+		getLogger().LOGd(TAG, "Refreshing device cache");
 
 		if (!isInitialized()) {
-			getLogger().LOGe(TAG, ".. not initialized");
+			getLogger().LOGe(TAG, "not initialized");
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
-			return false;
+			return;
 		}
 
 		Connection connection = _connections.get(address);
 		if (connection == null) {
-			getLogger().LOGe(TAG, ".. never connected");
+			getLogger().LOGe(TAG, "never connected");
 			callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
-			return false;
+			return;
 		}
 
+		if (!connection.setCallback(callback, ActionType.NONE)) {
+            getLogger().LOGw(TAG, "busy");
+            callback.onError(BleErrors.ERROR_BUSY);
+            return;
+        }
+
 		if (connection.getConnectionState() != ConnectionState.CONNECTED) {
-			getLogger().LOGe(TAG, ".. not connected?");
-			callback.onError(BleErrors.ERROR_NOT_CONNECTED);
-			return false;
+			getLogger().LOGe(TAG, "not connected?");
+			connection.reject(BleErrors.ERROR_NOT_CONNECTED);
+			return;
 		}
 
 		BluetoothGatt gatt = connection.getGatt();
 
 		if (gatt == null) {
-			getLogger().LOGe(TAG, "gatt == null");
-			return false;
+			getLogger().LOGe(TAG, "Huh? gatt == null");
+            // TODO: remove connection from _connections?
+            connection.reject(BleErrors.ERROR_WRONG_STATE);
+			return;
 		}
+
 		boolean success = refreshDeviceCache(gatt);
 		if (!success) {
-			callback.onError(BleErrors.ERROR_REFRESH_FAILED);
-			return false;
+            connection.reject(BleErrors.ERROR_REFRESH_FAILED);
+			return;
 		}
-		callback.onSuccess();
-		return true;
+        connection.resolve();
 	}
 
 	/**
@@ -1393,62 +1442,65 @@ public class BleCore extends Logging {
 	 * @param serviceUuid UUID of the service containing the characteristic
 	 * @param characteristicUuid UUID of the characteristic
 	 * @param callback callback to be informed about read value or error
-	 * @return true if read started, false if error
 	 */
-	public boolean read(String address, String serviceUuid, String characteristicUuid, IDataCallback callback) {
-
-		getLogger().LOGd(TAG, "read ...");
+	public void read(String address, String serviceUuid, String characteristicUuid, IDataCallback callback) {
+		getLogger().LOGd(TAG, "read " + serviceUuid + " " + characteristicUuid + " from " + address);
 
 		if (!isInitialized()) {
-			getLogger().LOGe(TAG, ".. not initialized");
+			getLogger().LOGe(TAG, "not initialized");
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
-			return false;
+			return;
 		}
 
 		Connection connection = _connections.get(address);
 		if (connection == null) {
-			getLogger().LOGe(TAG, ".. never connected");
+			getLogger().LOGe(TAG, "never connected");
 			callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
-			return false;
+			return;
 		}
 
+		if (!connection.setCallback(callback, ActionType.READ)) {
+            getLogger().LOGw(TAG, "busy");
+            callback.onError(BleErrors.ERROR_BUSY);
+            return;
+        }
+
 		if (connection.getConnectionState() != ConnectionState.CONNECTED) {
-			getLogger().LOGe(TAG, ".. not connected");
-			callback.onError(BleErrors.ERROR_NOT_CONNECTED);
-			return false;
+			getLogger().LOGe(TAG, "not connected");
+			connection.reject(BleErrors.ERROR_NOT_CONNECTED);
+			return;
 		}
 
 		BluetoothGatt gatt = connection.getGatt();
+        if (gatt == null) {
+            getLogger().LOGe(TAG, "Huh? gatt == null");
+            // TODO: remove connection from _connections?
+            connection.reject(BleErrors.ERROR_DEVICE_NOT_FOUND);
+            return;
+        }
+
 		BluetoothGattService service = gatt.getService(BleUtils.stringToUuid(serviceUuid));
-
 		if (service == null) {
-			getLogger().LOGe(TAG, ".. service not found!");
-			callback.onError(BleErrors.ERROR_SERVICE_NOT_FOUND);
-			return false;
+			getLogger().LOGe(TAG, "service not found!");
+			connection.reject(BleErrors.ERROR_SERVICE_NOT_FOUND);
+			return;
 		}
 
-		UUID uuid = BleUtils.stringToUuid(characteristicUuid);
-		BluetoothGattCharacteristic characteristic = service.getCharacteristic(uuid);
-
+		BluetoothGattCharacteristic characteristic = service.getCharacteristic(BleUtils.stringToUuid(characteristicUuid));
 		if (characteristic == null) {
-			getLogger().LOGe(TAG, ".. characteristic not found!");
-			callback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
-			return false;
+			getLogger().LOGe(TAG, "characteristic not found!");
+			connection.reject(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
+			return;
 		}
-
-		// todo: one callback per characteristic / read / write / operation
-		_characteristicsReadCallback = callback;
 
 		boolean result = gatt.readCharacteristic(characteristic);
 		if (!result) {
-			getLogger().LOGe(TAG, ".. failed to read from characteristic!");
-			callback.onError(BleErrors.ERROR_CHARACTERISTIC_READ_FAILED);
-			return false;
+			getLogger().LOGe(TAG, "failed to read from characteristic!");
+			connection.reject(BleErrors.ERROR_CHARACTERISTIC_READ_FAILED);
+			return;
 		}
-
-		getLogger().LOGd(TAG, "read ... done");
-
-		return true;
+		getLogger().LOGd(TAG, "read done");
+        // Resolve in BluetoothGattCallbackExt.onCharacteristicRead
 	}
 
 	/**
@@ -1459,10 +1511,9 @@ public class BleCore extends Logging {
 	 * @param characteristicUuid UUID of the characteristic
 	 * @param value the value to be written as an array of bytes
 	 * @param callback callback to be informed about success or error
-	 * @return true if the write was started, false if error
 	 */
-	public boolean write(String address, String serviceUuid, String characteristicUuid, byte[] value, IStatusCallback callback) {
-		return write(address, serviceUuid, characteristicUuid, value, callback, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+	public void write(String address, String serviceUuid, String characteristicUuid, byte[] value, IStatusCallback callback) {
+		write(address, serviceUuid, characteristicUuid, value, callback, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
 	}
 
 	/**
@@ -1473,10 +1524,9 @@ public class BleCore extends Logging {
 	 * @param characteristicUuid UUID of the characteristic
 	 * @param value the value to be written as an array of bytes
 	 * @param callback callback to be informed about success or error
-	 * @return true if the write was started, false if error
 	 */
-	public boolean writeNoResponse(String address, String serviceUuid, String characteristicUuid, byte[] value, IStatusCallback callback) {
-		return write(address, serviceUuid, characteristicUuid, value, callback, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
+	public void writeNoResponse(String address, String serviceUuid, String characteristicUuid, byte[] value, IStatusCallback callback) {
+		write(address, serviceUuid, characteristicUuid, value, callback, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
 	}
 
 	/**
@@ -1488,79 +1538,73 @@ public class BleCore extends Logging {
 	 * @param value the value to be written as an array of bytes
 	 * @param callback callback to be informed about success or error
 	 * @param writeType write type to be used, see {@link BluetoothGattCharacteristic}
-	 * @return true if the write was started, false if error
 	 */
-	private synchronized boolean write(String address, String serviceUuid, String characteristicUuid, byte[] value, IStatusCallback callback, int writeType) {
-
-		getLogger().LOGd(TAG, "write ...");
+	private synchronized void write(String address, String serviceUuid, String characteristicUuid, byte[] value, IStatusCallback callback, int writeType) {
+        getLogger().LOGd(TAG, "write " + serviceUuid + " " + characteristicUuid + " on " + address);
 
 		if (!isInitialized()) {
-			getLogger().LOGe(TAG, ".. not initialized");
+			getLogger().LOGe(TAG, "not initialized");
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
-			return false;
+			return;
 		}
 
-		Connection connection = _connections.get(address);
-		if (connection == null) {
-			getLogger().LOGe(TAG, ".. never connected");
-			callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
-			return false;
-		}
+        Connection connection = _connections.get(address);
+        if (connection == null) {
+            getLogger().LOGe(TAG, "never connected");
+            callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
+            return;
+        }
 
-		if (connection.getConnectionState() != ConnectionState.CONNECTED) {
-			getLogger().LOGe(TAG, ".. not connected");
-			callback.onError(BleErrors.ERROR_NOT_CONNECTED);
-			return false;
-		}
+        if (!connection.setCallback(callback, ActionType.READ)) {
+            getLogger().LOGw(TAG, "busy");
+            callback.onError(BleErrors.ERROR_BUSY);
+            return;
+        }
 
-		BluetoothGatt gatt = connection.getGatt();
-		BluetoothGattService service = gatt.getService(BleUtils.stringToUuid(serviceUuid));
+        if (connection.getConnectionState() != ConnectionState.CONNECTED) {
+            getLogger().LOGe(TAG, "not connected");
+            connection.reject(BleErrors.ERROR_NOT_CONNECTED);
+            return;
+        }
 
-		if (service == null) {
-			getLogger().LOGe(TAG, ".. service not found!");
-			callback.onError(BleErrors.ERROR_SERVICE_NOT_FOUND);
-			return false;
-		}
+        BluetoothGatt gatt = connection.getGatt();
+        if (gatt == null) {
+            getLogger().LOGe(TAG, "Huh? gatt == null");
+            // TODO: remove connection from _connections?
+            connection.reject(BleErrors.ERROR_DEVICE_NOT_FOUND);
+            return;
+        }
 
-		UUID uuid = BleUtils.stringToUuid(characteristicUuid);
-		BluetoothGattCharacteristic characteristic = service.getCharacteristic(uuid);
+        BluetoothGattService service = gatt.getService(BleUtils.stringToUuid(serviceUuid));
+        if (service == null) {
+            getLogger().LOGe(TAG, "service not found!");
+            connection.reject(BleErrors.ERROR_SERVICE_NOT_FOUND);
+            return;
+        }
 
-		if (characteristic == null) {
-			getLogger().LOGe(TAG, ".. characteristic not found!");
-			callback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
-			return false;
-		}
+        BluetoothGattCharacteristic characteristic = service.getCharacteristic(BleUtils.stringToUuid(characteristicUuid));
+        if (characteristic == null) {
+            getLogger().LOGe(TAG, "characteristic not found!");
+            connection.reject(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
+            return;
+        }
 
 		characteristic.setWriteType(writeType);
-
 		boolean result = characteristic.setValue(value);
 		if (!result) {
-			getLogger().LOGe(TAG, ".. failed to set value!");
-			callback.onError(BleErrors.ERROR_WRITE_VALUE_NOT_SET);
-			return false;
+			getLogger().LOGe(TAG, "failed to set value!");
+			connection.reject(BleErrors.ERROR_WRITE_VALUE_NOT_SET);
+			return;
 		}
 
-		_characteristicsWriteCallback = callback;
-
-		int retry = 0;
-
-		do {
-			result = gatt.writeCharacteristic(characteristic);
-			if (!result) {
-				retry++;
-				getLogger().LOGw(TAG, "retry: %d", retry);
-				SystemClock.sleep(retry * 50);
-			}
-		} while (!result && retry <= 3);
-
+		result = gatt.writeCharacteristic(characteristic);
 		if (!result) {
-			getLogger().LOGe(TAG, ".. failed to write characteristic!");
-			callback.onError(BleErrors.ERROR_WRITE_FAILED);
-			return false;
+			getLogger().LOGe(TAG, "failed to write characteristic!");
+			connection.reject(BleErrors.ERROR_WRITE_FAILED);
+			return;
 		}
-
-		getLogger().LOGd(TAG, "write ... done");
-		return true;
+		getLogger().LOGd(TAG, "write done");
+		// Resolve in BluetoothGattCallbackExt.onCharacteristicWrite
 	}
 
 	/**
@@ -1569,82 +1613,90 @@ public class BleCore extends Logging {
 	 * @param address MAC address of the device
 	 * @param serviceUuid UUID of the service containing the characteristic
 	 * @param characteristicUuid UUID of the characteristic
-	 * @param statusCallback callback to be informed about success or error
-	 * @param callback callback to be informed about received notifications
-	 * @return true if subscribe started, false if error
+	 * @param callback callback to be informed about success or error
+	 * @param notificationCallback callback invoked on received notifications
 	 */
-	protected boolean subscribe(String address, String serviceUuid, String characteristicUuid,
-								IStatusCallback statusCallback, ISubscribeCallback callback) {
-
-		getLogger().LOGd(TAG, "subscribe ...");
-
-		UUID uuidService = BleUtils.stringToUuid(serviceUuid);
-		UUID uuidCharacteristic = BleUtils.stringToUuid(characteristicUuid);
+	protected void subscribe(String address, String serviceUuid, String characteristicUuid,
+								IStatusCallback callback, INotificationCallback notificationCallback) {
+        getLogger().LOGd(TAG, "subscribe to " + serviceUuid + " " + characteristicUuid + " on " + address);
 
 		if (!isInitialized()) {
-			getLogger().LOGe(TAG, ".. not initialized");
-			statusCallback.onError(BleErrors.ERROR_NOT_INITIALIZED);
-			return false;
+			getLogger().LOGe(TAG, "not initialized");
+            callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
+			return;
 		}
 
 		Connection connection = _connections.get(address);
 		if (connection == null) {
-			getLogger().LOGe(TAG, ".. never connected");
-			statusCallback.onError(BleErrors.ERROR_NEVER_CONNECTED);
-			return false;
+			getLogger().LOGe(TAG, "never connected");
+            callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
+			return;
 		}
+
+        if (!connection.setCallback(callback, ActionType.SUBSCRIBE)) {
+            getLogger().LOGw(TAG, "busy");
+            callback.onError(BleErrors.ERROR_BUSY);
+            return;
+        }
 
 		if (connection.getConnectionState() != ConnectionState.CONNECTED) {
-			getLogger().LOGe(TAG, ".. not connected");
-			statusCallback.onError(BleErrors.ERROR_NOT_CONNECTED);
-			return false;
+			getLogger().LOGe(TAG, "not connected");
+			connection.reject(BleErrors.ERROR_NOT_CONNECTED);
+			return;
 		}
 
-		BluetoothGatt gatt = connection.getGatt();
-		BluetoothGattService service = gatt.getService(uuidService);
+        BluetoothGatt gatt = connection.getGatt();
+        if (gatt == null) {
+            getLogger().LOGe(TAG, "Huh? gatt == null");
+            // TODO: remove connection from _connections?
+            connection.reject(BleErrors.ERROR_DEVICE_NOT_FOUND);
+            return;
+        }
 
-		if (service == null) {
-			getLogger().LOGe(TAG, ".. service not found!");
-			statusCallback.onError(BleErrors.ERROR_SERVICE_NOT_FOUND);
-			return false;
-		}
+        BluetoothGattService service = gatt.getService(BleUtils.stringToUuid(serviceUuid));
+        if (service == null) {
+            getLogger().LOGe(TAG, "service not found!");
+            connection.reject(BleErrors.ERROR_SERVICE_NOT_FOUND);
+            return;
+        }
 
-		BluetoothGattCharacteristic characteristic = service.getCharacteristic(uuidCharacteristic);
+        BluetoothGattCharacteristic characteristic = service.getCharacteristic(BleUtils.stringToUuid(characteristicUuid));
+        if (characteristic == null) {
+            getLogger().LOGe(TAG, "characteristic not found!");
+            connection.reject(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
+            return;
+        }
 
-		if (characteristic == null) {
-			getLogger().LOGe(TAG, ".. characteristic not found!");
-			statusCallback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
-			return false;
-		}
+        if (connection.getNotificationCallbacks().containsKey(characteristic.getUuid())) {
+            getLogger().LOGe(TAG, "Already subscribed");
+            connection.reject(BleErrors.ERROR_ALREADY_SUBSCRIBED);
+            return;
+        }
 
 		BluetoothGattDescriptor descriptor = characteristic.getDescriptor(BleCoreTypes.CLIENT_CONFIGURATION_DESCRIPTOR_UUID);
-
 		if (descriptor == null) {
-			getLogger().LOGe(TAG, ".. descriptor not found!");
-			statusCallback.onError(BleErrors.ERROR_NOTIFICATION_DESCRIPTOR_NOT_FOUND);
-			return false;
+			getLogger().LOGe(TAG, "descriptor not found!");
+            connection.reject(BleErrors.ERROR_NOTIFICATION_DESCRIPTOR_NOT_FOUND);
+			return;
 		}
-
 
 		boolean result = descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
 		if (!result) {
-			getLogger().LOGe(TAG, ".. failed to set descriptor for notifications!");
-			statusCallback.onError(BleErrors.ERROR_DESCRIPTOR_SET_FAILED);
-			return false;
+			getLogger().LOGe(TAG, "failed to set descriptor for notifications!");
+			connection.reject(BleErrors.ERROR_DESCRIPTOR_SET_FAILED);
+			return;
 		}
 
 		result = gatt.writeDescriptor(descriptor);
 		if (!result) {
-			getLogger().LOGe(TAG, ".. failed to subscribe for notifications!");
-			statusCallback.onError(BleErrors.ERROR_SUBSCRIBE_NOTIFICATION_FAILED);
-			return false;
+			getLogger().LOGe(TAG, "failed to subscribe for notifications!");
+			connection.reject(BleErrors.ERROR_SUBSCRIBE_NOTIFICATION_FAILED);
+			return;
 		}
 
-		_subscribeCallback = statusCallback;
-		_notificationCallbacks.put(characteristic.getUuid(), callback);
-
-		getLogger().LOGd(TAG, "subscribe ... done");
-		return true;
+		connection.getNotificationCallbacks().put(characteristic.getUuid(), notificationCallback);
+		getLogger().LOGd(TAG, "subscribe done");
+		// Resolve in BluetoothGattCallbackExt.onDescriptorWrite
 	}
 
 	/**
@@ -1653,81 +1705,84 @@ public class BleCore extends Logging {
 	 * @param address MAC address of the device
 	 * @param serviceUuid UUID of the service containing the characteristic
 	 * @param characteristicUuid UUID of the characteristic
-	 * @param statusCallback callback to be informed about success or error
-	 * @return true if unsubscribe started, false if error
+	 * @param callback callback to be informed about success or error
 	 */
-	protected boolean unsubscribe(String address, String serviceUuid, String characteristicUuid,
-								  IStatusCallback statusCallback) {
+	protected void unsubscribe(String address, String serviceUuid, String characteristicUuid,
+								  IStatusCallback callback) {
+        getLogger().LOGd(TAG, "unsubscribe from " + serviceUuid + " " + characteristicUuid + " on " + address);
 
-		getLogger().LOGd(TAG, "unsubscribe ...");
+        if (!isInitialized()) {
+            getLogger().LOGe(TAG, "not initialized");
+            callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
+            return;
+        }
 
-		UUID uuidService = BleUtils.stringToUuid(serviceUuid);
-		UUID uuidCharacteristic = BleUtils.stringToUuid(characteristicUuid);
+        Connection connection = _connections.get(address);
+        if (connection == null) {
+            getLogger().LOGe(TAG, "never connected");
+            callback.onError(BleErrors.ERROR_NEVER_CONNECTED);
+            return;
+        }
 
-		if (!isInitialized()) {
-			getLogger().LOGe(TAG, ".. not initialized");
-			statusCallback.onError(BleErrors.ERROR_NOT_INITIALIZED);
-			return false;
-		}
+        if (!connection.setCallback(callback, ActionType.UNSUBSCRIBE)) {
+            getLogger().LOGw(TAG, "busy");
+            callback.onError(BleErrors.ERROR_BUSY);
+            return;
+        }
 
-		Connection connection = _connections.get(address);
-		if (connection == null) {
-			getLogger().LOGe(TAG, ".. never connected");
-			statusCallback.onError(BleErrors.ERROR_NEVER_CONNECTED);
-			return false;
-		}
+        if (connection.getConnectionState() != ConnectionState.CONNECTED) {
+            getLogger().LOGe(TAG, "not connected");
+            connection.reject(BleErrors.ERROR_NOT_CONNECTED);
+            return;
+        }
 
-		if (connection.getConnectionState() != ConnectionState.CONNECTED) {
-			getLogger().LOGe(TAG, ".. not connected");
-			statusCallback.onError(BleErrors.ERROR_NOT_CONNECTED);
-			return false;
-		}
+        BluetoothGatt gatt = connection.getGatt();
+        if (gatt == null) {
+            getLogger().LOGe(TAG, "Huh? gatt == null");
+            // TODO: remove connection from _connections?
+            connection.reject(BleErrors.ERROR_DEVICE_NOT_FOUND);
+            return;
+        }
 
-		BluetoothGatt gatt = connection.getGatt();
-		BluetoothGattService service = gatt.getService(uuidService);
+        BluetoothGattService service = gatt.getService(BleUtils.stringToUuid(serviceUuid));
+        if (service == null) {
+            getLogger().LOGe(TAG, "service not found!");
+            connection.reject(BleErrors.ERROR_SERVICE_NOT_FOUND);
+            return;
+        }
 
-		if (service == null) {
-			getLogger().LOGe(TAG, ".. service not found!");
-			statusCallback.onError(BleErrors.ERROR_SERVICE_NOT_FOUND);
-			return false;
-		}
+        BluetoothGattCharacteristic characteristic = service.getCharacteristic(BleUtils.stringToUuid(characteristicUuid));
+        if (characteristic == null) {
+            getLogger().LOGe(TAG, "characteristic not found!");
+            connection.reject(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
+            return;
+        }
 
-		BluetoothGattCharacteristic characteristic = service.getCharacteristic(uuidCharacteristic);
+        BluetoothGattDescriptor descriptor = characteristic.getDescriptor(BleCoreTypes.CLIENT_CONFIGURATION_DESCRIPTOR_UUID);
+        if (descriptor == null) {
+            getLogger().LOGe(TAG, "descriptor not found!");
+            connection.reject(BleErrors.ERROR_NOTIFICATION_DESCRIPTOR_NOT_FOUND);
+            return;
+        }
 
-		if (characteristic == null) {
-			getLogger().LOGe(TAG, ".. characteristic not found!");
-			statusCallback.onError(BleErrors.ERROR_CHARACTERISTIC_NOT_FOUND);
-			return false;
-		}
+        boolean result = descriptor.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
+        if (!result) {
+            getLogger().LOGe(TAG, "failed to set descriptor for notifications!");
+            connection.reject(BleErrors.ERROR_DESCRIPTOR_SET_FAILED);
+            return;
+        }
 
-		BluetoothGattDescriptor descriptor = characteristic.getDescriptor(BleCoreTypes.CLIENT_CONFIGURATION_DESCRIPTOR_UUID);
+        result = gatt.writeDescriptor(descriptor);
+        if (!result) {
+            getLogger().LOGe(TAG, "failed to unsubscribe from notifications!");
+            connection.reject(BleErrors.ERROR_UNSUBSCRIBE_NOTIFICATION_FAILED);
+            return;
+        }
 
-		if (descriptor == null) {
-			getLogger().LOGe(TAG, ".. descriptor not found!");
-			statusCallback.onError(BleErrors.ERROR_NOTIFICATION_DESCRIPTOR_NOT_FOUND);
-			return false;
-		}
-
-		boolean result = descriptor.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
-		if (!result) {
-			getLogger().LOGe(TAG, ".. failed to set descriptor for notifications!");
-			statusCallback.onError(BleErrors.ERROR_DESCRIPTOR_SET_FAILED);
-			return false;
-		}
-
-		result = gatt.writeDescriptor(descriptor);
-		if (!result) {
-			getLogger().LOGe(TAG, ".. failed to unsubscribe from notifications!");
-			statusCallback.onError(BleErrors.ERROR_UNSUBSCRIBE_NOTIFICATION_FAILED);
-			return false;
-		}
-
-		_unsubscribeCallback = statusCallback;
-
-		getLogger().LOGd(TAG, "unsubscribe ... done");
-
-		return true;
+        getLogger().LOGd(TAG, "unsubscribe done");
+        // Resolve in BluetoothGattCallbackExt.onDescriptorWrite
 	}
+
 
 
 	//##############################################################################################
@@ -1747,274 +1802,272 @@ public class BleCore extends Logging {
 		 */
 		@Override
 		public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-//			String intentAction;
-
 			BluetoothDevice device = gatt.getDevice();
-			Connection connection = _connections.get(device.getAddress());
-			if (status == BluetoothGatt.GATT_SUCCESS) {
+            String address = device.getAddress();
+			Connection connection = _connections.get(address);
 
-				if (newState == BluetoothProfile.STATE_CONNECTED) {
+			if (status != BluetoothGatt.GATT_SUCCESS) {
+                getLogger().LOGe(TAG, "BluetoothGatt Error, status: %d", status);
 
-					clearConnectTimeout();
+                clearConnectTimeout(); // TODO: do we want this here?
 
-					if (connection != null) {
-						connection.setConnectionState(ConnectionState.CONNECTED);
-					}
-					getLogger().LOGd(TAG, "Connected to GATT server.");
+                // [03.01.17] do not call gatt.close() here, it seems to lead to more gatt error 133
+                //   and BluetoothGatt calls close by itself
+                // [09.01.17] This seems to lead to staying connected.
+                //   We have to figure out which errors automatically disconnect and which don't.
+                // [17.01.17] call gatt.disconnect(), just in case the connection stays open
+                //   even after calling gatt.close()
+                gatt.disconnect();
+                gatt.close();
 
-					JSONObject json = new JSONObject();
-					setStatus(json, "connected");
+                if (connection != null) {
+                    _connections.remove(address);
+                    connection.setConnectionState(ConnectionState.DISCONNECTED);
+                    connection.reject(status);
+                }
+                return;
+            }
 
-					if (_connectionCallback != null) {
-						_connectionCallback.onData(json);
-					}
+            switch (newState) {
+                case BluetoothProfile.STATE_CONNECTED: {
+                    getLogger().LOGd(TAG, "Connected to GATT server.");
 
-					//				intentAction = ACTION_GATT_CONNECTED;
-					//				broadcastUpdate(intentAction);
+                    if (connection == null) {
+                        getLogger().LOGw(TAG, "No registered connection for device " + address);
+                        return;
+                    }
 
-				} else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    connection.setConnectionState(ConnectionState.CONNECTED);
+                    if (connection.getActionType() != ActionType.CONNECT) {
+                        connection.reject(BleErrors.ERROR_WRONG_ACTION);
+                        return;
+                    }
+                    connection.resolve();
+                    break;
+                }
+                case BluetoothProfile.STATE_DISCONNECTED: {
+                    getLogger().LOGd(TAG, "Disconnected from GATT server.");
 
-					if (connection != null) {
-						connection.setConnectionState(ConnectionState.DISCONNECTED);
-					}
-					getLogger().LOGd(TAG, "Disconnected from GATT server.");
+                    if (connection == null) {
+                        getLogger().LOGw(TAG, "No registered connection for device " + address);
+                        return;
+                    }
 
-					JSONObject json = new JSONObject();
-					setStatus(json, "disconnected");
-
-					if (_connectionCallback != null) {
-						_connectionCallback.onData(json);
-					}
-
-					//				intentAction = ACTION_GATT_DISCONNECTED;
-					//				broadcastUpdate(intentAction);
-
-				} else {
-					getLogger().LOGd(TAG, "..ing state: %d", status);
-					return;
-				}
-			} else {
-				getLogger().LOGe(TAG, "BluetoothGatt Error, status: %d", status);
-				clearConnectTimeout();
-
-				// [03.01.17] do not call gatt.close() here, it seems to lead to more gatt error 133
-				//   and BluetoothGatt calls close by itself
-				// [09.01.17] This seems to lead to staying connected.
-				//   We have to figure out which errors automatically disconnect and which don't.
-				// [17.01.17] call gatt.disconnect(), just in case the connection stays open
-				//   even after calling gatt.close()
-				gatt.disconnect();
-				gatt.close();
-				connection.setConnectionState(ConnectionState.DISCONNECTED);
-
-				if (_connectionCallback != null) {
-					_connectionCallback.onError(status);
-				}
-			}
-
+                    connection.setConnectionState(ConnectionState.DISCONNECTED);
+                    if (connection.getActionType() != ActionType.DISCONNECT) {
+                        connection.reject(BleErrors.ERROR_WRONG_ACTION);
+                        return;
+                    }
+                    connection.resolve();
+                    break;
+                }
+                default:
+                    getLogger().LOGd(TAG, "newState " + address + " = " + status);
+            }
 		}
 
 		/**
-		 * Is called when the service discovery completed. we obtain the discovered
-		 * services and characteristics and trigger the discoveryCallback
+		 * Is called when the service discovery completed. We obtain the discovered
+		 * services and characteristics and trigger the discovery callback.
 		 */
 		@Override
-		// New services discovered
 		public void onServicesDiscovered(BluetoothGatt gatt, int status) {
-
 			BluetoothDevice device = gatt.getDevice();
-			Connection connection = _connections.get(device.getAddress());
+            String address = device.getAddress();
+			Connection connection = _connections.get(address);
+            if (connection == null) {
+                getLogger().LOGe(TAG, "Huh? No registered connection for device " + address);
+                return;
+            }
 
-			if (status == BluetoothGatt.GATT_SUCCESS) {
-				connection.setDiscoveryState(DiscoveryState.DISCOVERED);
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                connection.setDiscoveryState(DiscoveryState.UNDISCOVERED);
+                getLogger().LOGe(TAG, "Discovery failed, status: %d", status);
+                connection.reject(BleErrors.ERROR_DISCOVERY_FAILED);
+                return;
+            }
 
-				JSONObject json = getDiscovery(gatt);
+            connection.setDiscoveryState(DiscoveryState.DISCOVERED);
+            if (connection.getActionType() != ActionType.DISCOVER) {
+                connection.reject(BleErrors.ERROR_WRONG_ACTION);
+                return;
+            }
 
-				if (_discoveryCallback != null) {
-					_discoveryCallback.onData(json);
-				}
-
-//				broadcastUpdate(ACTION_GATT_SERVICES_DISCOVERED);
-
-			} else {
-				connection.setDiscoveryState(DiscoveryState.UNDISCOVERED);
-
-				getLogger().LOGe(TAG, "Discovery failed, status: %d", status);
-
-				if (_discoveryCallback != null) {
-					_discoveryCallback.onError(BleErrors.ERROR_DISCOVERY_FAILED);
-				}
-			}
+            JSONObject json = getDiscovery(gatt);
+            connection.resolve(json);
 		}
 
 		/**
-		 * Is called whenever a characteristic is read. this can be successful or failure
-		 * trigger the characteristicsReadCallback with the read value or the error
+		 * Is called whenever a characteristic is read. This can be successful or failure
+		 * trigger the read callback with the read value or the error.
 		 */
 		@Override
-		// Result of a characteristic read operation
 		public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            BluetoothDevice device = gatt.getDevice();
+            String address = device.getAddress();
+            Connection connection = _connections.get(address);
+            if (connection == null) {
+                getLogger().LOGe(TAG, "Huh? No registered connection for device " + address);
+                return;
+            }
 
-			if (status == BluetoothGatt.GATT_SUCCESS) {
+			if (status != BluetoothGatt.GATT_SUCCESS) {
+                getLogger().LOGe(TAG, "Characteristic read failed, status: %d", status);
+                connection.reject(BleErrors.ERROR_CHARACTERISTIC_READ_FAILED);
+                return;
+            }
 
-				JSONObject json = new JSONObject();
+            if (connection.getActionType() != ActionType.READ) {
+                connection.reject(BleErrors.ERROR_WRONG_ACTION);
+                return;
+            }
 
-				setStatus(json, BleCoreTypes.CHARACTERISTIC_PROP_READ);
-				setCharacteristic(json, characteristic);
-				setValue(json, characteristic.getValue());
-
-				if (_characteristicsReadCallback != null) {
-					_characteristicsReadCallback.onData(json);
-				}
-
-//				broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
-
-			} else {
-				getLogger().LOGe(TAG, "Characteristic read failed, status: %d", status);
-
-				if (_characteristicsReadCallback != null) {
-					_characteristicsReadCallback.onError(BleErrors.ERROR_CHARACTERISTIC_READ_FAILED);
-				}
-			}
+            JSONObject json = new JSONObject();
+            setStatus(json, BleCoreTypes.CHARACTERISTIC_PROP_READ);
+            setCharacteristic(json, characteristic);
+            setValue(json, characteristic.getValue());
+            connection.resolve(json);
 		}
 
 		/**
-		 * Is called whenever a notification is received from a subscribed characteristic
-		 * trigger the notificationCallback for the given characteristic
+		 * Is called whenever a notification is received from a subscribed characteristic.
+		 * Trigger the notification callback for the given characteristic.
 		 */
 		@Override
 		public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+            BluetoothDevice device = gatt.getDevice();
+            String address = device.getAddress();
+            Connection connection = _connections.get(address);
+            if (connection == null) {
+                getLogger().LOGe(TAG, "Huh? No registered connection for device " + address);
+                return;
+            }
 
-			JSONObject json = new JSONObject();
+            UUID uuidCharacteristic = characteristic.getUuid();
+            INotificationCallback notificationCallback = connection.getNotificationCallbacks().get(uuidCharacteristic);
+            if (notificationCallback == null) {
+                getLogger().LOGe(TAG, "Huh? No callback for " + characteristic);
+                return;
+            }
 
-			setStatus(json, BleCoreTypes.CHARACTERISTIC_PROP_NOTIFY);
-			setCharacteristic(json, characteristic);
-			setValue(json, characteristic.getValue());
-
-			UUID uuidService = characteristic.getService().getUuid();
-			UUID uuidCharacteristic = characteristic.getUuid();
-
-			ISubscribeCallback callback = _notificationCallbacks.get(uuidCharacteristic);
-			if (callback != null) {
-				getLogger().LOGd(TAG, "notification: %s", BleUtils.bytesToString(characteristic.getValue()));
-				callback.onData(uuidService, uuidCharacteristic, json);
-			} else {
-				getLogger().LOGe(TAG, "callback is null");
-			}
-
+            getLogger().LOGd(TAG, "notification: %s", BleUtils.bytesToString(characteristic.getValue()));
+            JSONObject json = new JSONObject();
+            setStatus(json, BleCoreTypes.CHARACTERISTIC_PROP_NOTIFY);
+            setCharacteristic(json, characteristic);
+            setValue(json, characteristic.getValue());
+            notificationCallback.onData(characteristic.getService().getUuid(), uuidCharacteristic, json);
 		}
 
 		/**
-		 * Is called whenever a write on a characteristic completes. either successful or with error
-		 * trigger the characteristicsWriteCallback with success or error
+		 * Is called whenever a write on a characteristic completes. Either successful or with error
+		 * trigger the write callback with success or error.
 		 */
 		@Override
 		public synchronized void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            BluetoothDevice device = gatt.getDevice();
+            String address = device.getAddress();
+            Connection connection = _connections.get(address);
+            if (connection == null) {
+                getLogger().LOGe(TAG, "Huh? No registered connection for device " + address);
+                return;
+            }
 
-			if (status == BluetoothGatt.GATT_SUCCESS) {
+			if (status != BluetoothGatt.GATT_SUCCESS) {
+                getLogger().LOGe(TAG, "Characteristic write failed, status: %d", status);
+                connection.reject(BleErrors.ERROR_CHARACTERISTIC_WRITE_FAILED);
+                return;
+            }
 
-				// do we need to send back the status and the value we wrote??
-//				JSONObject json = new JSONObject();
-//				setStatus(json, BleCoreTypes.STATUS_WRITTEN);
-//				setCharacteristic(json, characteristic);
-//				setValue(json, characteristic.getValue());
-
-				if (_characteristicsWriteCallback != null) {
-//					_characteristicsWriteCallback.onData(json);
-					_characteristicsWriteCallback.onSuccess();
-				}
-
-			} else {
-				getLogger().LOGe(TAG, "Characteristic write failed, status: %d", status);
-
-				if (_characteristicsWriteCallback != null) {
-					_characteristicsWriteCallback.onError(BleErrors.ERROR_CHARACTERISTIC_WRITE_FAILED);
-				}
-			}
-		}
+            if (connection.getActionType() == ActionType.WRITE) {
+                connection.resolve();
+            }
+            else {
+                connection.reject(BleErrors.ERROR_WRONG_ACTION);
+            }
+        }
 
 		/**
 		 * Is called if the descriptor of a characteristic is read
 		 * NOT USED CURRENTLY
 		 */
 		public void onDescriptorRead(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
+            // No complete code!
 			if (status == BluetoothGatt.GATT_SUCCESS) {
-
 				JSONObject json = new JSONObject();
-
 				setStatus(json, BleCoreTypes.CHARACTERISTIC_PROP_READ);
-
 				BluetoothGattCharacteristic characteristic = descriptor.getCharacteristic();
 				setCharacteristic(json, characteristic);
-
 				setValue(json, descriptor.getValue());
-
-				if (_characteristicsReadCallback != null) {
-					_characteristicsReadCallback.onData(json);
-				}
-
-			} else {
+			}
+			else {
 				getLogger().LOGe(TAG, "failed to read descriptor, status: %d", status);
-
-				if (_characteristicsReadCallback != null) {
-					_characteristicsReadCallback.onError(BleErrors.ERROR_DESCRIPTOR_READ_FAILED);
-				}
-
 			}
 		}
 
 		/**
-		 * Is called if a descriptor of a characteristic is written. this is the case when
-		 * a characteristic is subscribed / unsubscribed.
-		 * trigger the subscribeCallback / unsubscribeCallback respectively
+		 * Is called if a descriptor of a characteristic is written.
+         * This is the case when a characteristic is subscribed / unsubscribed.
+		 * Trigger the subscribe callback / unsubscribe callback respectively.
 		 */
 		public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
+            BluetoothDevice device = gatt.getDevice();
+            String address = device.getAddress();
+            Connection connection = _connections.get(address);
+            if (connection == null) {
+                getLogger().LOGe(TAG, "Huh? No registered connection for device " + address);
+                return;
+            }
+
+            if (!descriptor.getUuid().equals(BleCoreTypes.CLIENT_CONFIGURATION_DESCRIPTOR_UUID)) {
+                return;
+            }
+
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                getLogger().LOGe(TAG, "Descriptor write failed, status: %d", status);
+                connection.reject(BleErrors.ERROR_DESCRIPTOR_WRITE_FAILED);
+                return;
+            }
 
 			BluetoothGattCharacteristic characteristic = descriptor.getCharacteristic();
+            if (descriptor.getValue() == BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE) {
+                // Unsubscribe
+                boolean result = gatt.setCharacteristicNotification(characteristic, false);
 
-			UUID uuidService = characteristic.getService().getUuid();
-			UUID uuidCharacteristic = characteristic.getUuid();
+                if (!result) {
+                    getLogger().LOGe(TAG, "Failed to unsubscribe");
+                    connection.reject(BleErrors.ERROR_UNSUBSCRIBE_FAILED);
+                    return;
+                }
 
-			if (descriptor.getUuid().equals(BleCoreTypes.CLIENT_CONFIGURATION_DESCRIPTOR_UUID)) {
+                // TODO: only remove here?
+                connection.getNotificationCallbacks().remove(characteristic.getUuid());
 
-				JSONObject json = new JSONObject();
+                if (connection.getActionType() != ActionType.UNSUBSCRIBE) {
+                    connection.reject(BleErrors.ERROR_WRONG_ACTION);
+                    return;
+                }
 
-				if (descriptor.getValue() == BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE) {
-					// unsubscribe
-					boolean result = gatt.setCharacteristicNotification(characteristic, false);
+                getLogger().LOGd(TAG, "unsubscribe success");
+                connection.resolve();
+            }
+            else {
+                // Subscribe
+                boolean result = gatt.setCharacteristicNotification(characteristic, true);
 
-					if (_unsubscribeCallback != null) {
-						if (status != BluetoothGatt.GATT_SUCCESS || !result) {
-							getLogger().LOGe(TAG, "Failed to unsubscribe");
-							_unsubscribeCallback.onError(BleErrors.ERROR_UNSUBSCRIBE_FAILED);
-							return;
-						}
+                if (!result) {
+                    getLogger().LOGe(TAG, "Failed to subscribe");
+                    connection.reject(BleErrors.ERROR_SUBSCRIBE_FAILED);
+                    return;
+                }
 
-						getLogger().LOGd(TAG, "unsubscribe success");
-						_unsubscribeCallback.onSuccess();
-						_notificationCallbacks.remove(characteristic.getUuid());
-					} else {
-						getLogger().LOGw(TAG, "unsubscribed but callback is null");
-					}
-				} else {
-					// subscribe
-					boolean result = gatt.setCharacteristicNotification(characteristic, true);
+                if (connection.getActionType() != ActionType.SUBSCRIBE) {
+                    connection.reject(BleErrors.ERROR_WRONG_ACTION);
+                    return;
+                }
 
-					if (_subscribeCallback != null) {
-						if (status != BluetoothGatt.GATT_SUCCESS || !result) {
-							getLogger().LOGe(TAG, "Failed to subscribe");
-							_subscribeCallback.onError(BleErrors.ERROR_SUBSCRIBE_FAILED);
-							return;
-						}
-
-						getLogger().LOGd(TAG, "subscribe success");
-						_subscribeCallback.onSuccess();
-					} else {
-						getLogger().LOGw(TAG, "subscribed but callback is null");
-					}
-				}
-			}
-
+                getLogger().LOGd(TAG, "subscribe success");
+                connection.resolve();
+            }
 		}
 	}
 

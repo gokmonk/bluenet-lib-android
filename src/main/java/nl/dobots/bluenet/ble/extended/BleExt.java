@@ -630,7 +630,7 @@ public class BleExt extends Logging implements IWriteCallback {
 //				_bleBase.connectDevice(_targetAddress, _connectTimeout, dataCallback);
 //			} else if (_bleBase.isDisconnected(_targetAddress)) {
 //				_bleBase.reconnectDevice(_targetAddress, 30, dataCallback);
-			if (_bleBase.isClosed(_targetAddress) || _bleBase.isDisconnected(_targetAddress)) {
+			if (_bleBase.isDisconnected(_targetAddress)) {
 				_bleBase.connectDevice(_targetAddress, _connectTimeout, connectCallback);
 			}
 		} else if (checkConnectionState(BleDeviceConnectionState.connected, null)) {
