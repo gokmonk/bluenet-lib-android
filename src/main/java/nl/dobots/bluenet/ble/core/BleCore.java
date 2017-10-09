@@ -946,17 +946,49 @@ public class BleCore extends Logging {
 			}
 		};
 
-		Connection connection = new Connection();
-		_connections.put(address, connection);
+		Connection connection = _connections.get(address);
+		if (connection == null) {
+			connection = new Connection();
+			_connections.put(address, connection);
+			if (!connection.setCallback(connectCallback, ActionType.CONNECT)) {
+				getLogger().LOGw(TAG, "busy");
+				connectCallback.onError(BleErrors.ERROR_BUSY);
+			}
+			BluetoothDevice device = _bluetoothAdapter.getRemoteDevice(address);
+			getLogger().LOGd(TAG, "gatt.connect");
+			connection.setConnectionState(ConnectionState.CONNECTING);
+			BluetoothGatt gatt = device.connectGatt(_context, false, new BluetoothGattCallbackExt());
+			connection.setGatt(gatt);
+			return;
+		}
+
 		if (!connection.setCallback(connectCallback, ActionType.CONNECT)) {
-            getLogger().LOGw(TAG, "busy");
+			getLogger().LOGw(TAG, "busy");
 			connectCallback.onError(BleErrors.ERROR_BUSY);
 		}
 
-		BluetoothDevice device = _bluetoothAdapter.getRemoteDevice(address);
-        getLogger().LOGd(TAG, "gatt.connect");
-		BluetoothGatt gatt = device.connectGatt(_context, false, new BluetoothGattCallbackExt());
-		connection.setGatt(gatt);
+		BluetoothGatt gatt = connection.getGatt();
+		if (gatt == null) {
+			getLogger().LOGe(TAG, "Huh? gatt == null");
+			// TODO: remove connection from _connections?
+			connection.reject(BleErrors.ERROR_DEVICE_NOT_FOUND);
+			return;
+		}
+
+		switch(connection.getConnectionState()) {
+			case CONNECTED:
+				connection.resolve();
+				return;
+			case DISCONNECTED: {
+				connection.setConnectionState(ConnectionState.CONNECTING);
+				gatt.connect();
+				break;
+			}
+			default:
+				getLogger().LOGe(TAG, "Huh? Wrong state: " + connection.getConnectionState().name());
+				connection.reject(BleErrors.ERROR_WRONG_STATE);
+		}
+
         // Resolve when the connection state changes. See BluetoothGattCallbackExt.onConnectionStateChange
 	}
 
@@ -1009,8 +1041,8 @@ public class BleCore extends Logging {
 
         // Start disconnecting
         connection.setConnectionState(ConnectionState.DISCONNECTING);
-        BluetoothGatt gatt = connection.getGatt();
 
+        BluetoothGatt gatt = connection.getGatt();
 		if (gatt == null) {
             getLogger().LOGe(TAG, "Huh? gatt == null");
             // TODO: remove connection from _connections?
@@ -1066,7 +1098,6 @@ public class BleCore extends Logging {
 		}
 
 		BluetoothGatt gatt = connection.getGatt();
-
 		if (gatt == null) {
             getLogger().LOGe(TAG, "Huh? gatt == null");
             // TODO: remove connection from _connections?
@@ -1208,7 +1239,6 @@ public class BleCore extends Logging {
 		JSONObject json;
 
 		BluetoothGatt gatt = connection.getGatt();
-
 		if (gatt == null) {
 			getLogger().LOGe(TAG, "Huh? gatt == null");
             connection.reject(BleErrors.ERROR_DEVICE_NOT_FOUND);
@@ -1305,7 +1335,6 @@ public class BleCore extends Logging {
 		}
 
 		BluetoothGatt gatt = connection.getGatt();
-
 		if (gatt == null) {
 			getLogger().LOGe(TAG, "Huh? gatt == null");
             // TODO: remove connection from _connections?
@@ -1781,6 +1810,7 @@ public class BleCore extends Logging {
 
         getLogger().LOGd(TAG, "unsubscribe done");
         // Resolve in BluetoothGattCallbackExt.onDescriptorWrite
+		// Remove notification callback in BluetoothGattCallbackExt.onDescriptorWrite
 	}
 
 
@@ -2033,6 +2063,7 @@ public class BleCore extends Logging {
                 // Unsubscribe
                 boolean result = gatt.setCharacteristicNotification(characteristic, false);
 
+				// TODO: what happens if you fail to unsubscribe?
                 if (!result) {
                     getLogger().LOGe(TAG, "Failed to unsubscribe");
                     connection.reject(BleErrors.ERROR_UNSUBSCRIBE_FAILED);

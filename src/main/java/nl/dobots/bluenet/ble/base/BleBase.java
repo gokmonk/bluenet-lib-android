@@ -73,7 +73,7 @@ public class BleBase extends BleCore {
 	 * gatt notifications (or errors) will then be delegated based on the characteristic uuid to all
 	 * subscribers of that uuid
 	 */
-	INotificationCallback notificationCallback = new INotificationCallback() {
+	private INotificationCallback _notificationCallback = new INotificationCallback() {
 		@Override
 		public void onData(UUID uuidService, UUID uuidCharacteristic, JSONObject data) {
 			for (IDataCallback callback : getSubscribers(uuidCharacteristic)) {
@@ -153,30 +153,30 @@ public class BleBase extends BleCore {
 	}
 
 	@Override
-	public void connectDevice(String address, int timeout, IDataCallback callback) {
+	public void connectDevice(String address, int timeout, IStatusCallback callback) {
 		clearSetupEncryptionKey(); // Make sure we start clean
 		_subscribers.clear();
 		super.connectDevice(address, timeout, callback);
 	}
 
 	@Override
-	public boolean disconnectDevice(String address, IDataCallback callback) {
+	public void disconnectDevice(String address, IStatusCallback callback) {
 		_subscribers.clear();
-		return super.disconnectDevice(address, callback);
+		super.disconnectDevice(address, callback);
 	}
 
 	@Override
-	public boolean closeDevice(String address, boolean clearCache, IStatusCallback callback) {
+	public void closeDevice(String address, boolean clearCache, IStatusCallback callback) {
 		_subscribers.clear();
-		return super.closeDevice(address, clearCache, callback);
+		super.closeDevice(address, clearCache, callback);
 	}
 
 	@Override
-	public boolean write(String address, String serviceUuid, String characteristicUuid, byte[] value, IStatusCallback callback) {
-		return write(address, serviceUuid, characteristicUuid, value, BleBaseEncryption.ACCESS_LEVEL_HIGHEST_AVAILABLE, callback);
+	public void write(String address, String serviceUuid, String characteristicUuid, byte[] value, IStatusCallback callback) {
+		write(address, serviceUuid, characteristicUuid, value, BleBaseEncryption.ACCESS_LEVEL_HIGHEST_AVAILABLE, callback);
 	}
 
-	public boolean write(String address, String serviceUuid, String characteristicUuid, byte[] value, char accessLevel, IStatusCallback callback) {
+	public void write(String address, String serviceUuid, String characteristicUuid, byte[] value, char accessLevel, IStatusCallback callback) {
 		if (_onWriteCallback != null) {
 			_onWriteCallback.onWrite();
 		}
@@ -188,29 +188,43 @@ public class BleBase extends BleCore {
 				encryptionKeys = new SetupEncryptionKey(_setupEncryptionKey);
 			}
 			if (encryptionKeys == null) {
-				return false;
+				getLogger().LOGw(TAG, "no keys");
+				callback.onError(BleErrors.ERROR_NO_KEYS_SET);
+				return;
+			}
+
+			if (_encryptionSessionData == null) {
+				getLogger().LOGw(TAG, "no session data");
+				callback.onError(BleErrors.ERROR_ENCRYPTION);
+				return;
 			}
 
 			// Just use highest available key
 			EncryptionKeys.KeyAccessLevelPair keyAccessLevelPair = encryptionKeys.getHighestKey();
-			if (_encryptionSessionData == null || keyAccessLevelPair == null) {
-				return false;
+			if (keyAccessLevelPair == null) {
+				getLogger().LOGw(TAG, "no key available");
+				callback.onError(BleErrors.ERROR_NO_KEYS_SET);
+				return;
 			}
+
 			byte[] encryptedBytes = BleBaseEncryption.encryptCtr(value, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, keyAccessLevelPair.key, keyAccessLevelPair.accessLevel);
 			if (encryptedBytes == null) {
-				return false;
+				getLogger().LOGw(TAG, "encryption failed");
+				callback.onError(BleErrors.ERROR_ENCRYPTION);
+				return;
 			}
-			return super.write(address, serviceUuid, characteristicUuid, encryptedBytes, callback);
+
+			super.write(address, serviceUuid, characteristicUuid, encryptedBytes, callback);
 		}
-		return super.write(address, serviceUuid, characteristicUuid, value, callback);
+		super.write(address, serviceUuid, characteristicUuid, value, callback);
 	}
 
 	@Override
-	public boolean read(String address, String serviceUuid, String characteristicUuid, IDataCallback callback) {
-		return read(address, serviceUuid, characteristicUuid, true, callback);
+	public void read(String address, String serviceUuid, String characteristicUuid, IDataCallback callback) {
+		read(address, serviceUuid, characteristicUuid, true, callback);
 	}
 
-	public boolean read(String address, String serviceUuid, String characteristicUuid, boolean useEncryption, final IDataCallback callback) {
+	public void read(String address, String serviceUuid, String characteristicUuid, boolean useEncryption, final IDataCallback callback) {
 		if (_encryptionEnabled && useEncryption) {
 			IDataCallback encryptedCallback = new IDataCallback() {
 				@Override
@@ -223,13 +237,20 @@ public class BleBase extends BleCore {
 						getLogger().LOGi(TAG, "Use setup encryption key");
 						encryptionKeys = new SetupEncryptionKey(_setupEncryptionKey);
 					}
-					if (_encryptionSessionData == null || encryptionKeys == null) {
-						callback.onError(BleErrors.ENCRYPTION_ERROR);
+					if (encryptionKeys == null) {
+						getLogger().LOGw(TAG, "no keys");
+						callback.onError(BleErrors.ERROR_ENCRYPTION);
+						return;
+					}
+					if (_encryptionSessionData == null) {
+						getLogger().LOGw(TAG, "no session data");
+						callback.onError(BleErrors.ERROR_ENCRYPTION);
 						return;
 					}
 					byte[] decryptedBytes = BleBaseEncryption.decryptCtr(encryptedBytes, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, encryptionKeys);
 					if (decryptedBytes == null) {
-						callback.onError(BleErrors.ENCRYPTION_ERROR);
+						getLogger().LOGw(TAG, "encryption failed");
+						callback.onError(BleErrors.ERROR_ENCRYPTION);
 						return;
 					}
 					setValue(json, decryptedBytes);
@@ -240,9 +261,9 @@ public class BleBase extends BleCore {
 					callback.onError(error);
 				}
 			};
-			return super.read(address, serviceUuid, characteristicUuid, encryptedCallback);
+			super.read(address, serviceUuid, characteristicUuid, encryptedCallback);
 		}
-		return super.read(address, serviceUuid, characteristicUuid, callback);
+		super.read(address, serviceUuid, characteristicUuid, callback);
 	}
 
 	/**
@@ -610,87 +631,92 @@ public class BleBase extends BleCore {
 	 * @param address the address of the device
 	 * @param serviceUuid the uuid of the service containing the characteristic
 	 * @param characteristicUuid the uuid of the characteristic which should be subscribed to
-	 * @param statusCallback the callback which will be informed about success or failure.
+	 * @param callback the callback which will be informed about success or failure.
 	 *                       in case of success, the onSuccess function will return the subscriber
 	 *                       id which is needed for unsubscribing afterwards
-	 * @param callback the callback which will be triggered every time a gatt notification arrives
+	 * @param notificationCallback the callback which will be triggered every time a gatt notification arrives (not decrypted)
 	 */
 	public void subscribe(String address, String serviceUuid, String characteristicUuid,
-						  final IIntegerCallback statusCallback, final IDataCallback callback) {
+						  final IIntegerCallback callback, final IDataCallback notificationCallback) {
 
 		UUID uuid = BleUtils.stringToUuid(characteristicUuid);
 		final ArrayList<IDataCallback> subscribers = getSubscribers(uuid);
 
 		if (subscribers.isEmpty()) {
-			subscribers.add(callback);
-			if (!super.subscribe(address, serviceUuid, characteristicUuid, new IStatusCallback() {
-				@Override
-				public void onError(int error) {
-					statusCallback.onError(error);
-				}
+			// Not subscribed yet.
+			subscribers.add(notificationCallback);
 
+			IStatusCallback subscribeCallback = new IStatusCallback() {
 				@Override
 				public void onSuccess() {
-					statusCallback.onSuccess(subscribers.indexOf(callback));
+					callback.onSuccess(subscribers.indexOf(notificationCallback));
 				}
-			}, notificationCallback)) {
-				subscribers.remove(callback);
-			}
-		} else {
-			subscribers.add(callback);
 
-//			JSONObject json = new JSONObject();
-//			setStatus(json, BleCoreTypes.CHARACTERISTIC_SUBSCRIBED);
-//			callback.onData(json);
-			statusCallback.onSuccess(subscribers.indexOf(callback));
+				@Override
+				public void onError(int error) {
+					subscribers.remove(notificationCallback);
+					callback.onError(error);
+				}
+			};
+
+			super.subscribe(address, serviceUuid, characteristicUuid, subscribeCallback, _notificationCallback);
 		}
-
+		else {
+			// Already subscribed, just add this callback to the list.
+			subscribers.add(notificationCallback);
+			callback.onSuccess(subscribers.indexOf(notificationCallback));
+		}
 	}
 
 	private class MultiPartNotificationCallback implements IDataCallback {
 
-		IDataCallback callback;
+		IDataCallback _callback;
+		ByteBuffer _buffer = ByteBuffer.allocate(BluenetConfig.BLE_MAX_MULTIPART_NOTIFICATION_LENGTH);
+		int _messageNr = 0;
+		long _timeStart = 0;
+		boolean _decrypt = true;
 
 		MultiPartNotificationCallback(IDataCallback callback, boolean decrypt) {
-			this.callback = callback;
+			_callback = callback;
 			_decrypt = decrypt;
 		}
-
-		ByteBuffer buffer = ByteBuffer.allocate(BluenetConfig.BLE_MAX_MULTIPART_NOTIFICATION_LENGTH);
-		int messageNr = 0;
-
-		long timeStart;
-		boolean _decrypt = true;
 
 		@Override
 		public void onData(JSONObject json) {
 			final byte[] notificationBytes = BleCore.getValue(json);
-			int nr = BleUtils.toUint8(notificationBytes[0]);
 
+			// Check what message number this is.
+			int nr = BleUtils.toUint8(notificationBytes[0]);
 			if (nr == 0) {
-				timeStart = SystemClock.elapsedRealtime();
-				if (messageNr != 0) {
+				_timeStart = SystemClock.elapsedRealtime();
+				if (_messageNr != 0) {
 					getLogger().LOGw(TAG, "notification reset!");
-					buffer.clear();
-				} else {
+					_buffer.clear();
+				}
+				else {
 					// this is the first
 				}
-			} else if (messageNr > nr) {
-				getLogger().LOGe(TAG, "fatal error");
-				callback.onError(0);
+			}
+			else if (_messageNr > nr) {
+				getLogger().LOGw(TAG, "Received notification part nr is smaller than stored!");
+				_callback.onError(BleErrors.ERROR_MULTIPART_NOTIFICATION_COUNT);
 				return;
 			}
-			messageNr = nr;
+			_messageNr = nr;
 
-			buffer.put(notificationBytes, 1, notificationBytes.length - 1);
+			// Copy the data after the message number to buffer.
+			_buffer.put(notificationBytes, 1, notificationBytes.length - 1);
 
-			if (messageNr == 0xFF) {
+			// If this is the last part, decrypt and call the callback.
+			if (_messageNr == 0xFF) {
 				getLogger().LOGd(TAG, "received last part");
-				getLogger().LOGv(TAG, "duration: %d", SystemClock.elapsedRealtime() - timeStart);
+				getLogger().LOGv(TAG, "duration: %d", SystemClock.elapsedRealtime() - _timeStart);
 				JSONObject combinedJson = new JSONObject();
-				byte[] result = new byte[buffer.position()];
-				buffer.rewind();
-				buffer.get(result);
+
+				// Copy data from buffer to byte array.
+				byte[] result = new byte[_buffer.position()];
+				_buffer.rewind();
+				_buffer.get(result);
 
 				byte[] decryptedBytes;
 				if (_decrypt) {
@@ -704,26 +730,27 @@ public class BleBase extends BleCore {
 					decryptedBytes = BleBaseEncryption.decryptCtr(result, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, encryptionKeys);
 					if (decryptedBytes == null) {
 						getLogger().LOGw(TAG, "Unable to decrypt");
-						callback.onError(BleErrors.ENCRYPTION_ERROR);
-						messageNr = 0;
-						buffer.clear();
+						_messageNr = 0;
+						_buffer.clear();
+						_callback.onError(BleErrors.ERROR_ENCRYPTION);
 						return;
 					}
 					result = decryptedBytes;
 				}
 
 				BleCore.setValue(combinedJson, result);
-				callback.onData(combinedJson);
-				messageNr = 0;
-				buffer.clear();
-			} else {
-				getLogger().LOGd(TAG, "received part %d", messageNr + 1);
+				_callback.onData(combinedJson);
+				_messageNr = 0;
+				_buffer.clear();
+			}
+			else {
+				getLogger().LOGd(TAG, "received part %d", _messageNr + 1);
 			}
 		}
 
 		@Override
 		public void onError(int error) {
-
+			_callback.onError(error);
 		}
 	}
 
@@ -737,62 +764,22 @@ public class BleBase extends BleCore {
 	 * @param address the address of the device
 	 * @param serviceUuid the uuid of the service containing the characteristic
 	 * @param characteristicUuid the uuid of the characteristic which should be subscribed to
-	 * @param statusCallback the callback which will be informed about success or failure.
+	 * @param callback the callback which will be informed about success or failure.
 	 *                       in case of success, the onSuccess function will return the subscriber
 	 *                       id which is needed for unsubscribing afterwards
-	 * @param callback the callback which will be triggered every time a gatt notification arrives
+	 * @param notificationCallback the callback which will be triggered every time the last notification of a multipart message was received.
 	 */
 	public void subscribeMultipart(String address, String serviceUuid, String characteristicUuid,
-	                               final IIntegerCallback statusCallback, final IDataCallback callback) {
-		subscribeMultipart(address, serviceUuid, characteristicUuid, _encryptionEnabled, statusCallback, callback);
+	                               final IIntegerCallback callback, final IDataCallback notificationCallback) {
+		subscribeMultipart(address, serviceUuid, characteristicUuid, _encryptionEnabled, callback, notificationCallback);
 	}
 
 	public void subscribeMultipart(String address, String serviceUuid, String characteristicUuid, boolean decrypt,
-						  final IIntegerCallback statusCallback, final IDataCallback callback) {
+						  final IIntegerCallback callback, final IDataCallback notificationCallback) {
 
-		UUID uuid = BleUtils.stringToUuid(characteristicUuid);
-		final ArrayList<IDataCallback> subscribers = getSubscribers(uuid);
-
-		final MultiPartNotificationCallback notificationCB = new MultiPartNotificationCallback(callback, decrypt);
-
-		final Runnable timeoutRunnable = new Runnable() {
-			@Override
-			public void run() {
-				getLogger().LOGd(TAG, "timeout!");
-				// TODO
-				subscribers.remove(notificationCB);
-				statusCallback.onError(BleErrors.ERROR_TIMEOUT);
-			}
-		};
-
-		if (subscribers.isEmpty()) {
-			subscribers.add(notificationCB);
-			_handler.postDelayed(timeoutRunnable, 3000);
-			if (!super.subscribe(address, serviceUuid, characteristicUuid, new IStatusCallback() {
-				@Override
-				public void onError(int error) {
-					subscribers.remove(notificationCB);
-					_handler.removeCallbacks(timeoutRunnable);
-					statusCallback.onError(error);
-				}
-
-				@Override
-				public void onSuccess() {
-					_handler.removeCallbacks(timeoutRunnable);
-					statusCallback.onSuccess(subscribers.indexOf(notificationCB));
-				}
-			}, notificationCallback)) {
-//				subscribers.remove(notificationCB); // Remove in onError() instead
-			}
-		} else {
-			subscribers.add(notificationCB);
-
-//			JSONObject json = new JSONObject();
-//			setStatus(json, BleCoreTypes.CHARACTERISTIC_SUBSCRIBED);
-//			callback.onData(json);
-			statusCallback.onSuccess(subscribers.indexOf(callback));
-		}
-
+		// Subscribe with the multipart notification class wrapped around the given callback
+		final MultiPartNotificationCallback multiPartNotificationCallback = new MultiPartNotificationCallback(notificationCallback, decrypt);
+		subscribe(address, serviceUuid, characteristicUuid, callback, multiPartNotificationCallback);
 	}
 
 	/**
@@ -803,38 +790,46 @@ public class BleBase extends BleCore {
 	 * @param serviceUuid the uuid of the service containing the characteristic
 	 * @param characteristicUuid the uuid of the characteristic which should be subscribed to
 	 * @param subscriberId id obtained from the subscribeState call
-	 * @param statusCallback the callback which will be informed about success or failure.
+	 * @param callback the callback which will be informed about success or failure.
 	 */
 	public void unsubscribe(String address, String serviceUuid, String characteristicUuid,
-							int subscriberId, IStatusCallback statusCallback) {
+							int subscriberId, final IStatusCallback callback) {
 
 		UUID uuid = BleUtils.stringToUuid(characteristicUuid);
 		ArrayList<IDataCallback> subscribers = getSubscribers(uuid);
 
 		if (subscribers.remove(subscriberId) != null) {
+			// If no subscribers are left, then unsubscribe from this characteristic.
 			if (subscribers.isEmpty()) {
-				super.unsubscribe(address, serviceUuid, characteristicUuid, statusCallback);
-			} else {
+				super.unsubscribe(address, serviceUuid, characteristicUuid, new IStatusCallback() {
+					@Override
+					public void onSuccess() {
+						callback.onSuccess();
+					}
 
-//				JSONObject json = new JSONObject();
-//				setStatus(json, BleCoreTypes.CHARACTERISTIC_UNSUBSCRIBED);
-//				callback.onData(json);
-
-				statusCallback.onSuccess();
+					@Override
+					public void onError(int error) {
+						// Failed to unsubscribe, now what? Is there any cleaning up to do?
+						callback.onError(error);
+					}
+				});
 			}
-		} else {
-			statusCallback.onError(BleErrors.WRONG_CALLBACK);
-//			callback.onError(BleErrors.WRONG_CALLBACK);
+			else {
+				callback.onSuccess();
+			}
+		}
+		else {
+			callback.onError(BleErrors.WRONG_CALLBACK);
 		}
 	}
 
-	// todo: better name than single shot?
 	/**
 	 * Subscribe to a characteristic, get the notifications, then unsubscribe again (silently).
 	 * internal use only
 	 * @param address the address of the device
 	 * @param serviceUuid the uuid of the service containing the characteristic
 	 * @param characteristicUuid the uuid of the characteristic which should be subscribed to
+	 * @param decrypt whether or not to decrypt the message.
 	 * @param callback the callback which will be triggered every time a gatt notification arrives
 	 */
 	private void subscribeMultipartSingleShot(final String address, final String serviceUuid,
@@ -900,7 +895,6 @@ public class BleBase extends BleCore {
 				});
 	}
 
-	// todo: better name than single shot?
 	private void subscribeSingleShot(final String address, final String serviceUuid, final String characteristicUuid,
 									 final IDataCallback callback) {
 
@@ -2272,7 +2266,7 @@ public class BleBase extends BleCore {
 				else {
 					if (_encryptionKeys == null) {
 						getLogger().LOGe(TAG, "no keys set!");
-						callback.onError(BleErrors.ENCRYPTION_ERROR);
+						callback.onError(BleErrors.ERROR_ENCRYPTION);
 						return;
 					}
 					byte[] decryptedData = BleBaseEncryption.decryptEcb(data, _encryptionKeys.getGuestKey());
@@ -2281,7 +2275,7 @@ public class BleBase extends BleCore {
 
 				if (_encryptionSessionData == null) {
 					getLogger().LOGe(TAG, "no keys set!");
-					callback.onError(BleErrors.ENCRYPTION_ERROR);
+					callback.onError(BleErrors.ERROR_ENCRYPTION);
 					return;
 				}
 				getLogger().LOGd(TAG, "sessionNonce:" + BleUtils.bytesToString(_encryptionSessionData.sessionNonce));

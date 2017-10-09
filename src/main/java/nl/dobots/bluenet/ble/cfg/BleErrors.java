@@ -67,7 +67,9 @@ public class BleErrors {
 
 
 	// BleBase
-	public static final int ENCRYPTION_ERROR = 400;
+	public static final int ERROR_ENCRYPTION = 400;
+	public static final int ERROR_NO_KEYS_SET = 401;
+	public static final int ERROR_MULTIPART_NOTIFICATION_COUNT = 402;
 
 	// BleExt
 	public static final int ERROR_WRONG_STATE = 500;

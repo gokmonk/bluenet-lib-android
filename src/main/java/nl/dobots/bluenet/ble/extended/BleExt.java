@@ -600,49 +600,68 @@ public class BleExt extends Logging implements IWriteCallback {
 
 			_connectionState = BleDeviceConnectionState.connecting;
 
-			IDataCallback connectCallback = new IDataCallback() {
+//			IDataCallback connectCallback = new IDataCallback() {
+//				@Override
+//				public void onData(JSONObject json) {
+//					String status = BleCore.getStatus(json);
+//					if (status == "connected") {
+//						onConnect();
+//						callback.onSuccess();
+//					} else {
+//						getLogger().LOGe(TAG, "wrong status received: %s", status);
+//						_connectionState = BleDeviceConnectionState.initialized;
+//						callback.onError(BleErrors.ERROR_CONNECT_FAILED);
+//					}
+//				}
+//
+//				@Override
+//				public void onError(int error) {
+//					_connectionState = BleDeviceConnectionState.initialized;
+//
+//					if (!retry(error)) {
+//						callback.onError(error);
+//					} else {
+//						connect(address, callback);
+//					}
+//				}
+//			};
+			IStatusCallback connectCallback = new IStatusCallback() {
 				@Override
-				public void onData(JSONObject json) {
-					String status = BleCore.getStatus(json);
-					if (status == "connected") {
-						onConnect();
-						callback.onSuccess();
-					} else {
-						getLogger().LOGe(TAG, "wrong status received: %s", status);
-						_connectionState = BleDeviceConnectionState.initialized;
-						callback.onError(BleErrors.ERROR_CONNECT_FAILED);
-					}
+				public void onSuccess() {
+					onConnect();
+					callback.onSuccess();
 				}
 
 				@Override
 				public void onError(int error) {
 					_connectionState = BleDeviceConnectionState.initialized;
-
 					if (!retry(error)) {
 						callback.onError(error);
-					} else {
+					}
+					else {
 						connect(address, callback);
 					}
 				}
 			};
 
-//			if (_bleBase.isClosed(_targetAddress)) {
-//				_bleBase.connectDevice(_targetAddress, _connectTimeout, dataCallback);
-//			} else if (_bleBase.isDisconnected(_targetAddress)) {
-//				_bleBase.reconnectDevice(_targetAddress, 30, dataCallback);
 			if (_bleBase.isDisconnected(_targetAddress)) {
 				_bleBase.connectDevice(_targetAddress, _connectTimeout, connectCallback);
 			}
-		} else if (checkConnectionState(BleDeviceConnectionState.connected, null)) {
+			else {
+				callback.onError(BleErrors.ERROR_WRONG_STATE);
+			}
+		}
+		else if (checkConnectionState(BleDeviceConnectionState.connected, null)) {
 			if (_targetAddress.equals(address)) {
 				callback.onSuccess();
-			} else {
+			}
+			else {
 				callback.onError(BleErrors.ERROR_STILL_CONNECTED);
 			}
-		} else {
+		}
+		else {
 			callback.onError(BleErrors.ERROR_WRONG_STATE);
 		}
-
 	}
 
 	/**
@@ -702,29 +721,42 @@ public class BleExt extends Logging implements IWriteCallback {
 	 * success or failure
 	 *
 	 * @param callback the callback used to report back if the disconnect was successful or not
-	 * @return true if disconnect procedure is started, false if an error occurred and disconnect
-	 * procedure could not be started
 	 */
-	public boolean disconnect(final IStatusCallback callback) {
+	public void disconnect(final IStatusCallback callback) {
 		checkConnectionState(BleDeviceConnectionState.connected, null);
 //		if (!checkConnectionState(BleDeviceConnectionState.connected, callback)) return false;
 
 		_connectionState = BleDeviceConnectionState.disconnecting;
-		return _bleBase.disconnectDevice(_targetAddress, new IDataCallback() {
+//		return _bleBase.disconnectDevice(_targetAddress, new IDataCallback() {
+//			@Override
+//			public void onData(JSONObject json) {
+//				String status = BleCore.getStatus(json);
+//				if (status == "disconnected") {
+//					onDisconnect();
+//					callback.onSuccess();
+//				} else {
+//					getLogger().LOGe(TAG, "wrong status received: %s", status);
+//					callback.onError(BleErrors.ERROR_DISCONNECT_FAILED);
+//				}
+//			}
+//
+//			@Override
+//			public void onError(int error) {
+//				callback.onError(error);
+//			}
+//		});
+
+		_bleBase.disconnectDevice(_targetAddress, new IStatusCallback() {
 			@Override
-			public void onData(JSONObject json) {
-				String status = BleCore.getStatus(json);
-				if (status == "disconnected") {
-					onDisconnect();
-					callback.onSuccess();
-				} else {
-					getLogger().LOGe(TAG, "wrong status received: %s", status);
-					callback.onError(BleErrors.ERROR_DISCONNECT_FAILED);
-				}
+			public void onSuccess() {
+				onDisconnect();
+				callback.onSuccess();
 			}
 
 			@Override
 			public void onError(int error) {
+				// TODO: now what? Set _connectionState to initialized anyway?
+				getLogger().LOGe(TAG, "failed to disconnect: " + error);
 				callback.onError(error);
 			}
 		});
@@ -1147,18 +1179,17 @@ public class BleExt extends Logging implements IWriteCallback {
 	 *
 	 * @param clearCache set to true if device cache should be cleared on close. see @close for details
 	 * @param callback   the callback which will be notified about success or failure
-	 * @return
 	 */
-	public synchronized boolean disconnectAndClose(boolean clearCache, final IStatusCallback callback) {
+	public synchronized void disconnectAndClose(boolean clearCache, final IStatusCallback callback) {
 		checkConnectionState(BleDeviceConnectionState.connected, null);
 //		if (!checkConnectionState(BleDeviceConnectionState.connected, callback)) return false;
 
 		_connectionState = BleDeviceConnectionState.disconnecting;
-		return _bleBase.disconnectAndCloseDevice(_targetAddress, clearCache, new IDataCallback() {
+		_bleBase.disconnectAndCloseDevice(_targetAddress, clearCache, new IStatusCallback() {
 			@Override
-			public void onData(JSONObject json) {
-				String status = BleCore.getStatus(json);
-				if (status == "closed") {
+			public void onSuccess() {
+//				String status = BleCore.getStatus(json);
+//				if (status == "closed") {
 					onDisconnect();
 					// give the bluetooth adapter some time to settle after a close
 					_handler.postDelayed(new Runnable() {
@@ -1167,19 +1198,19 @@ public class BleExt extends Logging implements IWriteCallback {
 							callback.onSuccess();
 						}
 					}, 300);
-				} else if (status != "disconnected") {
-					getLogger().LOGe(TAG, "wrong status received: %s", status);
-				}
+//				} else if (status != "disconnected") {
+//					getLogger().LOGe(TAG, "wrong status received: %s", status);
+//				}
 			}
 
 			@Override
 			public void onError(int error) {
-				switch (error) {
-					case BleErrors.ERROR_NEVER_CONNECTED:
-					case BleErrors.ERROR_NOT_CONNECTED:
-						_connectionState = BleDeviceConnectionState.initialized;
-						break;
-				}
+//				switch (error) {
+//					case BleErrors.ERROR_NEVER_CONNECTED:
+//					case BleErrors.ERROR_NOT_CONNECTED:
+//						_connectionState = BleDeviceConnectionState.initialized;
+//						break;
+//				}
 				callback.onError(error);
 			}
 		});
