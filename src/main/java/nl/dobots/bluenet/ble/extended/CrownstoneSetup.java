@@ -76,7 +76,7 @@ public class CrownstoneSetup {
 		_bleExt.getLogger().LOGe(TAG, "setup failed at step %d with error %d", _currentStep, error);
 		_progressCallback.onProgress(0, null);
 		_progressCallback.onError(BleErrors.ERROR_SETUP_FAILED);
-		_statusCallback.onError(BleErrors.ERROR_SETUP_FAILED);
+		_statusCallback.onError(error);
 	}
 
 	private void setupStep(final int step) {

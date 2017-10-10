@@ -49,10 +49,10 @@ public class BleErrors {
 	public static final int NO_SUBSCRIBER_ID = 237;
 	public static final int ERROR_RECOVER_MODE_DISABLED = 238;
 	public static final int ERROR_NOT_IN_RECOVERY_MODE = 239;
-	public static final int ERROR_SETUP_FAILED = 240;
+
 	public static final int ERROR_VALIDATION_FAILED = 241;
 	public static final int ERROR_LOCATION_SERVICES_TURNED_OFF = 242;
-	public static final int ERROR_SETUP_CANCELED = 243;
+
 	public static final int ERROR_WRONG_PAYLOAD_SIZE = 244;
 	public static final int ERROR_MSG_PARSING = 245;
 	public static final int ERROR_REFRESH_FAILED = 246;
@@ -70,6 +70,8 @@ public class BleErrors {
 	public static final int ERROR_ENCRYPTION = 400;
 	public static final int ERROR_NO_KEYS_SET = 401;
 	public static final int ERROR_MULTIPART_NOTIFICATION_COUNT = 402;
+	public static final int ERROR_SETUP_FAILED = 403;
+	public static final int ERROR_SETUP_CANCELED = 404;
 
 	// BleExt
 	public static final int ERROR_WRONG_STATE = 500;
@@ -78,11 +80,13 @@ public class BleErrors {
 
 	// BluetoothGatt errors (see https://android.googlesource.com/platform/external/bluetooth/bluedroid/+/master/stack/include/gatt_api.h)
 	// 8    GATT_CONN_TIMEOUT
-	//      [01.11.17] (Bart @ oneplus 3) When I get this error, it continuously fails.
+	//      [11.01.17] (Bart @ oneplus 3) When I get this error, it continuously fails.
+	// 22   GATT_CONN_TERMINATE_LOCAL_HOST
+	//      [10.10.17] Getting this error on a samsung s7 a lot, seems to happen when out of reach.
 	// 133  GATT_ERROR
-	//      [01.11.17] This error seems rather common, retry usually helps.
+	//      [11.01.17] This error seems rather common, retry usually helps.
 	// 257  ??
-	//      [01.11.17] (Bart @ oneplus 3) When I get this error, not long after i will get scan error 2
+	//      [11.01.17] (Bart @ oneplus 3) When I get this error, not long after i will get scan error 2
 	//                                  And scanning completely stops working.
 
 	// ScanCallback errors

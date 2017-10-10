@@ -1584,7 +1584,7 @@ public class BleCore extends Logging {
             return;
         }
 
-        if (!connection.setCallback(callback, ActionType.READ)) {
+        if (!connection.setCallback(callback, ActionType.WRITE)) {
             getLogger().LOGw(TAG, "busy");
             callback.onError(BleErrors.ERROR_BUSY);
             return;
@@ -1935,6 +1935,7 @@ public class BleCore extends Logging {
 		public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             BluetoothDevice device = gatt.getDevice();
             String address = device.getAddress();
+			getLogger().LOGd(TAG, "onCharacteristicRead " + address + " char: " + characteristic.getUuid());
             Connection connection = _connections.get(address);
             if (connection == null) {
                 getLogger().LOGe(TAG, "Huh? No registered connection for device " + address);
@@ -1967,6 +1968,7 @@ public class BleCore extends Logging {
 		public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             BluetoothDevice device = gatt.getDevice();
             String address = device.getAddress();
+			getLogger().LOGd(TAG, "onCharacteristicChanged " + address + " char: " + characteristic.getUuid());
             Connection connection = _connections.get(address);
             if (connection == null) {
                 getLogger().LOGe(TAG, "Huh? No registered connection for device " + address);
@@ -1994,9 +1996,10 @@ public class BleCore extends Logging {
 		 */
 		@Override
 		public synchronized void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
-            BluetoothDevice device = gatt.getDevice();
-            String address = device.getAddress();
-            Connection connection = _connections.get(address);
+			BluetoothDevice device = gatt.getDevice();
+			String address = device.getAddress();
+			getLogger().LOGd(TAG, "onCharacteristicWrite " + address + " char: " + characteristic.getUuid());
+			Connection connection = _connections.get(address);
             if (connection == null) {
                 getLogger().LOGe(TAG, "Huh? No registered connection for device " + address);
                 return;
@@ -2042,6 +2045,7 @@ public class BleCore extends Logging {
 		public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
             BluetoothDevice device = gatt.getDevice();
             String address = device.getAddress();
+			getLogger().LOGd(TAG, "onDescriptorWrite " + address + " char: " + descriptor.getCharacteristic().getUuid());
             Connection connection = _connections.get(address);
             if (connection == null) {
                 getLogger().LOGe(TAG, "Huh? No registered connection for device " + address);

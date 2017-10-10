@@ -180,43 +180,46 @@ public class BleBase extends BleCore {
 		if (_onWriteCallback != null) {
 			_onWriteCallback.onWrite();
 		}
-		if (_encryptionEnabled && accessLevel != BleBaseEncryption.ACCESS_LEVEL_ENCRYPTION_DISABLED) {
-			EncryptionKeys encryptionKeys = _encryptionKeys;
-			if (_setupMode && _setupEncryptionKey != null) {
-				// TODO: this is a hackish solution
-				getLogger().LOGi(TAG, "Use setup encryption key");
-				encryptionKeys = new SetupEncryptionKey(_setupEncryptionKey);
-			}
-			if (encryptionKeys == null) {
-				getLogger().LOGw(TAG, "no keys");
-				callback.onError(BleErrors.ERROR_NO_KEYS_SET);
-				return;
-			}
 
-			if (_encryptionSessionData == null) {
-				getLogger().LOGw(TAG, "no session data");
-				callback.onError(BleErrors.ERROR_ENCRYPTION);
-				return;
-			}
-
-			// Just use highest available key
-			EncryptionKeys.KeyAccessLevelPair keyAccessLevelPair = encryptionKeys.getHighestKey();
-			if (keyAccessLevelPair == null) {
-				getLogger().LOGw(TAG, "no key available");
-				callback.onError(BleErrors.ERROR_NO_KEYS_SET);
-				return;
-			}
-
-			byte[] encryptedBytes = BleBaseEncryption.encryptCtr(value, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, keyAccessLevelPair.key, keyAccessLevelPair.accessLevel);
-			if (encryptedBytes == null) {
-				getLogger().LOGw(TAG, "encryption failed");
-				callback.onError(BleErrors.ERROR_ENCRYPTION);
-				return;
-			}
-
-			super.write(address, serviceUuid, characteristicUuid, encryptedBytes, callback);
+		if (!_encryptionEnabled || accessLevel == BleBaseEncryption.ACCESS_LEVEL_ENCRYPTION_DISABLED) {
+			super.write(address, serviceUuid, characteristicUuid, value, callback);
+			return;
 		}
-		super.write(address, serviceUuid, characteristicUuid, value, callback);
+
+		EncryptionKeys encryptionKeys = _encryptionKeys;
+		if (_setupMode && _setupEncryptionKey != null) {
+			// TODO: this is a hackish solution
+			getLogger().LOGi(TAG, "Use setup encryption key");
+			encryptionKeys = new SetupEncryptionKey(_setupEncryptionKey);
+		}
+		if (encryptionKeys == null) {
+			getLogger().LOGw(TAG, "no keys");
+			callback.onError(BleErrors.ERROR_NO_KEYS_SET);
+			return;
+		}
+
+		if (_encryptionSessionData == null) {
+			getLogger().LOGw(TAG, "no session data");
+			callback.onError(BleErrors.ERROR_ENCRYPTION);
+			return;
+		}
+
+		// Just use highest available key
+		EncryptionKeys.KeyAccessLevelPair keyAccessLevelPair = encryptionKeys.getHighestKey();
+		if (keyAccessLevelPair == null) {
+			getLogger().LOGw(TAG, "no key available");
+			callback.onError(BleErrors.ERROR_NO_KEYS_SET);
+			return;
+		}
+
+		byte[] encryptedBytes = BleBaseEncryption.encryptCtr(value, _encryptionSessionData.sessionNonce, _encryptionSessionData.validationKey, keyAccessLevelPair.key, keyAccessLevelPair.accessLevel);
+		if (encryptedBytes == null) {
+			getLogger().LOGw(TAG, "encryption failed");
+			callback.onError(BleErrors.ERROR_ENCRYPTION);
+			return;
+		}
+
+		super.write(address, serviceUuid, characteristicUuid, encryptedBytes, callback);
 	}
 
 	@Override
@@ -2305,7 +2308,7 @@ public class BleBase extends BleCore {
 
 			@Override
 			public void onError(int error) {
-				getLogger().LOGd(TAG, "onError");
+				getLogger().LOGd(TAG, "failed to read session nonce");
 				callback.onError(error);
 			}
 		};

@@ -1134,33 +1134,7 @@ public class BleExt extends Logging implements IWriteCallback {
 //				_handler.postDelayed(new Runnable() {
 //					@Override
 //					public void run() {
-				discoverServices(new IDiscoveryCallback() {
-					@Override
-					public void onDiscovery(String serviceUuid, String characteristicUuid) {
-						callback.onDiscovery(serviceUuid, characteristicUuid);
-					}
-
-					@Override
-					public void onSuccess() {
-						callback.onSuccess();
-					}
-
-					@Override
-					public void onError(int error) {
-						switch (error) {
-							case BleErrors.ERROR_NOT_CONNECTED:
-										/* [18 nov 2016] When there was a successful connect, but a disconnect shortly after,
-										 * the callback.onError() was called twice. This avoids that behaviour.
-										 */
-								break;
-							case BleErrors.ERROR_SERVICE_NOT_FOUND: {
-								break;
-							}
-							default:
-								callback.onError(error);
-						}
-					}
-				}, readSessionNonce);
+				discoverServices(callback, readSessionNonce);
 //					}
 //				}, 500);
 //				discoverServices(callback);
@@ -1205,12 +1179,6 @@ public class BleExt extends Logging implements IWriteCallback {
 
 			@Override
 			public void onError(int error) {
-//				switch (error) {
-//					case BleErrors.ERROR_NEVER_CONNECTED:
-//					case BleErrors.ERROR_NOT_CONNECTED:
-//						_connectionState = BleDeviceConnectionState.initialized;
-//						break;
-//				}
 				callback.onError(error);
 			}
 		});
