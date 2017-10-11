@@ -896,6 +896,7 @@ public class BleExt extends Logging implements IWriteCallback {
 					_bleBase.readSessionNonce(_targetAddress, new IDataCallback() {
 						@Override
 						public void onData(JSONObject json) {
+							handleOtherRetrySuccess();
 							callback.onSuccess();
 						}
 
