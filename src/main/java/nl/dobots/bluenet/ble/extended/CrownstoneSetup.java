@@ -63,7 +63,12 @@ public class CrownstoneSetup {
 		@Override
 		public void onSuccess() {
 			_progressCallback.onProgress(_currentStep, null);
-			setupStep(_currentStep+1);
+            _bleExt.getHandler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    setupStep(_currentStep+1);
+                }
+            }, 500);
 		}
 
 		@Override
