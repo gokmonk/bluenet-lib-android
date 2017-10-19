@@ -648,6 +648,7 @@ public class BleExt extends Logging implements IWriteCallback {
 				_bleBase.connectDevice(_targetAddress, _connectTimeout, connectCallback);
 			}
 			else {
+				getLogger().LOGd(TAG, "not disconnected");
 				callback.onError(BleErrors.ERROR_WRONG_STATE);
 			}
 		}
@@ -660,6 +661,7 @@ public class BleExt extends Logging implements IWriteCallback {
 			}
 		}
 		else {
+			getLogger().LOGd(TAG, "not initialized or connected");
 			callback.onError(BleErrors.ERROR_WRONG_STATE);
 		}
 	}
@@ -789,6 +791,7 @@ public class BleExt extends Logging implements IWriteCallback {
 		if (_connectionState != state) {
 //			getLogger().LOGe(TAG, "wrong connection state: %s instead of %s", _connectionState.toString(), state.toString());
 			if (callback != null) {
+				getLogger().LOGd(TAG, _connectionState + " != " + state);
 				callback.onError(BleErrors.ERROR_WRONG_STATE);
 			}
 			return false;
@@ -1547,6 +1550,7 @@ public class BleExt extends Logging implements IWriteCallback {
 			case connected:
 			case disconnecting: {
 				if (callback != null) {
+					getLogger().LOGd(TAG, "disconnecting..");
 					callback.onError(BleErrors.ERROR_WRONG_STATE);
 				}
 				return false;
