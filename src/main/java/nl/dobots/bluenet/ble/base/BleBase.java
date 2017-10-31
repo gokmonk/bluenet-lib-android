@@ -2262,7 +2262,14 @@ public class BleBase extends BleCore {
 			@Override
 			public void onData(final JSONObject json) {
 				byte[] data = getValue(json);
-				getLogger().LOGv(TAG, "get session nonce (setup=%b): %s", _setupMode, BleUtils.bytesToString(data));
+				getLogger().LOGd(TAG, "get session nonce (setup=%b): %s", _setupMode, BleUtils.bytesToString(data));
+
+				// On the sony phone the read was successful but with 0 bytes read, instead of a characteristic read fail.
+				if (data.length == 0) {
+					callback.onError(BleErrors.ERROR_CHARACTERISTIC_READ_FAILED);
+					return;
+				}
+
 				if (_setupMode) {
 					_encryptionSessionData = BleBaseEncryption.getSessionData(data, false);
 				}
@@ -2277,7 +2284,7 @@ public class BleBase extends BleCore {
 				}
 
 				if (_encryptionSessionData == null) {
-					getLogger().LOGe(TAG, "no keys set!");
+					getLogger().LOGe(TAG, "no session data!");
 					callback.onError(BleErrors.ERROR_ENCRYPTION);
 					return;
 				}
