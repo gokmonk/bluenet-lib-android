@@ -81,6 +81,7 @@ public class BleErrors {
 	// BluetoothGatt errors (see https://android.googlesource.com/platform/external/bluetooth/bluedroid/+/master/stack/include/gatt_api.h)
 	// 8    GATT_CONN_TIMEOUT
 	//      [11.01.17] (Bart @ oneplus 3) When I get this error, it continuously fails.
+    // 19   Wasn't this when being disconnected by the crownstone?
 	// 22   GATT_CONN_TERMINATE_LOCAL_HOST
 	//      [10.10.17] Getting this error on a samsung s7 a lot, seems to happen when out of reach.
 	// 133  GATT_ERROR

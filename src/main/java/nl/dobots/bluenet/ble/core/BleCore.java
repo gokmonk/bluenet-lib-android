@@ -609,7 +609,7 @@ public class BleCore extends Logging {
 		// check first if phone has bluetooth le
 		if (!context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE))
 		{
-			getLogger().LOGe(TAG, "Can't use library without BLE hardware!! Abort.");
+			getLogger().LOGe(TAG, "Can't use library without BLE hardware.");
 			callback.onError(BleErrors.ERROR_BLE_HARDWARE_MISSING);
 			return;
 		}
@@ -660,6 +660,7 @@ public class BleCore extends Logging {
 				_initializeCallback.onSuccess();
 				_initializeCallback = null;
 			}
+            getLogger().LOGe(TAG, "Huh? cb == null");
 		}
 
 	}

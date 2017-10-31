@@ -63,6 +63,7 @@ public class CrownstoneSetup {
 		@Override
 		public void onSuccess() {
 			_progressCallback.onProgress(_currentStep, null);
+			// Add a delay, that seems to help against getting gatt error 22.
             _bleExt.getHandler().postDelayed(new Runnable() {
                 @Override
                 public void run() {
