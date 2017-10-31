@@ -2721,7 +2721,7 @@ public class BleExt extends Logging implements IWriteCallback {
 							}
 						});
 					}
-				}, 20); // Should be less than FACTORY_PROCESS_TIMEOUT, only need to wait for a very short time.
+				}, 1); // Should be less than FACTORY_PROCESS_TIMEOUT, only need to wait for a very short time.
 			}
 
 			@Override
@@ -2791,7 +2791,13 @@ public class BleExt extends Logging implements IWriteCallback {
 			@Override
 			public void onSuccess() {
 				// Perform step 2
-				recoverStep(address, callback);
+				// Delay with 2s, to give the device time to reboot.
+				getHandler().postDelayed(new Runnable() {
+					@Override
+					public void run() {
+						recoverStep(address, callback);
+					}
+				}, 2000);
 			}
 
 			@Override
