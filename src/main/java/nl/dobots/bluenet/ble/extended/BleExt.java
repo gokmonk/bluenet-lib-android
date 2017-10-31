@@ -2573,6 +2573,7 @@ public class BleExt extends Logging implements IWriteCallback {
 				disconnectAndClose(true, new IStatusCallback() {
 					@Override
 					public void onSuccess() {
+						getLogger().LOGd(TAG, "disconnected");
 						callback.onSuccess();
 					}
 

@@ -1853,9 +1853,15 @@ public class BleCore extends Logging {
 
                 if (connection != null) {
                     _connections.remove(address);
-                    connection.setConnectionState(ConnectionState.DISCONNECTED);
-                    connection.reject(status);
-                }
+					if (connection.getActionType() == ActionType.DISCONNECT) {
+						connection.setConnectionState(ConnectionState.DISCONNECTED);
+						connection.resolve();
+					}
+					else {
+						connection.setConnectionState(ConnectionState.DISCONNECTED);
+						connection.reject(status);
+					}
+				}
                 return;
             }
 
