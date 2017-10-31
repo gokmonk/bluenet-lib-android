@@ -130,21 +130,21 @@ public class BleIbeaconRanging {
 		return _rangingListeners.remove(listener);
 	}
 
-	public void pause() {
+	public synchronized void pause() {
 		_paused = true;
 	}
 
-	public void resume() {
+	public synchronized void resume() {
 		_paused = false;
 		// TODO: Fire event to listeners?
 	}
 
 	// Rssi threshold for enter region events
-	public void setRssiThreshold(int rssi) {
+	public synchronized void setRssiThreshold(int rssi) {
 		_minRssi = rssi;
 	}
 
-	public Set getEnteredRegions() {
+	public synchronized Set getEnteredRegions() {
 		return _inRegion;
 	}
 
