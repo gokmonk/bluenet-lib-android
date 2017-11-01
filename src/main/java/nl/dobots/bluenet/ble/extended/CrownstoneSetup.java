@@ -186,28 +186,33 @@ public class CrownstoneSetup {
 		_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_VALIDATE_SETUP), callback);
 	}
 
-	public void executeSetup(int crownstoneId, String adminKey, String memberKey, String guestKey,
-							 int meshAccessAddress, String iBeaconUuid, int iBeaconMajor,
-							 int iBeaconMinor, IProgressCallback progressCallback, IStatusCallback statusCallback) {
+	public void executeSetup(final int crownstoneId, final String adminKey, final String memberKey, final String guestKey,
+							 final int meshAccessAddress, final String iBeaconUuid, final int iBeaconMajor,
+							 final int iBeaconMinor, final IProgressCallback progressCallback, final IStatusCallback statusCallback) {
 
 		if (_bleExt.isConnected(statusCallback)) {
-			_bleExt.getLogger().LOGi(TAG, "executeSetup");
+			_bleExt.getHandler().postDelayed(new Runnable() {
+				@Override
+				public void run() {
+					_bleExt.getLogger().LOGi(TAG, "executeSetup");
 
-			_targetAddress = _bleExt.getTargetAddress();
-			_crownstoneId = crownstoneId;
-			_adminKey = adminKey;
-			_memberKey = memberKey;
-			_guestKey = guestKey;
-			_meshAccessAddress = meshAccessAddress;
-			_iBeaconUuid = iBeaconUuid;
-			_iBeaconMajor = iBeaconMajor;
-			_iBeaconMinor = iBeaconMinor;
-			_progressCallback = progressCallback;
-			_statusCallback = statusCallback;
+					_targetAddress = _bleExt.getTargetAddress();
+					_crownstoneId = crownstoneId;
+					_adminKey = adminKey;
+					_memberKey = memberKey;
+					_guestKey = guestKey;
+					_meshAccessAddress = meshAccessAddress;
+					_iBeaconUuid = iBeaconUuid;
+					_iBeaconMajor = iBeaconMajor;
+					_iBeaconMinor = iBeaconMinor;
+					_progressCallback = progressCallback;
+					_statusCallback = statusCallback;
 
-			_cancel = false;
+					_cancel = false;
 
-			setupStep(1);
+					setupStep(1);
+				}
+			}, 500);
 		}
 
 	}
