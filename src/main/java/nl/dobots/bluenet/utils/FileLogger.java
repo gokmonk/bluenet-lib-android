@@ -266,6 +266,9 @@ public class FileLogger {
 //		});
 
 		File[] files = getLogFiles();
+		if (files == null) {
+			return true;
+		}
 		long currentTime = new Date().getTime();
 		for (File file : files) {
 			if (currentTime - file.lastModified() > 24*3600*1000*MAX_LOG_DAYS) {
