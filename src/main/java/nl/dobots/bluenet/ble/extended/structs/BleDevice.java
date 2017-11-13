@@ -540,7 +540,7 @@ public class BleDevice {
 
 	}
 
-	public void copyFromOld(BleDevice old) {
+	public synchronized void copyFromOld(BleDevice old) {
 		// Copy from old to new
 		_isValidatedCrownstone   = old._isValidatedCrownstone;
 		_lastCrownstoneId        = old._lastCrownstoneId;
