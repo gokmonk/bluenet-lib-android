@@ -1858,7 +1858,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	public void writeRelay(final boolean relayOn, final IStatusCallback callback) {
 		if (isConnected(callback)) {
 			getLogger().LOGd(TAG, "Set Relay to %b", relayOn);
-			if (hasControlCharacteristic(null)) {
+			if (hasControlCharacteristic(null, true)) {
 				getLogger().LOGd(TAG, "use control characteristic");
 				int value = relayOn ? BluenetConfig.RELAY_ON : BluenetConfig.RELAY_OFF;
 				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_RELAY, 1, new byte[]{(byte) value}), callback);

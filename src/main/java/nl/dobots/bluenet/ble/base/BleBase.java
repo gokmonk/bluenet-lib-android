@@ -1918,7 +1918,7 @@ public class BleBase extends BleCore {
 	private void sendCommand(String address, ControlMsg command, String serviceUuid, String characteristicUuid, char accessLevel,
 							 final IStatusCallback callback) {
 		byte[] bytes = command.toArray();
-		getLogger().LOGd(TAG, "control command: write %s at service %s and characteristic %s", BleUtils.bytesToString(bytes), BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONTROL_UUID);
+		getLogger().LOGd(TAG, "control command: write %s at service %s and characteristic %s", BleUtils.bytesToString(bytes), serviceUuid, characteristicUuid);
 		write(address, serviceUuid, characteristicUuid, bytes, accessLevel,
 				new IStatusCallback() {
 
@@ -1969,6 +1969,7 @@ public class BleBase extends BleCore {
 	 * @param callback callback function to be called on success or error
 	 */
 	public void sendCommand(String address, ControlMsg command, char accessLevel, final IStatusCallback callback) {
+		getLogger().LOGd(TAG, "setupMode = " + _setupMode);
 		if (_setupMode) {
 			sendCommand(address, command, BluenetConfig.SETUP_SERVICE_UUID, BluenetConfig.CHAR_SETUP_CONTROL_UUID, accessLevel, callback);
 		} else {
