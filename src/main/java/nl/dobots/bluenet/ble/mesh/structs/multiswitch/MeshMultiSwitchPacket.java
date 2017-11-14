@@ -37,6 +37,9 @@ public class MeshMultiSwitchPacket implements MeshPayload {
 	private static final int MULTI_SWITCH_PACKET_HEADER_SIZE = 1;
 	protected static final int MULTI_SWITCH_PACKET_MAX_PAYLOAD_SIZE = (BluenetConfig.MESH_MAX_PAYLOAD_SIZE - MULTI_SWITCH_PACKET_HEADER_SIZE);
 
+	// Define the different types
+	private static final int TYPE_LIST = 0;
+
 	// Type of the payload
 	private int _type;
 
@@ -49,6 +52,22 @@ public class MeshMultiSwitchPacket implements MeshPayload {
 	public MeshMultiSwitchPacket() {
 		_type = -1;
 		_payload = null;
+	}
+
+	/**
+	 * Set the payload of the packet, automatically sets the correct type.
+	 * @param payload The payload to set.
+	 * @return true on success.
+	 */
+	public boolean setPayload(MeshMultiSwitchPayload payload) {
+		if (payload == null) {
+			return false;
+		}
+		if (payload instanceof MeshMultiSwitchListPacket) {
+			_type = TYPE_LIST;
+		}
+		_payload = payload;
+		return true;
 	}
 
 	/**
@@ -72,7 +91,7 @@ public class MeshMultiSwitchPacket implements MeshPayload {
 		_type = BleUtils.toUint8(bb.get());
 		boolean success = false;
 		switch (_type) {
-			case 0:
+			case TYPE_LIST:
 				_payload = new MeshMultiSwitchListPacket();
 				success = _payload.fromArray(bb);
 				break;
@@ -93,7 +112,7 @@ public class MeshMultiSwitchPacket implements MeshPayload {
 	public boolean toArray(ByteBuffer bb) {
 		boolean success = false;
 		switch (_type) {
-			case 0:
+			case TYPE_LIST:
 				success = true;
 				break;
 		}

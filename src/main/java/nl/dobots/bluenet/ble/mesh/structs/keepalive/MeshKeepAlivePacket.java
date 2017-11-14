@@ -37,6 +37,9 @@ public class MeshKeepAlivePacket implements MeshPayload {
 	private static final int KEEP_ALIVE_PACKET_HEADER_SIZE = 1;
 	protected static final int KEEP_ALIVE_PACKET_MAX_PAYLOAD_SIZE = (BluenetConfig.MESH_MAX_PAYLOAD_SIZE - KEEP_ALIVE_PACKET_HEADER_SIZE);
 
+	// Define the different types
+	private static final int TYPE_SAME_TIMEOUT = 1;
+
 	// Type of the payload
 	private int _type;
 
@@ -49,6 +52,22 @@ public class MeshKeepAlivePacket implements MeshPayload {
 	public MeshKeepAlivePacket() {
 		_type = -1;
 		_payload = null;
+	}
+
+	/**
+	 * Set the payload of the packet, automatically sets the correct type.
+	 * @param payload The payload to set.
+	 * @return true on success.
+	 */
+	public boolean setPayload(MeshKeepAlivePayload payload) {
+		if (payload == null) {
+			return false;
+		}
+		if (payload instanceof MeshKeepAliveSameTimeoutPacket) {
+			_type = TYPE_SAME_TIMEOUT;
+		}
+		_payload = payload;
+		return true;
 	}
 
 	/**
@@ -72,7 +91,7 @@ public class MeshKeepAlivePacket implements MeshPayload {
 		_type = BleUtils.toUint8(bb.get());
 		boolean success = false;
 		switch (_type) {
-			case 1:
+			case TYPE_SAME_TIMEOUT:
 				_payload = new MeshKeepAliveSameTimeoutPacket();
 				success = _payload.fromArray(bb);
 				break;
@@ -93,7 +112,7 @@ public class MeshKeepAlivePacket implements MeshPayload {
 	public boolean toArray(ByteBuffer bb) {
 		boolean success = false;
 		switch (_type) {
-			case 1:
+			case TYPE_SAME_TIMEOUT:
 				success = true;
 				break;
 		}

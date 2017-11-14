@@ -138,9 +138,10 @@ public class BluenetConfig {
 	public static final char CMD_NOP =                                  21;   // 0x15
 	public static final char CMD_INCREASE_TX =                          22;   // 0x16
 	public static final char CMD_RESET_STATE_ERRORS =                   23;   // 0x17
-	public static final char CMD_KEEP_ALIVE_MESH =                      24;   // 0x18
+	public static final char CMD_KEEP_ALIVE_REPEAT_LAST =               24;   // 0x18
 	public static final char CMD_MULTI_SWITCH =                         25;   // 0x19
 	public static final char CMD_SCHEDULE_ENTRY_CLEAR =                 26;   // 0x1A
+	public static final char CMD_KEEP_ALIVE_MESH =                      27;   // 0x1B
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
