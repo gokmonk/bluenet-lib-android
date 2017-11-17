@@ -1760,7 +1760,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	public void writePwm(final int value, final IStatusCallback callback) {
 		if (isConnected(callback)) {
 			getLogger().LOGd(TAG, "Set PWM to %d", value);
-			if (hasControlCharacteristic(null)) {
+			if (hasControlCharacteristic(null, true)) {
 				getLogger().LOGd(TAG, "use control characteristic");
 				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_PWM, 1, new byte[]{(byte) value}), callback);
 			} else if (hasCharacteristic(BluenetConfig.CHAR_PWM_UUID, callback)) {
