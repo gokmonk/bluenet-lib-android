@@ -32,12 +32,14 @@ public class MeshCommandPacket implements MeshPayload {
 
 	public static final String TAG = MeshCommandPacket.class.getCanonicalName();
 
-	// 2B message type + 1B number of ids
+	// 1B message type + 1B bitmask + 1B number of ids
 	private static final int COMMAND_PACKET_HEADER_SIZE = 3;
 	// 2B Crownstone ID
 	private static final int CROWNSTONE_ID_SIZE = 2; // bytes
 
 	private int _messageType;
+
+	private int _bitMask;
 
 	private int _numberOfIds;
 
@@ -48,18 +50,28 @@ public class MeshCommandPacket implements MeshPayload {
 
 	public MeshCommandPacket() {
 		_messageType = -1;
+		_bitMask = 0;
 		_numberOfIds = 0;
 		_ids = null;
 	}
 
 	public MeshCommandPacket(int messageType, int... ids) {
 		_messageType = messageType;
+		_bitMask = 0;
 		_numberOfIds = ids.length;
 //		_ids = ids;
 		_ids = new ArrayList<>(_numberOfIds);
 		for (int id: ids) {
 			_ids.add(id);
 		}
+	}
+
+	public int getBitmask() {
+		return _bitMask;
+	}
+
+	public void setBitmask(int bitMask) {
+		_bitMask = bitMask;
 	}
 
 	@Override
@@ -70,7 +82,8 @@ public class MeshCommandPacket implements MeshPayload {
 		if (bytes.length < COMMAND_PACKET_HEADER_SIZE) {
 			return false;
 		}
-		_messageType = BleUtils.toUint16(bb.getShort());
+		_messageType = BleUtils.toUint8(bb.get());
+		_bitMask     = BleUtils.toUint8(bb.get());
 		_numberOfIds = BleUtils.toUint8(bb.get());
 		if (bytes.length < COMMAND_PACKET_HEADER_SIZE + _numberOfIds * CROWNSTONE_ID_SIZE) {
 			_numberOfIds = 0;
@@ -98,7 +111,8 @@ public class MeshCommandPacket implements MeshPayload {
 				_numberOfIds * CROWNSTONE_ID_SIZE + _payload.length);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
-		bb.putShort((short)_messageType);
+		bb.put((byte)_messageType);
+		bb.put((byte)_bitMask);
 		bb.put((byte)_numberOfIds);
 //		for (int i = 0; i < _numberOfIds; i++) {
 //			bb.putShort((short)_ids[i]);
@@ -138,8 +152,6 @@ public class MeshCommandPacket implements MeshPayload {
 
 	@Override
 	public String toString() {
-//		return String.format(Locale.ENGLISH, "{messageType: %d, numIds: %d [%s], payload: %s}",
-//				_messageType, _numberOfIds, Arrays.toString(_ids), payloadToString());
 		return String.format(Locale.ENGLISH, "{messageType: %d, numIds: %d [%s], payload: %s}",
 				_messageType, _numberOfIds, Arrays.toString(_ids.toArray()), payloadToString());
 	}

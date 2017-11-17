@@ -21,11 +21,29 @@ import java.nio.ByteBuffer;
  */
 public interface MeshMultiSwitchPayload {
 
+	/** Serialize the payload
+	 *
+	 * @return serialized byte array when successful, null on failure
+	 */
 	byte[] toArray();
 
+	/** Serialize the payload
+	 *
+	 * @param bb byte buffer output
+	 * @return true when successful
+	 */
 	boolean toArray(ByteBuffer bb);
 
+	/** Deserialize the payload
+	 *
+	 * @param bb byte buffer with the data
+	 * @return true when successful
+	 */
 	boolean fromArray(ByteBuffer bb);
 
+	/** Get the size in bytes.
+	 *
+	 * @return size of the payload in bytes.
+	 */
 	int getSize();
 }
