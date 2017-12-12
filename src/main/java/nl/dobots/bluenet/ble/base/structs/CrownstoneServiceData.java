@@ -122,7 +122,38 @@ public class CrownstoneServiceData extends JSONObject {
 				if (isExternalData(eventBitmask)) {
 					setCrownstoneId(-1);
 					setCrownstoneStateId(crownstoneId);
-				} else {
+				}
+				else {
+					setCrownstoneId(crownstoneId);
+					setCrownstoneStateId(-1);
+				}
+				return true;
+			}
+			case 2: {
+				int crownstoneId = BleUtils.toUint16(bb.getShort());
+				setSwitchState(BleUtils.toUint8(bb.get()));
+				byte eventBitmask = bb.get();
+				setEventBitmask(eventBitmask);
+				setTemperature(bb.get());
+
+				double powerFactor = bb.getShort() / 1024.0;
+				setPowerFactor(powerFactor);
+				double powerUsage = BleUtils.toUint16(bb.getShort()) / 16.0;
+				setPowerUsage(powerUsage);
+				double energyUsed = bb.getInt() / 64.0;
+				setAccumulatedEnergy(energyUsed);
+				byte[] randomBytes = new byte[3];
+				bb.get(randomBytes);
+				setRandomBytes(randomBytes);
+
+				setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
+				setPwm(getSwitchState() & ~(1 << 7));
+
+				if (isExternalData(eventBitmask)) {
+					setCrownstoneId(-1);
+					setCrownstoneStateId(crownstoneId);
+				}
+				else {
 					setCrownstoneId(crownstoneId);
 					setCrownstoneStateId(-1);
 				}
@@ -344,16 +375,34 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 	}
 
-	public int getPowerUsage() {
+	public double getPowerFactor() {
 		try {
-			return getInt("powerUsage");
+			return getDouble("powerFactor");
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "no power factor found");
+			return 0;
+		}
+	}
+
+	private void setPowerFactor(double powerFactor) {
+		try {
+			put("powerFactor", powerFactor);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "failed to add power factor");
+			e.printStackTrace();
+		}
+	}
+
+	public double getPowerUsage() {
+		try {
+			return getDouble("powerUsage");
 		} catch (JSONException e) {
 			getLogger().LOGv(TAG, "no power usage found");
 			return 0;
 		}
 	}
 
-	private void setPowerUsage(int powerUsage) {
+	private void setPowerUsage(double powerUsage) {
 		try {
 			put("powerUsage", powerUsage);
 		} catch (JSONException e) {
@@ -362,16 +411,16 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 	}                                                                                                                                                                                                                                                                                                                                                                                                     
 
-	public int getAccumulatedEnergy() {
+	public double getAccumulatedEnergy() {
 		try {
-			return getInt("accumulatedEnergy");
+			return getDouble("accumulatedEnergy");
 		} catch (JSONException e) {
 			getLogger().LOGv(TAG, "no accumulated energy found");
 			return 0;
 		}
 	}
 
-	private void setAccumulatedEnergy(int accumulatedEnergy) {
+	private void setAccumulatedEnergy(double accumulatedEnergy) {
 		try {
 			put("accumulatedEnergy", accumulatedEnergy);
 		} catch (JSONException e) {
