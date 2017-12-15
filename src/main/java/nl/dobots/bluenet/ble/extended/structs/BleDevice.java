@@ -106,7 +106,6 @@ public class BleDevice {
 		_isValidatedCrownstone = false;
 
 		updateRssiValue((new Date()).getTime(), rssi);
-//		_rssiHistory.add(new RssiMeasurement(rssi, (new Date()).getTime()));
 	}
 
 	private BleDevice(String address, String name, int rssi, DeviceType type, boolean isIBeacon, int major, int minor, UUID proximityUuid, int calibratedRssi, boolean validated, CrownstoneMode mode) {
@@ -123,7 +122,6 @@ public class BleDevice {
 		_isValidatedCrownstone = validated; // TODO: should this be copied?
 
 		updateRssiValue((new Date()).getTime(), rssi);
-//		_rssiHistory.add(new RssiMeasurement(rssi, (new Date()).getTime()));
 	}
 
 	public BleDevice(JSONObject json) throws JSONException {
@@ -163,7 +161,6 @@ public class BleDevice {
 
 		validateCrownstone();
 		updateRssiValue((new Date()).getTime(), _rssi);
-//		_rssiHistory.add(new RssiMeasurement(this._rssi, (new Date()).getTime()));
 	}
 
 	public BleDevice clone() {
@@ -280,7 +277,7 @@ public class BleDevice {
 		return _rssi;
 	}
 
-	public void setRssi(int rssi) {
+	public synchronized void setRssi(int rssi) {
 //		this._rssi = rssi;
 		updateRssiValue(new Date().getTime(), rssi);
 	}
@@ -340,7 +337,7 @@ public class BleDevice {
 	private synchronized boolean refreshHistory() {
 		Date now = new Date();
 		ArrayList<RssiMeasurement> newHistory = new ArrayList<>();
-
+		// TODO: sometime get a ConcurrentModificationException here
 		boolean hasChange = false;
 		for (RssiMeasurement measurement : _rssiHistory) {
 			if (measurement.timestamp + expirationTime > now.getTime()) {
@@ -377,17 +374,17 @@ public class BleDevice {
 	};
 
 	private synchronized ArrayList<RssiMeasurement> getHistoryClone() {
-		return (ArrayList<RssiMeasurement>) _rssiHistory.clone();
+		return (ArrayList<RssiMeasurement>) _rssiHistory.clone(); // Doesn't clone the RssiMeasurements, only the list with pointers
 	}
 
-	public ArrayList<RssiMeasurement> getTimeSortedHistory() {
+	public synchronized ArrayList<RssiMeasurement> getTimeSortedHistory() {
 		refreshHistory();
 		ArrayList<RssiMeasurement> clone = getHistoryClone();
 		Collections.sort(clone, timeSorter);
 		return clone;
 	}
 
-	public ArrayList<RssiMeasurement> getRssiSortedHistory() {
+	public synchronized ArrayList<RssiMeasurement> getRssiSortedHistory() {
 		refreshHistory();
 		ArrayList<RssiMeasurement> clone = getHistoryClone();
 		Collections.sort(clone, rssiSorter);
@@ -432,7 +429,7 @@ public class BleDevice {
 		return _averageRssi;
 	}
 
-	public void validateCrownstone() {
+	public synchronized void validateCrownstone() {
 		// TODO: if in dfu mode: validate differently
 		getLogger().LOGv(TAG, "validateCrownstone " + getAddress());
 
@@ -568,7 +565,7 @@ public class BleDevice {
 		updateRssiValue(System.currentTimeMillis(), getRssi());
 	}
 
-	public void update(BleDevice newDev) {
+	public synchronized void update(BleDevice newDev) {
 		// Copy from new to old
 		_serviceData             = newDev._serviceData;
 		_type                    = newDev._type;

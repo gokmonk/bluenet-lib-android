@@ -605,7 +605,7 @@ public class BleCore extends Logging {
 
 		_initializeCallback = callback;
 
-		getLogger().LOGd(TAG, "Initialize BLE hardware");
+		getLogger().LOGi(TAG, "Initialize BLE hardware");
 		// check first if phone has bluetooth le
 		if (!context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE))
 		{
@@ -660,7 +660,9 @@ public class BleCore extends Logging {
 				_initializeCallback.onSuccess();
 				_initializeCallback = null;
 			}
-            getLogger().LOGe(TAG, "Huh? cb == null");
+			else {
+				getLogger().LOGe(TAG, "Huh? cb == null");
+			}
 		}
 
 	}
@@ -677,25 +679,26 @@ public class BleCore extends Logging {
 		}
 		_locationServicesReady = false;
 
-		if (!isLocationServicesEnabled()) {
-			getLogger().LOGi(TAG, "request location service");
-			Intent intent = new Intent(_context, LocationRequest.class);
-			intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-			_context.startActivity(intent);
+		if (isLocationServicesEnabled()) {
+			_locationServicesReady = true;
+			return;
+		}
 
-			_timeoutHandler.postDelayed(new Runnable() {
-				@Override
-				public void run() {
-					if (!isLocationServicesEnabled()) {
-						if (_initializeCallback != null) {
-							_initializeCallback.onError(BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF);
-						}
+		getLogger().LOGi(TAG, "request location service");
+		Intent intent = new Intent(_context, LocationRequest.class);
+		intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		_context.startActivity(intent);
+
+		_timeoutHandler.postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				if (!isLocationServicesEnabled()) {
+					if (_initializeCallback != null) {
+						_initializeCallback.onError(BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF);
 					}
 				}
-			}, LOCATION_SERVICE_ENABLE_TIMEOUT);
-		} else {
-			_locationServicesReady = true;
-		}
+			}
+		}, LOCATION_SERVICE_ENABLE_TIMEOUT);
 	}
 
 	/**
