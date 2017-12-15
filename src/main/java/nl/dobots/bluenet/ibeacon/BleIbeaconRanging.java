@@ -203,6 +203,8 @@ public class BleIbeaconRanging {
 		if (_lastSeen == null) {
 			getLogger().LOGe(TAG, "lastSeen = null!");
 		}
+
+		// TODO: this causes ConcurrentModificationException because we edit _inRegion in the loop.
 		for (UUID uuid : _inRegion) {
 			getLogger().LOGv(TAG, "lastSeen " + uuid + ": " + _lastSeen.get(uuid));
 
