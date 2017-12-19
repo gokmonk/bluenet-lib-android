@@ -59,11 +59,11 @@ public class CrownstoneServiceData extends JSONObject {
 			setServiceUuid(BleUtils.toUint16(bb.getShort()));
 
 			bb.mark();
-			int firmwareVersion = BleUtils.toUint8(bb.get());
-			setFirmwareVersion(firmwareVersion);
+			int protocolVersion = BleUtils.toUint8(bb.get());
+			setFirmwareVersion(protocolVersion);
 
 			// First parse without decrypting
-			if (!parseDecryptedData(bytes, 3, firmwareVersion)) {
+			if (!parseDecryptedData(bytes, 3, protocolVersion)) {
 				return false;
 			}
 			// Check if data is setup mode data, if so, we don't have to decrypt
@@ -72,14 +72,14 @@ public class CrownstoneServiceData extends JSONObject {
 			}
 
 			if (encrypted) {
-				firmwareVersion = BleUtils.toUint8(bytes[2]);
+				protocolVersion = BleUtils.toUint8(bytes[2]);
 				//byte[] decryptedBytes = BleBaseEncryption.decryptEcb(bytes, bb.position(), key);
 				byte[] decryptedBytes = BleBaseEncryption.decryptEcb(bytes, 3, key);
 				if (decryptedBytes == null) {
 					return false;
 				}
 				// Parse again, but now with decrypted data
-				if (!parseDecryptedData(decryptedBytes, 0, firmwareVersion)) {
+				if (!parseDecryptedData(decryptedBytes, 0, protocolVersion)) {
 					return false;
 				}
 			}
@@ -91,7 +91,7 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 	}
 
-	private boolean parseDecryptedData(byte[] bytes, int offset, int firmwareVersion) {
+	private boolean parseDecryptedData(byte[] bytes, int offset, int protocolVersion) {
 		if (bytes.length - offset < 16) return false;
 
 		ByteBuffer bb = ByteBuffer.wrap(bytes, offset, bytes.length-offset);
@@ -103,12 +103,17 @@ public class CrownstoneServiceData extends JSONObject {
 		getLogger().LOGv(TAG, "parseDecryptedData: " + BleUtils.bytesToString(test));
 		bb.reset();
 
-		switch(firmwareVersion) {
+		boolean success = false;
+		byte flagBitmask = 0;
+		int crownstoneId = 0;
+
+
+		switch(protocolVersion) {
 			case 1: {
-				int crownstoneId = BleUtils.toUint16(bb.getShort());
+				crownstoneId = BleUtils.toUint16(bb.getShort());
 				setSwitchState(BleUtils.toUint8(bb.get()));
-				byte eventBitmask = bb.get();
-				setEventBitmask(eventBitmask);
+				flagBitmask = bb.get();
+				setEventBitmask(flagBitmask);
 				setTemperature(bb.get());
 				setPowerUsage(bb.getInt());
 				setAccumulatedEnergy(bb.getInt());
@@ -116,24 +121,14 @@ public class CrownstoneServiceData extends JSONObject {
 				bb.get(randomBytes);
 				setRandomBytes(randomBytes);
 
-				setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
-				setPwm(getSwitchState() & ~(1 << 7));
-
-				if (isExternalData(eventBitmask)) {
-					setCrownstoneId(-1);
-					setCrownstoneStateId(crownstoneId);
-				}
-				else {
-					setCrownstoneId(crownstoneId);
-					setCrownstoneStateId(-1);
-				}
-				return true;
+				success = true;
+				break;
 			}
 			case 2: {
-				int crownstoneId = BleUtils.toUint16(bb.getShort());
+				crownstoneId = BleUtils.toUint16(bb.getShort());
 				setSwitchState(BleUtils.toUint8(bb.get()));
-				byte eventBitmask = bb.get();
-				setEventBitmask(eventBitmask);
+				flagBitmask = bb.get();
+				setEventBitmask(flagBitmask);
 				setTemperature(bb.get());
 
 				double powerFactor = bb.getShort() / 1024.0;
@@ -146,18 +141,44 @@ public class CrownstoneServiceData extends JSONObject {
 				bb.get(randomBytes);
 				setRandomBytes(randomBytes);
 
-				setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
-				setPwm(getSwitchState() & ~(1 << 7));
+				success = true;
+				break;
+			}
+			case 3: {
+				int type = BleUtils.toUint8(bb.get());
+				crownstoneId = BleUtils.toUint16(bb.getShort());
+				setSwitchState(BleUtils.toUint8(bb.get()));
+				flagBitmask = bb.get();
+				setEventBitmask(flagBitmask);
+				setTemperature(bb.get());
+				double powerFactor = bb.get() / 127.0;
+				setPowerFactor(powerFactor);
+				double powerUsageReal = bb.getShort() / 8.0;
+				setPowerUsage(powerUsageReal);
 
-				if (isExternalData(eventBitmask)) {
-					setCrownstoneId(-1);
-					setCrownstoneStateId(crownstoneId);
+				double energyUsed = bb.getInt() / 64.0;
+				if (isExternalData(flagBitmask)) {
+					// Only partial energy is sent
+					// TODO: now what?
+					setAccumulatedEnergy(0);
 				}
 				else {
-					setCrownstoneId(crownstoneId);
-					setCrownstoneStateId(-1);
+					setAccumulatedEnergy(energyUsed);
 				}
-				return true;
+
+				byte[] partialTimestamp = new byte[2];
+				bb.get(partialTimestamp);
+				setPartialTimestamp(partialTimestamp);
+
+				byte randByte = bb.get();
+				byte[] randomBytes = new byte[3];
+				randomBytes[0] = partialTimestamp[0];
+				randomBytes[1] = partialTimestamp[1];
+				randomBytes[2] = randByte;
+				setRandomBytes(randomBytes);
+
+				success = true;
+				break;
 			}
 			default: {
 				// TODO: this is deprecated (for advertisements from before firmwareVersion)
@@ -174,10 +195,23 @@ public class CrownstoneServiceData extends JSONObject {
 
 				setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
 				setPwm(getSwitchState() & ~(1 << 7));
-				return true;
 			}
 		}
-//		return false;
+
+		if (success) {
+			setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
+			setPwm(getSwitchState() & ~(1 << 7));
+			if (isExternalData(flagBitmask)) {
+				setCrownstoneId(-1);
+				setCrownstoneStateId(crownstoneId);
+			}
+			else {
+				setCrownstoneId(crownstoneId);
+				setCrownstoneStateId(-1);
+			}
+		}
+
+		return success;
 	}
 
 	private boolean isSetupPacket() {
@@ -425,6 +459,24 @@ public class CrownstoneServiceData extends JSONObject {
 			put("accumulatedEnergy", accumulatedEnergy);
 		} catch (JSONException e) {
 			getLogger().LOGv(TAG, "failed to add accumulated energy");
+			e.printStackTrace();
+		}
+	}
+
+	public String getPartialTimestamp() {
+		try {
+			return getString("partialTimestamp");
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "no partial timestamp found");
+			return null;
+		}
+	}
+
+	private void setPartialTimestamp(byte[] partialTimestamp) {
+		try {
+			put("partialTimestamp", BleUtils.bytesToEncodedString(partialTimestamp));
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "failed to add partial timestamp");
 			e.printStackTrace();
 		}
 	}
