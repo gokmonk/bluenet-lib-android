@@ -168,7 +168,8 @@ public class CrownstoneServiceData extends JSONObject {
 
 				byte[] partialTimestamp = new byte[2];
 				bb.get(partialTimestamp);
-				setPartialTimestamp(partialTimestamp);
+//				setPartialTimestamp(partialTimestamp);
+				setPartialTimestamp(BleUtils.toUint16(BleUtils.byteArrayToShort(partialTimestamp)));
 
 				byte randByte = bb.get();
 				byte[] randomBytes = new byte[3];
@@ -463,18 +464,36 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 	}
 
-	public String getPartialTimestamp() {
+//	public String getPartialTimestamp() {
+//		try {
+//			return getString("partialTimestamp");
+//		} catch (JSONException e) {
+//			getLogger().LOGv(TAG, "no partial timestamp found");
+//			return null;
+//		}
+//	}
+//
+//	private void setPartialTimestamp(byte[] partialTimestamp) {
+//		try {
+//			put("partialTimestamp", BleUtils.bytesToEncodedString(partialTimestamp));
+//		} catch (JSONException e) {
+//			getLogger().LOGv(TAG, "failed to add partial timestamp");
+//			e.printStackTrace();
+//		}
+//	}
+
+	public int getPartialTimestamp() {
 		try {
-			return getString("partialTimestamp");
+			return getInt("partialTimestamp");
 		} catch (JSONException e) {
 			getLogger().LOGv(TAG, "no partial timestamp found");
-			return null;
+			return 0;
 		}
 	}
 
-	private void setPartialTimestamp(byte[] partialTimestamp) {
+	private void setPartialTimestamp(int partialTimestamp) {
 		try {
-			put("partialTimestamp", BleUtils.bytesToEncodedString(partialTimestamp));
+			put("partialTimestamp", partialTimestamp);
 		} catch (JSONException e) {
 			getLogger().LOGv(TAG, "failed to add partial timestamp");
 			e.printStackTrace();

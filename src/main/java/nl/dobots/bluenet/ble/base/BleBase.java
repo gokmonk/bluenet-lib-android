@@ -313,6 +313,7 @@ public class BleBase extends BleCore {
 //				if (Build.VERSION.SDK_INT >= 21) {
 //					ScanRecord scanRecord = ScanRecord.parseFromBytes(advertisement);
 //				}
+//				getLogger().LOGw(TAG, "Advertisment bytes: " + BleUtils.bytesToString(advertisement));
 
 				parseAdvertisement(advertisement, 0xFF, new IByteArrayCallback() {
 					// The callbacks can be called multiple times
@@ -360,6 +361,7 @@ public class BleBase extends BleCore {
 					getLogger().LOGd(TAG, "json: " + json.toString());
 					return;
 				}
+//				getLogger().LOGw(TAG, "Device: " + device.toString());
 				callback.onDeviceScanned(device);
 			}
 		});
