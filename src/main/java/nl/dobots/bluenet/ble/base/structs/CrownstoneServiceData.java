@@ -53,173 +53,287 @@ public class CrownstoneServiceData extends JSONObject {
 	public boolean parseBytes(byte[] bytes, boolean encrypted, byte[] key) {
 		// Includes the service UUID (first 2 bytes)
 		getLogger().LOGv(TAG, "serviceData: " + BleUtils.bytesToString(bytes));
+		if (bytes.length < 3) {
+			return false;
+		}
 		ByteBuffer bb = ByteBuffer.wrap(bytes);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
+
 		try {
 			setServiceUuid(BleUtils.toUint16(bb.getShort()));
 
-			bb.mark();
 			int protocolVersion = BleUtils.toUint8(bb.get());
 			setFirmwareVersion(protocolVersion);
 
-			// First parse without decrypting
-			if (!parseDecryptedData(bytes, 3, protocolVersion)) {
-				return false;
-			}
-			// Check if data is setup mode data, if so, we don't have to decrypt
-			if (isSetupPacket()) {
-				return true;
-			}
-
-			if (encrypted) {
-				protocolVersion = BleUtils.toUint8(bytes[2]);
-				//byte[] decryptedBytes = BleBaseEncryption.decryptEcb(bytes, bb.position(), key);
-				byte[] decryptedBytes = BleBaseEncryption.decryptEcb(bytes, 3, key);
-				if (decryptedBytes == null) {
+			switch (protocolVersion) {
+				case 1:
+					return parseDataV1(bytes, bb.position(), encrypted, key);
+				case 3:
+					return parseDataV3(bytes, bb.position(), encrypted, key);
+				case 4:
+					return parseDataV4(bytes, bb.position(), encrypted, key);
+				default:
+					setFirmwareVersion(0);
 					return false;
-				}
-				// Parse again, but now with decrypted data
-				if (!parseDecryptedData(decryptedBytes, 0, protocolVersion)) {
-					return false;
-				}
 			}
-			return true;
 		} catch (BufferUnderflowException e) {
-			getLogger().LOGv(TAG, "failed to parse");
+			getLogger().LOGe(TAG, "failed to parse");
 //			e.printStackTrace();
 			return false;
 		}
 	}
 
-	private boolean parseDecryptedData(byte[] bytes, int offset, int protocolVersion) {
-		if (bytes.length - offset < 16) return false;
 
+	private boolean parseDataV1(byte[] bytes, int offset, boolean encrypted, byte[] key) {
+		if (bytes.length - offset < 16) {
+			return false;
+		}
+
+		// First parse without decrypting
 		ByteBuffer bb = ByteBuffer.wrap(bytes, offset, bytes.length-offset);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
-		byte[] test = new byte[16];
-		bb.mark();
-		bb.get(test);
-		getLogger().LOGv(TAG, "parseDecryptedData: " + BleUtils.bytesToString(test));
-		bb.reset();
-
-		boolean success = false;
-		byte flagBitmask = 0;
-		int crownstoneId = 0;
-
-
-		switch(protocolVersion) {
-			case 1: {
-				crownstoneId = BleUtils.toUint16(bb.getShort());
-				setSwitchState(BleUtils.toUint8(bb.get()));
-				flagBitmask = bb.get();
-				setEventBitmask(flagBitmask);
-				setTemperature(bb.get());
-				setPowerUsage(bb.getInt());
-				setAccumulatedEnergy(bb.getInt());
-				byte[] randomBytes = new byte[3];
-				bb.get(randomBytes);
-				setRandomBytes(randomBytes);
-
-				success = true;
-				break;
+		// First try to parse without decrypting (in case encryption is disable or Crownstone is in setup mode)
+		if (!parseDecryptedDataV1(bb)) {
+			return false;
+		}
+		// Check if data is setup mode data, if so we're done
+		if (isSetupPacket()) {
+			return true;
+		}
+		if (encrypted) {
+			// Decrypt
+			byte[] decryptedBytes = BleBaseEncryption.decryptEcb(bytes, offset, key);
+			if (decryptedBytes == null) {
+				return false;
 			}
-			case 2: {
-				crownstoneId = BleUtils.toUint16(bb.getShort());
-				setSwitchState(BleUtils.toUint8(bb.get()));
-				flagBitmask = bb.get();
-				setEventBitmask(flagBitmask);
-				setTemperature(bb.get());
-
-				double powerFactor = bb.getShort() / 1024.0;
-				setPowerFactor(powerFactor);
-				double powerUsage = BleUtils.toUint16(bb.getShort()) / 16.0;
-				setPowerUsage(powerUsage);
-				double energyUsed = bb.getInt() / 64.0;
-				setAccumulatedEnergy(energyUsed);
-				byte[] randomBytes = new byte[3];
-				bb.get(randomBytes);
-				setRandomBytes(randomBytes);
-
-				success = true;
-				break;
+			// Parse again after decrypting data
+			ByteBuffer decryptedBB = ByteBuffer.wrap(decryptedBytes);
+			decryptedBB.order(ByteOrder.LITTLE_ENDIAN);
+			if (!parseDecryptedDataV1(decryptedBB)) {
+				return false;
 			}
-			case 3: {
-				int type = BleUtils.toUint8(bb.get());
-				crownstoneId = BleUtils.toUint16(bb.getShort());
-				setSwitchState(BleUtils.toUint8(bb.get()));
-				flagBitmask = bb.get();
-				setEventBitmask(flagBitmask);
+		}
+		return true;
+	}
+
+	private boolean parseDecryptedDataV1(ByteBuffer bb) {
+		int crownstoneId = BleUtils.toUint16(bb.getShort());
+		setSwitchState(BleUtils.toUint8(bb.get()));
+		byte flagBitmask = bb.get();
+		setFlagNewData(     (flagBitmask & (1L << 0)) != 0);
+		setFlagExternalData((flagBitmask & (1L << 1)) != 0);
+		setFlagError(       (flagBitmask & (1L << 2)) != 0);
+		setFlagSetup(       (flagBitmask & (1L << 7)) != 0);
+		setTemperature(bb.get());
+		setPowerUsage(bb.getInt());
+		setAccumulatedEnergy(bb.getInt());
+		byte[] randomBytes = new byte[3];
+		bb.get(randomBytes);
+		setChangingBytes(randomBytes);
+
+		if (getFlagExternalData()) {
+			setCrownstoneId(-1);
+			setCrownstoneExternalId(crownstoneId);
+		}
+		else {
+			setCrownstoneId(crownstoneId);
+			setCrownstoneExternalId(-1);
+		}
+		return true;
+	}
+
+
+	private boolean parseDataV3(byte[] bytes, int offset, boolean encrypted, byte[] key) {
+		if (bytes.length - offset < 16) {
+			return false;
+		}
+
+		// First decrypt if encryption is enabled.
+		ByteBuffer bb;
+		if (encrypted) {
+			byte[] decryptedBytes = BleBaseEncryption.decryptEcb(bytes, 3, key);
+			if (decryptedBytes == null) {
+				return false;
+			}
+			bb = ByteBuffer.wrap(decryptedBytes);
+		}
+		else {
+			bb = ByteBuffer.wrap(bytes, offset, bytes.length-offset);
+		}
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+
+		// Parse the (decrypted) data.
+		int type = BleUtils.toUint8(bb.get());
+		switch (type) {
+			case 0: { // state
+				return parseStatePacket(bb, false);
+			}
+			case 1: { // error
+				return parseErrorPacket(bb, false);
+			}
+			case 2: { // ext state
+				return parseStatePacket(bb, true);
+			}
+			case 3: { // ext error
+				return parseErrorPacket(bb, true);
+			}
+			default:
+				return false;
+		}
+	}
+
+	private boolean parseDataV4(byte[] bytes, int offset, boolean encrypted, byte[] key) {
+		// Never encrypted
+		if (bytes.length - offset < 16) {
+			return false;
+		}
+		ByteBuffer bb = ByteBuffer.wrap(bytes, offset, bytes.length-offset);
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+
+		int type = BleUtils.toUint8(bb.get());
+		switch (type) {
+			case 0: {
+				setFlagSetup(true);
+				setCrownstoneId(BleUtils.toUint8(bb.get()));
+				setCrownstoneExternalId(-1);
+				parseFlagsBitmask(bb.get());
 				setTemperature(bb.get());
 				double powerFactor = bb.get() / 127.0;
 				setPowerFactor(powerFactor);
 				double powerUsageReal = bb.getShort() / 8.0;
 				setPowerUsage(powerUsageReal);
-
-				double energyUsed = bb.getInt() / 64.0;
-				if (isExternalData(flagBitmask)) {
-					// Only partial energy is sent
-					// TODO: now what?
-					setAccumulatedEnergy(0);
-				}
-				else {
-					setAccumulatedEnergy(energyUsed);
-				}
-
-				byte[] partialTimestamp = new byte[2];
-				bb.get(partialTimestamp);
-//				setPartialTimestamp(partialTimestamp);
-				setPartialTimestamp(BleUtils.toUint16(BleUtils.byteArrayToShort(partialTimestamp)));
-
-				byte randByte = bb.get();
-				byte[] randomBytes = new byte[3];
-				randomBytes[0] = partialTimestamp[0];
-				randomBytes[1] = partialTimestamp[1];
-				randomBytes[2] = randByte;
-				setRandomBytes(randomBytes);
-
-				success = true;
-				break;
+				parseErrorBitmask(BleUtils.toUint32(bb.getInt()));
+				byte[] counter = new byte[1];
+				bb.get(counter);
+				setChangingBytes(counter);
+				// TODO: 4 more bytes left.
+				return true;
 			}
-			default: {
-				// TODO: this is deprecated (for advertisements from before firmwareVersion)
-				bb.reset();
-				setFirmwareVersion(0);
-				setCrownstoneId(BleUtils.toUint16(bb.getShort()));
-				setCrownstoneStateId(bb.getShort());
-				setSwitchState((bb.get() & 0xff));
-				setEventBitmask(bb.get());
-				setTemperature(bb.get());
-				bb.get(); // skip reserved
-				setPowerUsage(bb.getInt());
-				setAccumulatedEnergy(bb.getInt());
-
-				setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
-				setPwm(getSwitchState() & ~(1 << 7));
-			}
+			default:
+				return false;
 		}
-
-		if (success) {
-			setRelayState(BleUtils.isBitSet(getSwitchState(), 7));
-			setPwm(getSwitchState() & ~(1 << 7));
-			if (isExternalData(flagBitmask)) {
-				setCrownstoneId(-1);
-				setCrownstoneStateId(crownstoneId);
-			}
-			else {
-				setCrownstoneId(crownstoneId);
-				setCrownstoneStateId(-1);
-			}
-		}
-
-		return success;
 	}
+
+	private boolean parseStatePacket(ByteBuffer bb, boolean external) {
+		if (external) {
+			setFlagExternalData(true);
+			setCrownstoneId(-1);
+			setCrownstoneExternalId(BleUtils.toUint8(bb.get()));
+		}
+		else {
+			setCrownstoneId(BleUtils.toUint8(bb.get()));
+			setCrownstoneExternalId(-1);
+		}
+		setSwitchState(BleUtils.toUint8(bb.get()));
+		parseFlagsBitmask(bb.get());
+		setTemperature(bb.get());
+		double powerFactor = bb.get() / 127.0;
+		setPowerFactor(powerFactor);
+		double powerUsageReal = bb.getShort() / 8.0;
+		setPowerUsage(powerUsageReal);
+		double energyUsed = bb.getInt() / 64.0;
+		setAccumulatedEnergy(energyUsed);
+		parsePartialTimestamp(bb);
+		int validation = BleUtils.toUint16(bb.getShort());
+		if (validation != 0xFACE) {
+			getLogger().LOGw(TAG, "validation mismatch: " + validation);
+		}
+		return true;
+	}
+
+	private boolean parseErrorPacket(ByteBuffer bb, boolean external) {
+		if (external) {
+			setFlagExternalData(true);
+			setCrownstoneId(-1);
+			setCrownstoneExternalId(BleUtils.toUint8(bb.get()));
+		}
+		else {
+			setCrownstoneId(BleUtils.toUint8(bb.get()));
+			setCrownstoneExternalId(-1);
+		}
+		parseErrorBitmask(BleUtils.toUint32(bb.getInt()));
+		setErrorTimestamp(BleUtils.toUint32(bb.getInt()));
+		parseFlagsBitmask(bb.get());
+		setTemperature(bb.get());
+		parsePartialTimestamp(bb);
+		double powerUsageReal = bb.getShort() / 8.0;
+		setPowerUsage(powerUsageReal);
+
+		return true;
+	}
+
+
+	private void parseFlagsBitmask(byte flagBitmask) {
+		setFlagDimmingAvailable((flagBitmask & (1L << 0)) != 0);
+		setFlagDimmingAllowed(  (flagBitmask & (1L << 1)) != 0);
+		setFlagError(           (flagBitmask & (1L << 2)) != 0);
+		setFlagSwitchLocked(    (flagBitmask & (1L << 3)) != 0);
+		setFlagTimeSet(         (flagBitmask & (1L << 4)) != 0);
+	}
+
+	private void parseErrorBitmask(long bitmask) {
+		setErrorOverCurrent(      (bitmask & (1L << 0)) != 0);
+		setErrorOverCurrentDimmer((bitmask & (1L << 1)) != 0);
+		setErrorChipTemperature(  (bitmask & (1L << 2)) != 0);
+		setErrorDimmerTemperature((bitmask & (1L << 3)) != 0);
+		setErrorDimmerFailureOn(  (bitmask & (1L << 4)) != 0);
+		setErrorDimmerFailureOff( (bitmask & (1L << 5)) != 0);
+	}
+
+	private void parsePartialTimestamp(ByteBuffer bb) {
+		byte[] partialTimestamp = new byte[2];
+		bb.get(partialTimestamp);
+		setPartialTimestamp(BleUtils.toUint16(BleUtils.byteArrayToShort(partialTimestamp)));
+		setChangingBytes(partialTimestamp);
+	}
+
+
 
 	private boolean isSetupPacket() {
-		getLogger().LOGv(TAG, "setupbit=" + isSetupMode(getEventBitmask()) + " id=" + getCrownstoneId() + " switch=" + getSwitchState() + " power=" + getPowerUsage() + " energy=" + getAccumulatedEnergy());
-		return (isSetupMode(getEventBitmask()) && getCrownstoneId() == 0 && getSwitchState() == 0 && getPowerUsage() == 0 && getAccumulatedEnergy() == 0);
+		switch (getFirmwareVersion()) {
+			case 0:
+				return false;
+			case 1: {
+				getLogger().LOGv(TAG, "setupbit=" + getFlagSetup() + " id=" + getCrownstoneId() + " switch=" + getSwitchState() + " power=" + getPowerUsage() + " energy=" + getAccumulatedEnergy());
+				return (getFlagSetup() && getCrownstoneId() == 0 && getSwitchState() == 0 && getPowerUsage() == 0 && getAccumulatedEnergy() == 0);
+			}
+			default:
+				return getFlagSetup();
+		}
 	}
 
+	public boolean isSetupMode() { return isSetupPacket(); }
+
+	/** Copy data from old service data to current service data. Basically merging the two.
+	 *
+	 * This is handy for when service data is interleaved, with different kind of data in the different packets.
+	 * Basically merging the two.
+	 *
+	 * @param old previous service data.
+	 */
+	public void copyFromOld(CrownstoneServiceData old) {
+		if (old == null) {
+			return;
+		}
+		if (getFlagExternalData() || old.getFlagExternalData()) {
+			return;
+		}
+		if (getFlagError()) {
+			setErrorOverCurrent(old.getErrorOverCurrent());
+			setErrorOverCurrentDimmer(old.getErrorOverCurrentDimmer());
+			setErrorChipTemperature(old.getErrorChipTemperature());
+			setErrorDimmerTemperature(old.getErrorDimmerTemperature());
+			setErrorDimmerFailureOn(old.getErrorDimmerFailureOn());
+			setErrorDimmerFailureOff(old.getErrorDimmerFailureOff());
+		}
+		// TODO: merge more..
+	}
+
+
+	//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\\
+	//%%%%%%%%%%                    Getters and setters of fields                       %%%%%%%%%%\\
+	//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\\
 
 	public int getFirmwareVersion() {
 		try {
@@ -275,20 +389,20 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 	}
 
-	public int getCrownstoneStateId() {
+	public int getCrownstoneExternalId() {
 		try {
-			return getInt("crownstoneStateId");
+			return getInt("crownstoneExternalId");
 		} catch (JSONException e) {
-			getLogger().LOGv(TAG, "no crownstone state id found");
+			getLogger().LOGv(TAG, "no ext crownstone id found");
 			return 0;
 		}
 	}
 
-	private void setCrownstoneStateId(int crownstoneStateId) {
+	private void setCrownstoneExternalId(int crownstoneStateId) {
 		try {
-			put("crownstoneStateId", crownstoneStateId);
+			put("crownstoneExternalId", crownstoneStateId);
 		} catch (JSONException e) {
-			getLogger().LOGv(TAG, "failed to add crownstone state id");
+			getLogger().LOGv(TAG, "failed to add ext crownstone id");
 			e.printStackTrace();
 		}
 	}
@@ -303,6 +417,8 @@ public class CrownstoneServiceData extends JSONObject {
 	}
 
 	private void setSwitchState(int switchState) {
+		setRelayState(BleUtils.isBitSet(switchState, 7));
+		setPwm(switchState & ~(1 << 7));
 		try {
 			put("switchState", switchState);
 		} catch (JSONException e) {
@@ -347,50 +463,333 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 	}
 
-	public byte getEventBitmask() {
+
+
+
+
+
+
+
+
+	@Deprecated
+	public boolean getFlagNewData() {
+		final String entry = "flagNewData";
 		try {
-			return (byte)getInt("eventBitmask");
+			return getBoolean(entry);
 		} catch (JSONException e) {
-			getLogger().LOGv(TAG, "no event bitmask found");
-			return 0;
+			getLogger().LOGv(TAG, "not found " + entry);
+			return false;
+		}
+	}
+	@Deprecated
+	private void setFlagNewData(boolean val) {
+		final String entry = "flagNewData";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
 		}
 	}
 
-	public boolean isNewData() { return isNewData(getEventBitmask()); }
-	public static boolean isNewData(byte eventBitmask) {
-		return ((eventBitmask & (1L << 0)) != 0);
+
+	public boolean getFlagExternalData() {
+		final String entry = "flagExternalData";
+		try {
+			return getBoolean(entry);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "not found " + entry);
+			return false;
+		}
+	}
+	private void setFlagExternalData(boolean val) {
+		final String entry = "flagExternalData";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
+		}
 	}
 
-	public boolean isExternalData() { return isExternalData(getEventBitmask()); }
-	public static boolean isExternalData(byte eventBitmask) {
-		return ((eventBitmask & (1L << 1)) != 0);
+	public boolean getFlagError() {
+		final String entry = "flagError";
+		try {
+			return getBoolean(entry);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "not found " + entry);
+			return false;
+		}
+	}
+	private void setFlagError(boolean val) {
+		final String entry = "flagError";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
+		}
 	}
 
-	public boolean isErrorBit() { return isErrorBit(getEventBitmask()); }
-	public static boolean isErrorBit(byte eventBitmask) {
-		return ((eventBitmask & (1L << 2)) != 0);
+	public boolean getFlagSetup() {
+		final String entry = "flagSetup";
+		try {
+			return getBoolean(entry);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "not found " + entry);
+			return false;
+		}
 	}
+	private void setFlagSetup(boolean val) {
+		final String entry = "flagSetup";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
+		}
+	}
+
+	public boolean getFlagDimmingAvailable() {
+		final String entry = "flagDimmingAvailable";
+		try {
+			return getBoolean(entry);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "not found " + entry);
+			return false;
+		}
+	}
+	private void setFlagDimmingAvailable(boolean val) {
+		final String entry = "flagDimmingAvailable";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
+		}
+	}
+
+	public boolean getFlagDimmingAllowed() {
+		final String entry = "flagDimmingAllowed";
+		try {
+			return getBoolean(entry);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "not found " + entry);
+			return false;
+		}
+	}
+	private void setFlagDimmingAllowed(boolean val) {
+		final String entry = "flagDimmingAllowed";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
+		}
+	}
+
+	public boolean getFlagSwitchLocked() {
+		final String entry = "flagSwitchLocked";
+		try {
+			return getBoolean(entry);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "not found " + entry);
+			return false;
+		}
+	}
+	private void setFlagSwitchLocked(boolean val) {
+		final String entry = "flagSwitchLocked";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
+		}
+	}
+
+	public boolean getFlagTimeSet() {
+		final String entry = "flagTimeSet";
+		try {
+			return getBoolean(entry);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "not found " + entry);
+			return false;
+		}
+	}
+	private void setFlagTimeSet(boolean val) {
+		final String entry = "flagTimeSet";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
+		}
+	}
+
+
+
+
+	public boolean getErrorOverCurrent() {
+		final String entry = "errorOverCurrent";
+		try {
+			return getBoolean(entry);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "not found " + entry);
+			return false;
+		}
+	}
+	private void setErrorOverCurrent(boolean val) {
+		final String entry = "errorOverCurrent";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
+		}
+	}
+
+	public boolean getErrorOverCurrentDimmer() {
+		final String entry = "errorOverCurrentDimmer";
+		try {
+			return getBoolean(entry);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "not found " + entry);
+			return false;
+		}
+	}
+	private void setErrorOverCurrentDimmer(boolean val) {
+		final String entry = "errorOverCurrentDimmer";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
+		}
+	}
+
+	public boolean getErrorChipTemperature() {
+		final String entry = "errorChipTemperature";
+		try {
+			return getBoolean(entry);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "not found " + entry);
+			return false;
+		}
+	}
+	private void setErrorChipTemperature(boolean val) {
+		final String entry = "errorChipTemperature";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
+		}
+	}
+
+	public boolean getErrorDimmerTemperature() {
+		final String entry = "errorDimmerTemperature";
+		try {
+			return getBoolean(entry);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "not found " + entry);
+			return false;
+		}
+	}
+	private void setErrorDimmerTemperature(boolean val) {
+		final String entry = "errorDimmerTemperature";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
+		}
+	}
+
+	public boolean getErrorDimmerFailureOn() {
+		final String entry = "errorDimmerFailureOn";
+		try {
+			return getBoolean(entry);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "not found " + entry);
+			return false;
+		}
+	}
+	private void setErrorDimmerFailureOn(boolean val) {
+		final String entry = "errorDimmerFailureOn";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
+		}
+	}
+
+	public boolean getErrorDimmerFailureOff() {
+		final String entry = "errorDimmerFailureOff";
+		try {
+			return getBoolean(entry);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "not found " + entry);
+			return false;
+		}
+	}
+	private void setErrorDimmerFailureOff(boolean val) {
+		final String entry = "errorDimmerFailureOff";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
+		}
+	}
+
+	private long getErrorTimestamp() {
+		final String entry = "errorTimestamp";
+		try {
+			return getLong(entry);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "not found " + entry);
+			return 0;
+		}
+	}
+	private void setErrorTimestamp(long val) {
+		final String entry = "errorTimestamp";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
+		}
+	}
+
+
+
+//	public boolean isNewData() { return isNewData(getEventBitmask()); }
+//	public static boolean isNewData(byte eventBitmask) {
+//		return ((eventBitmask & (1L << 0)) != 0);
+//	}
+//
+//	public boolean isExternalData() { return isExternalData(getEventBitmask()); }
+//	public static boolean isExternalData(byte eventBitmask) {
+//		return ((eventBitmask & (1L << 1)) != 0);
+//	}
+//
+//	public boolean isErrorBit() { return isErrorBit(getEventBitmask()); }
+//	public static boolean isErrorBit(byte eventBitmask) {
+//		return ((eventBitmask & (1L << 2)) != 0);
+//	}
 
 //	public boolean isSetupMode() { return isSetupMode(getEventBitmask()); }
 //	public static boolean isSetupMode(byte eventBitmask) {
 //		return ((eventBitmask & (1L << 7)) != 0);
 //	}
-	public boolean isSetupMode() { return isSetupPacket(); }
+
 //	public static boolean isSetupMode(byte eventBitmask) {
 //		return isSetupPacket();
 //	}
-	private static boolean isSetupMode(byte eventBitmask) {
-		return ((eventBitmask & (1L << 7)) != 0);
-	}
-
-	private void setEventBitmask(byte eventBitmask) {
-		try {
-			put("eventBitmask", eventBitmask);
-		} catch (JSONException e) {
-			getLogger().LOGv(TAG, "failed to add event bitmask");
-			e.printStackTrace();
-		}
-	}
+//	private static boolean isSetupMode(byte eventBitmask) {
+//		return ((eventBitmask & (1L << 7)) != 0);
+//	}
 
 	public byte getTemperature() {
 		try {
@@ -464,24 +863,6 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 	}
 
-//	public String getPartialTimestamp() {
-//		try {
-//			return getString("partialTimestamp");
-//		} catch (JSONException e) {
-//			getLogger().LOGv(TAG, "no partial timestamp found");
-//			return null;
-//		}
-//	}
-//
-//	private void setPartialTimestamp(byte[] partialTimestamp) {
-//		try {
-//			put("partialTimestamp", BleUtils.bytesToEncodedString(partialTimestamp));
-//		} catch (JSONException e) {
-//			getLogger().LOGv(TAG, "failed to add partial timestamp");
-//			e.printStackTrace();
-//		}
-//	}
-
 	public int getPartialTimestamp() {
 		try {
 			return getInt("partialTimestamp");
@@ -500,23 +881,32 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 	}
 
-	public String getRandomBytes() {
+	public String getChangingBytes() {
 		try {
-			return getString("randomBytes");
+			return getString("changingBytes");
 		} catch (JSONException e) {
-			getLogger().LOGv(TAG, "no random bytes found");
+			getLogger().LOGv(TAG, "no changing bytes found");
 			return null;
 		}
 	}
-
-	private void setRandomBytes(byte[] randomBytes) {
+	private void setChangingBytes(byte[] bytes) {
 		try {
-			put("randomBytes", BleUtils.bytesToEncodedString(randomBytes));
+			put("changingBytes", BleUtils.bytesToEncodedString(bytes));
 		} catch (JSONException e) {
-			getLogger().LOGv(TAG, "failed to add random bytes");
+			getLogger().LOGv(TAG, "failed to add changing bytes");
 			e.printStackTrace();
 		}
 	}
+	private void setChangingBytes(String encodedString) {
+		try {
+			put("changingBytes", encodedString);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "failed to add changing bytes");
+			e.printStackTrace();
+		}
+	}
+
+
 
 	private BleLog getLogger() {
 		BleLog logger = BleLog.getInstance();

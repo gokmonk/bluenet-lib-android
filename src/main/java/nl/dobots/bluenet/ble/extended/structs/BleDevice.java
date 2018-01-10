@@ -57,8 +57,6 @@ public class BleDevice {
 		crownstonePlug,
 		crownstoneBuiltin,
 		guidestone,
-		@Deprecated
-		fridge
 	}
 
 	enum CrownstoneMode {
@@ -91,7 +89,7 @@ public class BleDevice {
 	private CrownstoneMode _crownstoneMode = CrownstoneMode.unknown;
 	private boolean _isValidatedCrownstone = false;
 	private int _lastCrownstoneId = -1;
-	private String _lastRandom;
+	private String _lastChangingBytes;
 	private int _numSimilarCrownstoneIds = 0;
 
 
@@ -207,11 +205,6 @@ public class BleDevice {
 
 	public boolean isGuidestone() { return _type == DeviceType.guidestone; }
 
-	@Deprecated
-	public boolean isFridge() {
-		return _type == DeviceType.fridge;
-	}
-
 	public boolean isValidatedCrownstone() {
 		return _isValidatedCrownstone;
 	}
@@ -219,14 +212,6 @@ public class BleDevice {
 	public boolean isSetupMode() { return _crownstoneMode == CrownstoneMode.setup; }
 
 	public boolean isDfuMode() { return _crownstoneMode == CrownstoneMode.dfu; }
-
-	public boolean isEncrypted() {
-		CrownstoneServiceData serviceData = getServiceData();
-		if (serviceData != null) {
-			return !serviceData.getRandomBytes().equals("");
-		}
-		return false;
-	}
 
 	private DeviceType determineDeviceType(JSONObject json) throws JSONException {
 		if (json.has(BleTypes.PROPERTY_IS_CROWNSTONE_PLUG)) {
@@ -242,11 +227,6 @@ public class BleDevice {
 		if (json.has(BleTypes.PROPERTY_IS_GUIDESTONE)) {
 			if (json.getBoolean(BleTypes.PROPERTY_IS_GUIDESTONE)) {
 				return DeviceType.guidestone;
-			}
-		}
-		if (json.has(BleTypes.PROPERTY_IS_FRIDGE)) {
-			if (json.getBoolean(BleTypes.PROPERTY_IS_FRIDGE)) {
-				return DeviceType.fridge;
 			}
 		}
 		if (json.has(BleTypes.PROPERTY_IS_IBEACON)) {
@@ -436,7 +416,7 @@ public class BleDevice {
 		if (isDfuMode()) {
 			getLogger().LOGv(TAG, "validate crownstone in dfu mode!");
 			_lastCrownstoneId = -1;
-			_lastRandom = null;
+			_lastChangingBytes = null;
 			_isValidatedCrownstone = true;
 			return;
 		}
@@ -448,15 +428,15 @@ public class BleDevice {
 		if (isSetupMode()) {
 			getLogger().LOGv(TAG, "validate crownstone in setup mode!");
 			_lastCrownstoneId = -1;
-			_lastRandom = null;
+			_lastChangingBytes = null;
 			_isValidatedCrownstone = true;
 			return;
 		}
 
-		getLogger().LOGv(TAG, "_lastCrownstoneId=" + _lastCrownstoneId + " _lastRandom=" + _lastRandom);
-		if (_lastCrownstoneId != -1 && _lastRandom != null) {
+		getLogger().LOGv(TAG, "_lastCrownstoneId=" + _lastCrownstoneId + " _lastChangingBytes=" + _lastChangingBytes);
+		if (_lastCrownstoneId != -1 && _lastChangingBytes != null) {
 			// Skip check if crownstone id is external crownstone, or when advertisement didn't change.
-			if (_serviceData.isExternalData() || _lastRandom.equals(_serviceData.getRandomBytes())) {
+			if (_serviceData.getFlagExternalData() || _lastChangingBytes.equals(_serviceData.getChangingBytes())) {
 				getLogger().LOGv(TAG, "isExternalData or similar rand");
 				return;
 			}
@@ -477,8 +457,8 @@ public class BleDevice {
 			}
 		}
 		_lastCrownstoneId = _serviceData.getCrownstoneId();
-		_lastRandom = _serviceData.getRandomBytes();
-		getLogger().LOGv(TAG, "updated: _lastCrownstoneId=" + _lastCrownstoneId + " _lastRandom=" + _lastRandom);
+		_lastChangingBytes = _serviceData.getChangingBytes();
+		getLogger().LOGv(TAG, "updated: _lastCrownstoneId=" + _lastCrownstoneId + " _lastChangingBytes=" + _lastChangingBytes);
 	}
 
 	/**
@@ -541,7 +521,7 @@ public class BleDevice {
 		// Copy from old to new
 		_isValidatedCrownstone   = old._isValidatedCrownstone;
 		_lastCrownstoneId        = old._lastCrownstoneId;
-		_lastRandom              = old._lastRandom;
+		_lastChangingBytes       = old._lastChangingBytes;
 		_numSimilarCrownstoneIds = old._numSimilarCrownstoneIds;
 		_rssiHistory             = old._rssiHistory;
 
@@ -559,6 +539,9 @@ public class BleDevice {
 				_crownstoneMode = old._crownstoneMode;
 				_name = old._name;
 			}
+		}
+		else {
+			_serviceData.copyFromOld(old._serviceData);
 		}
 
 

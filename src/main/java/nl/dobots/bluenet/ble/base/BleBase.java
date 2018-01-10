@@ -426,10 +426,6 @@ public class BleBase extends BleCore {
 						BleCore.addProperty(json, BleTypes.PROPERTY_IS_GUIDESTONE, true);
 						break;
 					}
-					case BluenetConfig.DEVICE_FRIDGE: {
-						BleCore.addProperty(json, BleTypes.PROPERTY_IS_FRIDGE, true);
-						break;
-					}
 				}
 			} catch (Exception e) {
 				BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE_PLUG, true);

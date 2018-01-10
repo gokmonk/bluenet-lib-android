@@ -20,7 +20,6 @@ public class BleTypes extends BleCoreTypes {
 	public static final String PROPERTY_IS_IBEACON = "isIBeacon";
 
 	public static final String PROPERTY_IS_GUIDESTONE = "isGuidestone";
-	public static final String PROPERTY_IS_FRIDGE = "isFridge";
 
 	public static final String PROPERTY_SERVICE_DATA = "serviceData";
 
