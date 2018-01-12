@@ -143,6 +143,8 @@ public class BluenetConfig {
 	public static final char CMD_SCHEDULE_ENTRY_CLEAR =                 26;   // 0x1A
 	public static final char CMD_KEEP_ALIVE_MESH =                      27;   // 0x1B
 	public static final char CMD_MESH_COMMAND =                         28;   // 0x1C
+	public static final char CMD_ALLOW_DIMMING =                        29;
+	public static final char CMD_LOCK_SWITCH =                          30;
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
