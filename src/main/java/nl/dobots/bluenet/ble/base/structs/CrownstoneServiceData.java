@@ -232,7 +232,7 @@ public class CrownstoneServiceData extends JSONObject {
 		setPowerFactor(powerFactor);
 		double powerUsageReal = bb.getShort() / 8.0;
 		setPowerUsage(powerUsageReal);
-		double energyUsed = bb.getInt() / 64.0;
+		double energyUsed = bb.getInt() * 64.0;
 		setAccumulatedEnergy(energyUsed);
 		parsePartialTimestamp(bb);
 		int validation = BleUtils.toUint16(bb.getShort());
