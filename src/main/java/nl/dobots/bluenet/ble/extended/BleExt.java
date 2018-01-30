@@ -1618,7 +1618,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	public void writeControl(ControlMsg controlMsg, final IStatusCallback callback) {
 		if (isConnected(callback)) {
 			getLogger().LOGd(TAG, "Write control: ", controlMsg.toString());
-			if (hasControlCharacteristic(callback)) {
+			if (hasControlCharacteristic(callback, true)) {
 				_bleBase.sendCommand(_targetAddress, controlMsg, callback);
 			}
 		}
