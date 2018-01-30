@@ -458,6 +458,7 @@ public class BleBase extends BleCore {
 			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData();
 			if (crownstoneServiceData.parseBytes(bb.array(), _encryptionEnabled, EncryptionKeys.getGuestKey(_encryptionKeys))) {
 				BleCore.addProperty(json, BleTypes.PROPERTY_SERVICE_DATA, crownstoneServiceData);
+//				getLogger().LOGv(TAG, "serviceData: " + crownstoneServiceData.toString());
 			}
 		}
 		else if (serviceUUID == BluenetConfig.CROWNSTONE_BUILTIN_SERVICE_DATA_UUID) {
@@ -466,6 +467,7 @@ public class BleBase extends BleCore {
 			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData();
 			if (crownstoneServiceData.parseBytes(bb.array(), _encryptionEnabled, EncryptionKeys.getGuestKey(_encryptionKeys))) {
 				BleCore.addProperty(json, BleTypes.PROPERTY_SERVICE_DATA, crownstoneServiceData);
+//				getLogger().LOGv(TAG, "serviceData: " + crownstoneServiceData.toString());
 			}
 		}
 		else if (serviceUUID == BluenetConfig.GUIDESTONE_SERVICE_DATA_UUID) {
@@ -474,6 +476,7 @@ public class BleBase extends BleCore {
 			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData();
 			if (crownstoneServiceData.parseBytes(bb.array(), _encryptionEnabled, EncryptionKeys.getGuestKey(_encryptionKeys))) {
 				BleCore.addProperty(json, BleTypes.PROPERTY_SERVICE_DATA, crownstoneServiceData);
+//				getLogger().LOGv(TAG, "serviceData: " + crownstoneServiceData.toString());
 			}
 		}
 	}

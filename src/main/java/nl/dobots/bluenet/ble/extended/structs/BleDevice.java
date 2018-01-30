@@ -528,7 +528,7 @@ public class BleDevice {
 
 		// If we didn't get any service data, we probably received an advertisement with no scan response
 		// In this case, use the old service data
-		if (_serviceData == null) {
+		if (_serviceData == null || _serviceData.isEmpty()) {
 			// In dfu mode, only copy the old type.
 			if (_crownstoneMode == CrownstoneMode.dfu) {
 				_type = old._type;

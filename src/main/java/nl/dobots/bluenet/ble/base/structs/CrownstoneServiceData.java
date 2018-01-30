@@ -32,6 +32,15 @@ import nl.dobots.bluenet.utils.BleUtils;
  */
 public class CrownstoneServiceData extends JSONObject {
 
+	public static final int TYPE_UNKNOWN =   0;
+	public static final int TYPE_V1 =        1;
+	public static final int TYPE_STATE =     2;
+	public static final int TYPE_ERROR =     3;
+	public static final int TYPE_EXT_STATE = 4;
+	public static final int TYPE_EXT_ERROR = 5;
+	public static final int TYPE_SETUP =     6;
+
+
 	// use BleLog.getInstance().setLogLevelPerTag(CrownstoneServiceData.class.getCanonicalName(), <NEW_LOG_LEVEL>)
 	// to change the log level
 	private static final int LOG_LEVEL = Log.WARN;
@@ -64,6 +73,7 @@ public class CrownstoneServiceData extends JSONObject {
 
 			int protocolVersion = BleUtils.toUint8(bb.get());
 			setFirmwareVersion(protocolVersion);
+			setType(TYPE_UNKNOWN);
 
 			switch (protocolVersion) {
 				case 1:
@@ -88,6 +98,8 @@ public class CrownstoneServiceData extends JSONObject {
 		if (bytes.length - offset < 16) {
 			return false;
 		}
+
+		setType(TYPE_V1);
 
 		// First parse without decrypting
 		ByteBuffer bb = ByteBuffer.wrap(bytes, offset, bytes.length-offset);
@@ -157,6 +169,7 @@ public class CrownstoneServiceData extends JSONObject {
 				return false;
 			}
 			bb = ByteBuffer.wrap(decryptedBytes);
+//			getLogger().LOGv(TAG, "decrypted: " + BleUtils.bytesToString(decryptedBytes));
 		}
 		else {
 			bb = ByteBuffer.wrap(bytes, offset, bytes.length-offset);
@@ -220,10 +233,12 @@ public class CrownstoneServiceData extends JSONObject {
 			setFlagExternalData(true);
 			setCrownstoneId(-1);
 			setCrownstoneExternalId(BleUtils.toUint8(bb.get()));
+			setType(TYPE_EXT_STATE);
 		}
 		else {
 			setCrownstoneId(BleUtils.toUint8(bb.get()));
 			setCrownstoneExternalId(-1);
+			setType(TYPE_STATE);
 		}
 		setSwitchState(BleUtils.toUint8(bb.get()));
 		parseFlagsBitmask(bb.get());
@@ -247,10 +262,12 @@ public class CrownstoneServiceData extends JSONObject {
 			setFlagExternalData(true);
 			setCrownstoneId(-1);
 			setCrownstoneExternalId(BleUtils.toUint8(bb.get()));
+			setType(TYPE_EXT_ERROR);
 		}
 		else {
 			setCrownstoneId(BleUtils.toUint8(bb.get()));
 			setCrownstoneExternalId(-1);
+			setType(TYPE_ERROR);
 		}
 		parseErrorBitmask(BleUtils.toUint32(bb.getInt()));
 		setErrorTimestamp(BleUtils.toUint32(bb.getInt()));
@@ -259,7 +276,6 @@ public class CrownstoneServiceData extends JSONObject {
 		parsePartialTimestamp(bb);
 		double powerUsageReal = bb.getShort() / 8.0;
 		setPowerUsage(powerUsageReal);
-
 		return true;
 	}
 
@@ -319,21 +335,62 @@ public class CrownstoneServiceData extends JSONObject {
 		if (getFlagExternalData() || old.getFlagExternalData()) {
 			return;
 		}
-		if (getFlagError()) {
+		int type = getType();
+		int oldType = old.getType();
+		getLogger().LOGv(TAG, "current:" + this.toString());
+		getLogger().LOGv(TAG, "old:" + old.toString());
+		if (type == TYPE_STATE && getFlagError()) {
 			setErrorOverCurrent(old.getErrorOverCurrent());
 			setErrorOverCurrentDimmer(old.getErrorOverCurrentDimmer());
 			setErrorChipTemperature(old.getErrorChipTemperature());
 			setErrorDimmerTemperature(old.getErrorDimmerTemperature());
 			setErrorDimmerFailureOn(old.getErrorDimmerFailureOn());
 			setErrorDimmerFailureOff(old.getErrorDimmerFailureOff());
+			setErrorTimestamp(old.getErrorTimestamp());
+		}
+		if (!hasSwitchState()) {
+			setSwitchState(old.getSwitchState());
+		}
+		if (!hasPowerFactor()) {
+			setPowerFactor(old.getPowerFactor());
+		}
+		if (!hasAccumulatedEnergy()) {
+			setAccumulatedEnergy(old.getAccumulatedEnergy());
 		}
 		// TODO: merge more..
+	}
+
+
+	/** Check if service data is empty
+	 *
+	 * @return true when service data object is empty.
+	 */
+	public boolean isEmpty() {
+		return length() == 0;
 	}
 
 
 	//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\\
 	//%%%%%%%%%%                    Getters and setters of fields                       %%%%%%%%%%\\
 	//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\\
+
+	public int getType() {
+		try {
+			return getInt("serviceDataType");
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "no type found");
+			return 0;
+		}
+	}
+
+	private void setType(int type) {
+		try {
+			put("serviceDataType", type);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "failed to add type");
+			e.printStackTrace();
+		}
+	}
 
 	public int getFirmwareVersion() {
 		try {
@@ -405,6 +462,10 @@ public class CrownstoneServiceData extends JSONObject {
 			getLogger().LOGv(TAG, "failed to add ext crownstone id");
 			e.printStackTrace();
 		}
+	}
+
+	public boolean hasSwitchState() {
+		return has("switchState");
 	}
 
 	public int getSwitchState() {
@@ -809,6 +870,10 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 	}
 
+	public boolean hasPowerFactor() {
+		return has("powerFactor");
+	}
+
 	public double getPowerFactor() {
 		try {
 			return getDouble("powerFactor");
@@ -827,6 +892,10 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 	}
 
+	public boolean hasPowerUsage() {
+		return has("powerUsage");
+	}
+
 	public double getPowerUsage() {
 		try {
 			return getDouble("powerUsage");
@@ -843,7 +912,11 @@ public class CrownstoneServiceData extends JSONObject {
 			getLogger().LOGv(TAG, "failed to add power usage");
 			e.printStackTrace();
 		}
-	}                                                                                                                                                                                                                                                                                                                                                                                                     
+	}
+
+	public boolean hasAccumulatedEnergy() {
+		return has("accumulatedEnergy");
+	}
 
 	public double getAccumulatedEnergy() {
 		try {
