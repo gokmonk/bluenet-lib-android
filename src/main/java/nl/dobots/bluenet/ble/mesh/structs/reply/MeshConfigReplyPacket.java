@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import nl.dobots.bluenet.ble.base.structs.ConfigurationMsg;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.utils.BleLog;
+import nl.dobots.bluenet.utils.BleUtils;
 
 /**
  * Copyright (c) 2017 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -27,23 +28,24 @@ import nl.dobots.bluenet.utils.BleLog;
  */
 public class MeshConfigReplyPacket extends MeshCommandReplyPacket {
 
-	// TODO: this only holds 1 config reply packet at the moment
+	// 1B crownstone id
+	protected static final int CONFIG_REPLY_PACKET_HEADER_SIZE = 1;
 
+	private int _crownstoneId;
 	private ConfigurationMsg _configMsg;
 
 	public MeshConfigReplyPacket() {
 		super();
+		_crownstoneId = 0;
 		_configMsg = null;
 	}
 
-	public MeshConfigReplyPacket(ConfigurationMsg message, long messageNumber) {
-		super(BluenetConfig.MESH_REPLY_CONFIG, messageNumber);
-		_configMsg = message;
-		setNumberOfReplies(1);
-		setPayload(_configMsg.toArray());
-	}
-
-//	public MeshConfigReplyPacket(byte[] bytes) {
+//	public MeshConfigReplyPacket(int crownstoneId, ConfigurationMsg message, long messageNumber) {
+//		super(BluenetConfig.MESH_REPLY_CONFIG, messageNumber);
+//		_crownstoneId = crownstoneId;
+//		_configMsg = message;
+//		setNumberOfReplies(1);
+////		setPayload(_configMsg.toArray()); // TODO: add crownstone id
 //	}
 
 	@Override
@@ -51,8 +53,19 @@ public class MeshConfigReplyPacket extends MeshCommandReplyPacket {
 		if (!super.fromArray(bytes)) {
 			return false;
 		}
+		byte[] payload = getPayload();
+		if (payload.length < CONFIG_REPLY_PACKET_HEADER_SIZE) {
+			return false;
+		}
+		ByteBuffer bb = ByteBuffer.wrap(payload);
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+
+		_crownstoneId = BleUtils.toUint8(bb.get());
+
+		byte[] configMsg = new byte[bb.remaining()];
+		bb.get(configMsg);
 		_configMsg = new ConfigurationMsg();
-		if (!_configMsg.fromArray(getPayload())) {
+		if (!_configMsg.fromArray(configMsg)) {
 			_configMsg = null;
 			return false;
 		}

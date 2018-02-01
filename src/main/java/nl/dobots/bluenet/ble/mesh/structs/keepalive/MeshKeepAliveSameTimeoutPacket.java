@@ -40,12 +40,12 @@ public class MeshKeepAliveSameTimeoutPacket implements MeshKeepAlivePayload {
 		}
 
 		public MeshKeepAliveSameTimeoutItem(ByteBuffer bb) {
-			_crownstoneId = BleUtils.toUint16(bb.getShort());
+			_crownstoneId = BleUtils.toUint8(bb.get());
 			_actionSwitchState = BleUtils.toUint8(bb.get());
 		}
 
 		public void toArray(ByteBuffer bb) {
-			bb.putShort((short) _crownstoneId);
+			bb.put((byte) _crownstoneId);
 			bb.put((byte) _actionSwitchState);
 		}
 
@@ -71,10 +71,10 @@ public class MeshKeepAliveSameTimeoutPacket implements MeshKeepAlivePayload {
 		}
 	}
 
-	// 2B timeout + 1B count + 1B reserved
-	private static final int HEADER_SIZE = 4;
-	// 2B Crownstone ID + 1B action + switch state
-	private static final int ITEM_SIZE = 3;
+	// 2B timeout + 1B count
+	private static final int HEADER_SIZE = 3;
+	// 1B Crownstone ID + 1B action + switch state
+	private static final int ITEM_SIZE = 2;
 	// Max number of items in the list
 	private static final int MAX_ITEMS = (MeshKeepAlivePacket.KEEP_ALIVE_PACKET_MAX_PAYLOAD_SIZE - HEADER_SIZE) / ITEM_SIZE;
 

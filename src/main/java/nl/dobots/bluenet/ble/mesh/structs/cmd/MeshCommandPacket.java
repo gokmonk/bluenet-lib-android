@@ -34,8 +34,8 @@ public class MeshCommandPacket implements MeshPayload {
 
 	// 1B message type + 1B bitmask + 1B number of ids
 	private static final int COMMAND_PACKET_HEADER_SIZE = 3;
-	// 2B Crownstone ID
-	private static final int CROWNSTONE_ID_SIZE = 2; // bytes
+	// 1B Crownstone ID
+	private static final int CROWNSTONE_ID_SIZE = 1; // bytes
 
 	private int _messageType;
 
@@ -43,7 +43,6 @@ public class MeshCommandPacket implements MeshPayload {
 
 	private int _numberOfIds;
 
-//	private int[] _ids;
 	private ArrayList<Integer> _ids;
 
 	private byte[] _payload;
@@ -59,7 +58,6 @@ public class MeshCommandPacket implements MeshPayload {
 		_messageType = messageType;
 		_bitMask = 0;
 		_numberOfIds = ids.length;
-//		_ids = ids;
 		_ids = new ArrayList<>(_numberOfIds);
 		for (int id: ids) {
 			_ids.add(id);
@@ -89,13 +87,9 @@ public class MeshCommandPacket implements MeshPayload {
 			_numberOfIds = 0;
 			return false;
 		}
-//		_ids = new int[_numberOfIds];
-//		for (int i = 0; i < _numberOfIds; i++) {
-//			_ids[i] = BleUtils.toUint16(bb.getShort());
-//		}
 		_ids = new ArrayList<>(_numberOfIds);
 		for (int i = 0; i < _numberOfIds; i++) {
-			_ids.add(BleUtils.toUint16(bb.getShort()));
+			_ids.add(BleUtils.toUint8(bb.get()));
 		}
 		_payload = new byte[bb.remaining()];
 		bb.get(_payload);
@@ -114,14 +108,11 @@ public class MeshCommandPacket implements MeshPayload {
 		bb.put((byte)_messageType);
 		bb.put((byte)_bitMask);
 		bb.put((byte)_numberOfIds);
-//		for (int i = 0; i < _numberOfIds; i++) {
-//			bb.putShort((short)_ids[i]);
-//		}
 		if (_numberOfIds != _ids.size()) {
 			return null;
 		}
 		for (int i = 0; i < _numberOfIds; i++) {
-			bb.putShort(_ids.get(i).shortValue());
+			bb.put(_ids.get(i).byteValue());
 		}
 
 		bb.put(_payload);

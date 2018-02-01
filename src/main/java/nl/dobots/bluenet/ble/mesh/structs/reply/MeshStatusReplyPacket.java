@@ -57,15 +57,15 @@ public class MeshStatusReplyPacket extends MeshCommandReplyPacket {
 			ByteBuffer bb = ByteBuffer.allocate(_numberOfReplies * STATUS_REPLY_ITEM_SIZE);
 			bb.order(ByteOrder.LITTLE_ENDIAN);
 
-			bb.putShort((short) _crownstoneId);
+			bb.put((byte) _crownstoneId);
 			bb.putShort((short) _status);
 
 			return bb.array();
 		}
 	}
 
-	// 2B Crownstone ID + 2B Status
-	private static final int STATUS_REPLY_ITEM_SIZE = 4;
+	// 1B Crownstone ID + 2B Status
+	private static final int STATUS_REPLY_ITEM_SIZE = 3;
 	private static final int MAX_STATUS_REPLY_ITEMS = (BluenetConfig.MESH_MAX_PAYLOAD_SIZE - COMMAND_REPLY_PACKET_HEADER_SIZE) / STATUS_REPLY_ITEM_SIZE;
 
 	private StatusReplyItem[] _list = new StatusReplyItem[MAX_STATUS_REPLY_ITEMS];
@@ -93,7 +93,7 @@ public class MeshStatusReplyPacket extends MeshCommandReplyPacket {
 		ByteBuffer bb = ByteBuffer.wrap(getPayload());
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 		for (int i = 0; i < _numberOfReplies; i++) {
-			int crownstoneId = BleUtils.toUint16(bb.getShort());
+			int crownstoneId = BleUtils.toUint8(bb.get());
 			int status = BleUtils.toUint16(bb.getShort());
 			_list[i] = new StatusReplyItem(crownstoneId, status);
 		}

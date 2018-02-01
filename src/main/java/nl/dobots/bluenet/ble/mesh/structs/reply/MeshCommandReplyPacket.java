@@ -28,7 +28,7 @@ public class MeshCommandReplyPacket implements MeshPayload {
 
 	public static final String TAG = MeshCommandReplyPacket.class.getCanonicalName();
 
-	// 2B reply type + 4B for message counter + 1B number of replies
+	// 1B reply type + 1B reserved + 4B for message counter + 1B number of replies
 	protected static final int COMMAND_REPLY_PACKET_HEADER_SIZE = 7;
 
 	private int _replyType;

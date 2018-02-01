@@ -61,10 +61,10 @@ public class MeshScanResultPacket implements MeshPayload {
 		}
 	}
 
-	// 1B size + 1B reserved
-	private static final int MESH_SCAN_RESULT_HEADER_SIZE = 2;
-	// 2B id of crownstone that scanned the address + 6B scanned address + 1B rssi
-	private static final int MESH_SCAN_RESULT_ITEM_SIZE = 9;
+	// 1B size + 3B reserved
+	private static final int MESH_SCAN_RESULT_HEADER_SIZE = 4;
+	// 1B id of crownstone that scanned the address + 6B scanned address + 1B rssi
+	private static final int MESH_SCAN_RESULT_ITEM_SIZE = 8;
 	// max capacity of the list
 	private static final int MESH_SCAN_RESULT_MAX_LIST_ELEMENTS = (BluenetConfig.MESH_MAX_PAYLOAD_SIZE - MESH_SCAN_RESULT_HEADER_SIZE) / MESH_SCAN_RESULT_ITEM_SIZE;
 
@@ -149,7 +149,7 @@ public class MeshScanResultPacket implements MeshPayload {
 			// reversed automatically
 			byte[] address = new byte[BluenetConfig.BLE_DEVICE_ADDRESS_LENGTH];
 			bb.get(address);
-			device.id = BleUtils.toUint16(bb.getShort());
+			device.id = BleUtils.toUint8(bb.get());
 			device.address = BleUtils.reverse(address);
 			device.rssi = bb.get();
 			_devices.add(device);
@@ -170,7 +170,7 @@ public class MeshScanResultPacket implements MeshPayload {
 		bb.put((byte) 0); // Reserved
 
 		for (ScannedDevice device : _devices) {
-			bb.putShort((short) device.id);
+			bb.put((byte) device.id);
 			bb.put(device.address);
 			bb.put((byte) device.rssi);
 		}

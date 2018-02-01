@@ -1,7 +1,11 @@
 package nl.dobots.bluenet.ble.mesh.structs.reply;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
 import nl.dobots.bluenet.ble.base.structs.StateMsg;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
+import nl.dobots.bluenet.utils.BleUtils;
 
 /**
  * Copyright (c) 2017 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -22,22 +26,24 @@ import nl.dobots.bluenet.ble.cfg.BluenetConfig;
  */
 public class MeshStateReplyPacket extends MeshCommandReplyPacket {
 
-	// TODO: this only holds 1 state reply packet at the moment
+	// 1B crownstone id
+	protected static final int STATE_REPLY_PACKET_HEADER_SIZE = 1;
 
+	private int _crownstoneId;
 	private StateMsg _stateMsg;
 
 	public MeshStateReplyPacket() {
 		super();
+		_crownstoneId = 0;
 		_stateMsg = null;
 	}
 
-	public MeshStateReplyPacket(StateMsg message, long messageNumber) {
-		super(BluenetConfig.MESH_REPLY_CONFIG, messageNumber);
-		_stateMsg = message;
-		setPayload(_stateMsg.toArray());
-	}
-
-//	public MeshStateReplyPacket(byte[] bytes) {
+//	public MeshStateReplyPacket(int crownstoneId, StateMsg message, long messageNumber) {
+//		super(BluenetConfig.MESH_REPLY_STATE, messageNumber);
+//		_crownstoneId = crownstoneId;
+//		_stateMsg = message;
+//		setNumberOfReplies(1);
+////		setPayload(_stateMsg.toArray()); // TODO: add crownstone id
 //	}
 
 	@Override
@@ -45,8 +51,19 @@ public class MeshStateReplyPacket extends MeshCommandReplyPacket {
 		if (!super.fromArray(bytes)) {
 			return false;
 		}
+		byte[] payload = getPayload();
+		if (payload.length < STATE_REPLY_PACKET_HEADER_SIZE) {
+			return false;
+		}
+		ByteBuffer bb = ByteBuffer.wrap(payload);
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+
+		_crownstoneId = BleUtils.toUint8(bb.get());
+
+		byte[] stateMsg = new byte[bb.remaining()];
+		bb.get(stateMsg);
 		_stateMsg = new StateMsg();
-		if (!_stateMsg.fromArray(getPayload())) {
+		if (!_stateMsg.fromArray(stateMsg)) {
 			_stateMsg = null;
 			return false;
 		}

@@ -41,14 +41,14 @@ public class MeshMultiSwitchListPacket implements MeshMultiSwitchPayload {
 		}
 
 		public MultiSwitchListItem(ByteBuffer bb) {
-			_crownstoneId =    BleUtils.toUint16(bb.getShort());
+			_crownstoneId =    BleUtils.toUint8(bb.get());
 			_switchState =     BleUtils.toUint8(bb.get());
 			_timeout =         BleUtils.toUint16(bb.getShort());
 			_intent =          BleUtils.toUint8(bb.get());
 		}
 
 		public void toArray(ByteBuffer bb) {
-			bb.putShort((short) _crownstoneId);
+			bb.put((byte) _crownstoneId);
 			bb.put((byte) _switchState);
 			bb.putShort((short) _timeout);
 			bb.put((byte) _intent);
@@ -61,8 +61,8 @@ public class MeshMultiSwitchListPacket implements MeshMultiSwitchPayload {
 
 	// 1B count
 	private static final int HEADER_SIZE = 1;
-	// 2B Crownstone ID + 1B switch state + 2B timeout + 1B intent
-	private static final int ITEM_SIZE = 6;
+	// 1B Crownstone ID + 1B switch state + 2B timeout + 1B intent
+	private static final int ITEM_SIZE = 5;
 	// Max number of items in the list
 	private static final int MAX_ITEMS = (MeshMultiSwitchPacket.MULTI_SWITCH_PACKET_MAX_PAYLOAD_SIZE - HEADER_SIZE) / ITEM_SIZE;
 
