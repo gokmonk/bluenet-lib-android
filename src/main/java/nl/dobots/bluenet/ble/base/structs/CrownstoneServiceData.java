@@ -10,6 +10,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import nl.dobots.bluenet.ble.base.BleBaseEncryption;
+import nl.dobots.bluenet.ble.base.utils.PartialTime;
 import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
@@ -71,11 +72,11 @@ public class CrownstoneServiceData extends JSONObject {
 		try {
 			setServiceUuid(BleUtils.toUint16(bb.getShort()));
 
-			int protocolVersion = BleUtils.toUint8(bb.get());
-			setFirmwareVersion(protocolVersion);
+			int opCode = BleUtils.toUint8(bb.get());
+			setOpCode(opCode);
 			setType(TYPE_UNKNOWN);
 
-			switch (protocolVersion) {
+			switch (opCode) {
 				case 1:
 					return parseDataV1(bytes, bb.position(), encrypted, key);
 				case 3:
@@ -83,7 +84,7 @@ public class CrownstoneServiceData extends JSONObject {
 				case 4:
 					return parseDataV4(bytes, bb.position(), encrypted, key);
 				default:
-					setFirmwareVersion(0);
+					setOpCode(0);
 					return false;
 			}
 		} catch (BufferUnderflowException e) {
@@ -138,7 +139,8 @@ public class CrownstoneServiceData extends JSONObject {
 		setFlagError(       (flagBitmask & (1L << 2)) != 0);
 		setFlagSetup(       (flagBitmask & (1L << 7)) != 0);
 		setTemperature(bb.get());
-		setPowerUsage(bb.getInt());
+		setPowerUsageReal(bb.getInt() / 1000.0);
+//		setPowerUsageApparent(getPowerUsageReal()); // Assume power factor of 1.0
 		setAccumulatedEnergy(bb.getInt());
 		byte[] randomBytes = new byte[3];
 		bb.get(randomBytes);
@@ -215,7 +217,8 @@ public class CrownstoneServiceData extends JSONObject {
 				double powerFactor = bb.get() / 127.0;
 				setPowerFactor(powerFactor);
 				double powerUsageReal = bb.getShort() / 8.0;
-				setPowerUsage(powerUsageReal);
+				setPowerUsageReal(powerUsageReal);
+				setPowerUsageApparent(powerRealToApparent(powerUsageReal, powerFactor));
 				parseErrorBitmask(BleUtils.toUint32(bb.getInt()));
 				byte[] counter = new byte[1];
 				bb.get(counter);
@@ -246,7 +249,8 @@ public class CrownstoneServiceData extends JSONObject {
 		double powerFactor = bb.get() / 127.0;
 		setPowerFactor(powerFactor);
 		double powerUsageReal = bb.getShort() / 8.0;
-		setPowerUsage(powerUsageReal);
+		setPowerUsageReal(powerUsageReal);
+		setPowerUsageApparent(powerRealToApparent(powerUsageReal, powerFactor));
 		double energyUsed = bb.getInt() * 64.0;
 		setAccumulatedEnergy(energyUsed);
 		parsePartialTimestamp(bb);
@@ -254,6 +258,7 @@ public class CrownstoneServiceData extends JSONObject {
 		if (validation != 0xFACE) {
 			getLogger().LOGw(TAG, "validation mismatch: " + validation);
 		}
+		reconstructTimestamp();
 		return true;
 	}
 
@@ -275,7 +280,9 @@ public class CrownstoneServiceData extends JSONObject {
 		setTemperature(bb.get());
 		parsePartialTimestamp(bb);
 		double powerUsageReal = bb.getShort() / 8.0;
-		setPowerUsage(powerUsageReal);
+		setPowerUsageReal(powerUsageReal);
+//		setPowerUsageApparent(powerUsageReal); // Assume power factor of 1.0
+		reconstructTimestamp();
 		return true;
 	}
 
@@ -304,15 +311,30 @@ public class CrownstoneServiceData extends JSONObject {
 		setChangingBytes(partialTimestamp);
 	}
 
+	private void reconstructTimestamp() {
+		if (getFlagTimeSet()) {
+			PartialTime partialTime = new PartialTime();
+			long timestamp = partialTime.reconstructTimestamp(getPartialTimestamp());
+			setReconstructedTimestamp(timestamp);
+		}
+	}
+
+	private double powerRealToApparent(double realPower, double powerFactor) {
+		if (powerFactor == 0.0) {
+			powerFactor = 0.01;
+		}
+		return realPower / powerFactor;
+	}
+
 
 
 	private boolean isSetupPacket() {
-		switch (getFirmwareVersion()) {
+		switch (getOpCode()) {
 			case 0:
 				return false;
 			case 1: {
-				getLogger().LOGv(TAG, "setupbit=" + getFlagSetup() + " id=" + getCrownstoneId() + " switch=" + getSwitchState() + " power=" + getPowerUsage() + " energy=" + getAccumulatedEnergy());
-				return (getFlagSetup() && getCrownstoneId() == 0 && getSwitchState() == 0 && getPowerUsage() == 0 && getAccumulatedEnergy() == 0);
+				getLogger().LOGv(TAG, "setupbit=" + getFlagSetup() + " id=" + getCrownstoneId() + " switch=" + getSwitchState() + " power=" + getPowerUsageReal() + " energy=" + getAccumulatedEnergy());
+				return (getFlagSetup() && getCrownstoneId() == 0 && getSwitchState() == 0 && getPowerUsageReal() == 0 && getAccumulatedEnergy() == 0);
 			}
 			default:
 				return getFlagSetup();
@@ -392,20 +414,20 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 	}
 
-	public int getFirmwareVersion() {
+	public int getOpCode() {
 		try {
-			return getInt("firmwareVersion");
+			return getInt("opCode");
 		} catch (JSONException e) {
-			getLogger().LOGv(TAG, "no firmware version found");
+			getLogger().LOGv(TAG, "no opCode found");
 			return 0;
 		}
 	}
 
-	private void setFirmwareVersion(int firmwareVersion) {
+	private void setOpCode(int opCode) {
 		try {
-			put("firmwareVersion", firmwareVersion);
+			put("opCode", opCode);
 		} catch (JSONException e) {
-			getLogger().LOGv(TAG, "failed to add firmware version");
+			getLogger().LOGv(TAG, "failed to add opCode");
 			e.printStackTrace();
 		}
 	}
@@ -526,7 +548,23 @@ public class CrownstoneServiceData extends JSONObject {
 
 
 
+	public long getReconstructedTimestamp() {
+		try {
+			return getLong("reconstructedTimestamp");
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "no reconstructed timestamp found");
+			return -1;
+		}
+	}
 
+	private void setReconstructedTimestamp(long timestamp) {
+		try {
+			put("reconstructedTimestamp", timestamp);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "failed to add reconstructed timestamp");
+			e.printStackTrace();
+		}
+	}
 
 
 
@@ -879,11 +917,14 @@ public class CrownstoneServiceData extends JSONObject {
 			return getDouble("powerFactor");
 		} catch (JSONException e) {
 			getLogger().LOGv(TAG, "no power factor found");
-			return 0;
+			return 1.0;
 		}
 	}
 
 	private void setPowerFactor(double powerFactor) {
+		if (powerFactor == 0.0) {
+			powerFactor = 1.0;
+		}
 		try {
 			put("powerFactor", powerFactor);
 		} catch (JSONException e) {
@@ -892,24 +933,42 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 	}
 
-	public boolean hasPowerUsage() {
-		return has("powerUsage");
-	}
+//	public boolean hasPowerUsage() {
+//		return has("powerUsage");
+//	}
 
-	public double getPowerUsage() {
+	public double getPowerUsageReal() {
 		try {
-			return getDouble("powerUsage");
+			return getDouble("powerUsageReal");
 		} catch (JSONException e) {
-			getLogger().LOGv(TAG, "no power usage found");
+			getLogger().LOGv(TAG, "no real power usage found");
 			return 0;
 		}
 	}
 
-	private void setPowerUsage(double powerUsage) {
+	private void setPowerUsageReal(double powerUsage) {
 		try {
-			put("powerUsage", powerUsage);
+			put("powerUsageReal", powerUsage);
 		} catch (JSONException e) {
-			getLogger().LOGv(TAG, "failed to add power usage");
+			getLogger().LOGv(TAG, "failed to add real power usage");
+			e.printStackTrace();
+		}
+	}
+
+	public double getPowerUsageApparent() {
+		try {
+			return getDouble("powerUsageApparent");
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "no apparent power usage found");
+			return 0;
+		}
+	}
+
+	private void setPowerUsageApparent(double powerUsage) {
+		try {
+			put("powerUsageApparent", powerUsage);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "failed to add apparent power usage");
 			e.printStackTrace();
 		}
 	}
