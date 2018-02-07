@@ -1654,6 +1654,55 @@ public class BleExt extends Logging implements IWriteCallback {
 	///////////////////
 
 	/**
+	 * Function to read the current switch state value from the device.
+	 * <p>
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 *
+	 * @param callback the callback which will get the read value on success, or an error otherwise
+	 */
+	public void readSwitch(final IIntegerCallback callback) {
+		if (isConnected(callback)) {
+			getLogger().LOGd(TAG, "Reading current switch state ...");
+			if (hasStateCharacteristics(callback)) {
+				_bleExtState.getSwitchState(_targetAddress, new IIntegerCallback() {
+					@Override
+					public void onSuccess(int result) {
+						callback.onSuccess(result);
+					}
+
+					@Override
+					public void onError(int error) {
+						callback.onError(error);
+					}
+				});
+			}
+		}
+	}
+
+	/**
+	 * Function to read the current switch state from the device. Connects to the device if not already
+	 * connected, and/or delays the disconnect if necessary.
+	 *
+	 * @param address  the MAC address of the device from which the switch state should be read
+	 * @param callback the callback which will get the read value on success, or an error otherwise
+	 */
+	public void readSwitch(final String address, final IIntegerCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "Reading current switch state ...");
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						readSwitch(execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
+	/**
 	 * Function to write the given switch value to the device.
 	 * <p>
 	 * Note: needs to be already connected or an error is created! Use overloaded function
@@ -1689,6 +1738,94 @@ public class BleExt extends Logging implements IWriteCallback {
 					@Override
 					public void execute(final IExecStatusCallback execCallback) {
 						writeSwitch(value, execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
+
+	/**
+	 * Function to enable/disable the switch lock
+	 * <p>
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 *
+	 * @param enable   whether to enable the switch lock
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void writeSwitchLock(final boolean enable, final IStatusCallback callback) {
+		if (isConnected(callback)) {
+			getLogger().LOGd(TAG, "Enable switch lock " + enable);
+			if (hasControlCharacteristic(callback)) {
+				byte[] val = { (byte)(enable ? 1 : 0) };
+				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_LOCK_SWITCH, 1, val), callback);
+			}
+		}
+	}
+
+	/**
+	 * Function to enable/disable the switch lock. Connects to the device if not already
+	 * connected, and/or delays the disconnect if necessary.
+	 * <p>
+	 *
+	 * @param address  the MAC address of the device to which should be written
+	 * @param enable   whether to enable the switch lock
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void writeSwitchLock(final String address, final boolean enable, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "Enable switch lock " + enable);
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						writeSwitchLock(enable, execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
+
+	/**
+	 * Function to allow/disallow dimming
+	 * <p>
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 *
+	 * @param enable   whether to allow dimming
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void writeAllowDimming(final boolean enable, final IStatusCallback callback) {
+		if (isConnected(callback)) {
+			getLogger().LOGd(TAG, "Allow dimming " + enable);
+			if (hasControlCharacteristic(callback)) {
+				byte[] val = { (byte)(enable ? 1 : 0) };
+				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_ALLOW_DIMMING, 1, val), callback);
+			}
+		}
+	}
+
+	/**
+	 * Function to write the given switch value to the device. Connects to the device if not already
+	 * connected, and/or delays the disconnect if necessary.
+	 * <p>
+	 *
+	 * @param address  the MAC address of the device to which should be written
+	 * @param enable   whether to allow dimming
+	 * @param callback the callback which will be informed about success or failure
+	 */
+	public void writeAllowDimming(final String address, final boolean enable, final IStatusCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "Allow dimming " + enable);
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						writeAllowDimming(enable, execCallback);
 					}
 				}, new SimpleExecStatusCallback(callback));
 			}
@@ -3317,27 +3454,27 @@ public class BleExt extends Logging implements IWriteCallback {
 		});
 	}
 
-	public void writeKeepAliveState(final int action, final int switchState, final int timeout, final IStatusCallback callback) {
+	public void writeKeepAliveState(final int action, final int switchVal, final int timeout, final IStatusCallback callback) {
 		if (isConnected(callback)) {
-			getLogger().LOGd(TAG, "write keep alive with state %d and timeout %d", switchState, timeout);
+			getLogger().LOGd(TAG, "write keep alive with switch val %d and timeout %d", switchVal, timeout);
 			ByteBuffer bb = ByteBuffer.allocate(4);
 			bb.order(ByteOrder.LITTLE_ENDIAN);
 			bb.put((byte)action);
-			bb.put((byte)switchState);
+			bb.put((byte)switchVal);
 			bb.putShort((short)timeout);
 			_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_KEEP_ALIVE_STATE, 4, bb.array()), callback);
 		}
 	}
 
-	public void writeKeepAliveState(final String address, final int action, final int switchState, final int timeout, final IStatusCallback callback) {
+	public void writeKeepAliveState(final String address, final int action, final int switchVal, final int timeout, final IStatusCallback callback) {
 		getHandler().post(new Runnable() {
 			@Override
 			public void run() {
-				getLogger().LOGd(TAG, "write keep alive with state %d and timeout %d", switchState, timeout);
+				getLogger().LOGd(TAG, "write keep alive with switch val %d and timeout %d", switchVal, timeout);
 				connectAndExecute(address, new IExecuteCallback() {
 					@Override
 					public void execute(final IExecStatusCallback execCallback) {
-						writeKeepAliveState(action, switchState, timeout, execCallback);
+						writeKeepAliveState(action, switchVal, timeout, execCallback);
 					}
 				}, new SimpleExecStatusCallback(callback));
 			}
