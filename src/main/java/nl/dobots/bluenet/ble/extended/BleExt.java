@@ -3469,7 +3469,7 @@ public class BleExt extends Logging implements IWriteCallback {
 		}
 	}
 
-	public void readFirmwareRevision(final String address, final IIntegerCallback callback) {
+	public void readFirmwareRevision(final String address, final IByteArrayCallback callback) {
 		getHandler().post(new Runnable() {
 			@Override
 			public void run() {
@@ -3491,7 +3491,7 @@ public class BleExt extends Logging implements IWriteCallback {
 		}
 	}
 
-	public void readHardwareRevision(final String address, final IIntegerCallback callback) {
+	public void readHardwareRevision(final String address, final IByteArrayCallback callback) {
 		getHandler().post(new Runnable() {
 			@Override
 			public void run() {
@@ -3515,7 +3515,7 @@ public class BleExt extends Logging implements IWriteCallback {
 		}
 	}
 
-	public void readBootloaderRevision(final String address, final IIntegerCallback callback) {
+	public void readBootloaderRevision(final String address, final IByteArrayCallback callback) {
 		getHandler().post(new Runnable() {
 			@Override
 			public void run() {
