@@ -11,6 +11,7 @@ import java.nio.ByteOrder;
 
 import nl.dobots.bluenet.ble.base.BleBaseEncryption;
 import nl.dobots.bluenet.ble.base.utils.PartialTime;
+import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
@@ -296,12 +297,12 @@ public class CrownstoneServiceData extends JSONObject {
 	}
 
 	private void parseErrorBitmask(long bitmask) {
-		setErrorOverCurrent(      (bitmask & (1L << 0)) != 0);
-		setErrorOverCurrentDimmer((bitmask & (1L << 1)) != 0);
-		setErrorChipTemperature(  (bitmask & (1L << 2)) != 0);
-		setErrorDimmerTemperature((bitmask & (1L << 3)) != 0);
-		setErrorDimmerFailureOn(  (bitmask & (1L << 4)) != 0);
-		setErrorDimmerFailureOff( (bitmask & (1L << 5)) != 0);
+		setErrorOverCurrent(      (bitmask & (1L << BluenetConfig.STATE_ERROR_POS_OVERCURRENT)) != 0);
+		setErrorOverCurrentDimmer((bitmask & (1L << BluenetConfig.STATE_ERROR_POS_OVERCURRENT_DIMMER)) != 0);
+		setErrorChipTemperature(  (bitmask & (1L << BluenetConfig.STATE_ERROR_POS_TEMP_CHIP)) != 0);
+		setErrorDimmerTemperature((bitmask & (1L << BluenetConfig.STATE_ERROR_POS_TEMP_DIMMER)) != 0);
+		setErrorDimmerFailureOn(  (bitmask & (1L << BluenetConfig.STATE_ERROR_POS_DIMMER_ON_FAILURE)) != 0);
+		setErrorDimmerFailureOff( (bitmask & (1L << BluenetConfig.STATE_ERROR_POS_DIMMER_OFF_FAILURE)) != 0);
 	}
 
 	private void parsePartialTimestamp(ByteBuffer bb) {

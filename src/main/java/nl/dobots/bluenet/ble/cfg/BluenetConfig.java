@@ -276,10 +276,12 @@ public class BluenetConfig {
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// State error bits
-	public static final char STATE_ERROR_POS_OVERCURRENT =              0;    // 0x00;
-	public static final char STATE_ERROR_POS_OVERCURRENT_DIMMER =       1;    // 0x01;
-	public static final char STATE_ERROR_POS_TEMP_CHIP =                2;    // 0x02;
-	public static final char STATE_ERROR_POS_TEMP_DIMMER =              3;    // 0x03;
+	public static final char STATE_ERROR_POS_OVERCURRENT =              0;
+	public static final char STATE_ERROR_POS_OVERCURRENT_DIMMER =       1;
+	public static final char STATE_ERROR_POS_TEMP_CHIP =                2;
+	public static final char STATE_ERROR_POS_TEMP_DIMMER =              3;
+	public static final char STATE_ERROR_POS_DIMMER_ON_FAILURE =        4;
+	public static final char STATE_ERROR_POS_DIMMER_OFF_FAILURE =       5;
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
