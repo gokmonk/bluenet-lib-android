@@ -71,8 +71,8 @@ public class MeshKeepAliveSameTimeoutPacket implements MeshKeepAlivePayload {
 		}
 	}
 
-	// 2B timeout + 1B count
-	private static final int HEADER_SIZE = 3;
+	// 2B timeout + 1B count + 1B reserved
+	private static final int HEADER_SIZE = 4;
 	// 1B Crownstone ID + 1B action + switch state
 	private static final int ITEM_SIZE = 2;
 	// Max number of items in the list
