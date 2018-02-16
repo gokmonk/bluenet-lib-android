@@ -591,6 +591,15 @@ public class BleScanService extends Service {
 	 */
 	public void startIntervalScan(BleDeviceFilter filter) {
 		_ble.setScanFilter(filter);
+		startIntervalScan();
+	}
+
+	/**
+	 * Tell the service to start scanning for devices and report any devices found.
+	 * This will use the scan interval and pause values set earlier, or the default values if nothing
+	 * was set previously.
+	 */
+	public void startIntervalScan() {
 		setScanningState(true);
 		getLogger().LOGi(TAG, "startIntervalScan with interval=" + _scanInterval + " pause=" + _scanPause);
 
@@ -606,16 +615,6 @@ public class BleScanService extends Service {
 			_intervalScanHandler.removeCallbacksAndMessages(null);
 			_intervalScanHandler.post(_startScanRunnable);
 		}
-	}
-
-	/**
-	 * Tell the service to start scanning for devices and report any devices found.
-	 * This will use the scan interval and pause values set earlier, or the default values if nothing
-	 * was set previously.
-	 */
-	@Deprecated
-	public void startIntervalScan() {
-		startIntervalScan(BleDeviceFilter.guidestone);
 	}
 
 	/**
