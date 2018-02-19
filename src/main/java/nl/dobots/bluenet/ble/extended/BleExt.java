@@ -441,7 +441,7 @@ public class BleExt extends Logging implements IWriteCallback {
 			@Override
 			public void onDeviceScanned(BleDevice device) {
 
-//				getLogger().LOGd(TAG, "scanned:" + device.toString());
+				getLogger().LOGv(TAG, "scanned:" + device.toString());
 
 				if (_blackList != null && _blackList.contains(device.getAddress())) {
 					return;

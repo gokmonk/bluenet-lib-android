@@ -534,6 +534,7 @@ public class BleDevice {
 				_type = old._type;
 			}
 			else {
+				getLogger().LOGv(TAG, "copy service data " + _address);
 				_serviceData = old._serviceData;
 				_type = old._type;
 				_crownstoneMode = old._crownstoneMode;

@@ -167,7 +167,7 @@ public class CrownstoneServiceData extends JSONObject {
 		// First decrypt if encryption is enabled.
 		ByteBuffer bb;
 		if (encrypted) {
-			byte[] decryptedBytes = BleBaseEncryption.decryptEcb(bytes, 3, key);
+			byte[] decryptedBytes = BleBaseEncryption.decryptEcb(bytes, offset, key);
 			if (decryptedBytes == null) {
 				return false;
 			}
@@ -195,7 +195,10 @@ public class CrownstoneServiceData extends JSONObject {
 				return parseErrorPacket(bb, true);
 			}
 			default:
-				return false;
+				// Use this as default, else service data of another sphere gets no service data at all,
+				// which can result in getting old service data being copied into it.
+				return parseStatePacket(bb, false);
+//				return false;
 		}
 	}
 
@@ -257,7 +260,7 @@ public class CrownstoneServiceData extends JSONObject {
 		parsePartialTimestamp(bb);
 		int validation = BleUtils.toUint16(bb.getShort());
 		if (validation != 0xFACE) {
-			getLogger().LOGw(TAG, "validation mismatch: " + validation);
+			getLogger().LOGv(TAG, "validation mismatch: " + validation);
 		}
 		reconstructTimestamp();
 		return true;
