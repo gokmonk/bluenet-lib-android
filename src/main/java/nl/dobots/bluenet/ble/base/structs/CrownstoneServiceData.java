@@ -306,6 +306,7 @@ public class CrownstoneServiceData extends JSONObject {
 		setErrorDimmerTemperature((bitmask & (1L << BluenetConfig.STATE_ERROR_POS_TEMP_DIMMER)) != 0);
 		setErrorDimmerFailureOn(  (bitmask & (1L << BluenetConfig.STATE_ERROR_POS_DIMMER_ON_FAILURE)) != 0);
 		setErrorDimmerFailureOff( (bitmask & (1L << BluenetConfig.STATE_ERROR_POS_DIMMER_OFF_FAILURE)) != 0);
+		setErrorBitMaskString(Long.toBinaryString(bitmask));
 	}
 
 	private void parsePartialTimestamp(ByteBuffer bb) {
@@ -731,6 +732,24 @@ public class CrownstoneServiceData extends JSONObject {
 
 
 
+	public String getErrorBitMaskString() {
+		final String entry = "errorBitMaskString";
+		try {
+			return getString(entry);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "no error bitmask string found");
+			return "";
+		}
+	}
+	private void setErrorBitMaskString(String val) {
+		final String entry = "errorBitMaskString";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
+		}
+	}
 
 	public boolean getErrorOverCurrent() {
 		final String entry = "errorOverCurrent";
