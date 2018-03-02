@@ -105,15 +105,15 @@ public class BleScanService extends Service {
 	private static final int START_SCAN_NUM_RETRIES = 5;
 	private static final int START_SCAN_RETRY_DELAY = 100;
 
-	/**
-	 * Set auto start to true if the service should start scanning directly on start.
-	 */
-	public static final String EXTRA_AUTO_START = "nl.dobots.bluenet.AUTO_START";
-
-	/**
-	 * Default value for EXTRA_AUTO_START
-	 */
-	private static final boolean DEFAULT_AUTO_START = false;
+//	/**
+//	 * Set auto start to true if the service should start scanning directly on start.
+//	 */
+//	public static final String EXTRA_AUTO_START = "nl.dobots.bluenet.AUTO_START";
+//
+//	/**
+//	 * Default value for EXTRA_AUTO_START
+//	 */
+//	private static final boolean DEFAULT_AUTO_START = false;
 
 	/**
 	 * Set the scan device filter on start. only used if EXTRA_AUTO_START is set to true.
@@ -131,23 +131,9 @@ public class BleScanService extends Service {
 	public static final String EXTRA_FILE_LOG_LEVEL = "fileLogLevel";
 
 	/**
-	 * values for EXTRA_SCAN_FILTER:
-	 *   FILTER_ALL: return all scanned BLE devices
-	 *   FILTER_CROWNSTONE: return only scanned crownstones
-	 *   FILTER_GUIDESTONE: return only scanned guidestones
-	 *   FILTER_IBEACON: return all scanned iBeacon devices
-	 */
-	public static final int FILTER_ALL = 0;
-	public static final int FILTER_IBEACON = 1;
-	public static final int FILTER_ANY_STONE = 2;
-	public static final int FILTER_CROWNSTONE_PLUG = 3;
-	public static final int FILTER_CROWNSTONE_BUILTIN = 4;
-	public static final int FILTER_GUIDESTONE = 5;
-
-	/**
 	 * Default value for EXTRA_SCAN_FILTER
 	 */
-	private static final int DEFAULT_SCAN_FILTER = FILTER_ALL;
+	private static final int DEFAULT_SCAN_FILTER = BleDeviceFilter.ALL;
 
 	/**
 	 * Preferences stored by the service to keep track of e.g. scanning state when the
@@ -185,8 +171,8 @@ public class BleScanService extends Service {
 	// values and flags used at runtime
 	private int _scanPause = DEFAULT_SCAN_PAUSE;
 	private int _scanInterval = DEFAULT_SCAN_INTERVAL;
-	private boolean _autoStart = false;
-	private BleDeviceFilter _scanFilter = BleDeviceFilter.all;
+//	private boolean _autoStart = false;
+	private int _scanFilter = BleDeviceFilter.ALL;
 
 	private boolean _running = false;
 	private boolean _wasRunning = false;
@@ -231,32 +217,6 @@ public class BleScanService extends Service {
 		getLogger().LOGi(TAG, "onBind");
 		parseParameters(intent);
 		return _binder;
-	}
-
-	/**
-	 * Helper function to get the ScanFilter enum from the bundle
-	 * @param bundle bundle to be parsed
-	 * @return returns the filter found in the bundle, or BleDeviceFilter.all
-	 *   if the field EXTRA_SCAN_FILTER was not defined
-	 */
-	private BleDeviceFilter getFilterFromExtra(Bundle bundle) {
-		if (bundle != null) {
-			switch (bundle.getInt(EXTRA_SCAN_FILTER, DEFAULT_SCAN_FILTER)) {
-				case FILTER_ALL:
-					return BleDeviceFilter.all;
-				case FILTER_IBEACON:
-					return BleDeviceFilter.iBeacon;
-				case FILTER_ANY_STONE:
-					return BleDeviceFilter.anyStone;
-				case FILTER_CROWNSTONE_PLUG:
-					return BleDeviceFilter.crownstonePlug;
-				case FILTER_CROWNSTONE_BUILTIN:
-					return BleDeviceFilter.crownstoneBuiltin;
-				case FILTER_GUIDESTONE:
-					return BleDeviceFilter.guidestone;
-			}
-		}
-		return BleDeviceFilter.all;
 	}
 
 	private void initBluetooth() {
@@ -380,9 +340,10 @@ public class BleScanService extends Service {
 	 * @return the bluenet extended object used by this service
 	 */
 	public BleExt getBleExt() {
-		if (!_initialized) {
-			initBluetooth();
-		}
+		// TODO: why initialize bluetooth here?
+//		if (!_initialized) {
+//			initBluetooth();
+//		}
 		return _ble;
 	}
 
@@ -392,8 +353,8 @@ public class BleScanService extends Service {
 			if (bundle != null) {
 				_scanInterval = bundle.getInt(EXTRA_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL);
 				_scanPause = bundle.getInt(EXTRA_SCAN_PAUSE, DEFAULT_SCAN_PAUSE);
-				_autoStart = bundle.getBoolean(EXTRA_AUTO_START, DEFAULT_AUTO_START);
-				_scanFilter = getFilterFromExtra(bundle);
+//				_autoStart = bundle.getBoolean(EXTRA_AUTO_START, DEFAULT_AUTO_START);
+				_scanFilter = bundle.getInt(EXTRA_SCAN_FILTER, DEFAULT_SCAN_FILTER);
 				int logLevel = bundle.getInt(EXTRA_LOG_LEVEL, LOG_LEVEL);
 				int fileLogLevel = bundle.getInt(EXTRA_FILE_LOG_LEVEL, LOG_LEVEL);
 				getLogger().setLogLevel(logLevel, fileLogLevel);
@@ -415,7 +376,7 @@ public class BleScanService extends Service {
 		parseParameters(intent);
 
 		// if intent had the auto start set, or if last scanning state was true, start interval scan
-		if (_autoStart || getScanningState()) {
+		if (getScanningState()) {
 			startIntervalScan(_scanFilter);
 		}
 
@@ -573,24 +534,24 @@ public class BleScanService extends Service {
 	 *                     pausing again
 	 * @param scanPause the scan paus in ms, the service pauses for this amount of time before starting
 	 *                  a new scan
-	 * @param filter set the scan device filter. by setting a filter, only the devices specified will
-	 *               be reported to the application, any other detected devices will be ignored.
+	 * @param deviceFilter set the scan device filter, see BleDeviceFilter. By setting a filter, only the devices specified will
+	 *                     be reported to the application, any other detected devices will be ignored.
 	 */
-	public void startIntervalScan(int scanInterval, int scanPause, BleDeviceFilter filter) {
+	public void startIntervalScan(int scanInterval, int scanPause, int deviceFilter) {
 		this._scanInterval = scanInterval;
 		this._scanPause = scanPause;
-		startIntervalScan(filter);
+		startIntervalScan(deviceFilter);
 	}
 
 	/**
 	 * Tell the service to start scanning for devices and report only devices specified by the filter.
 	 * This will use the scan interval and pause values set earlier, or the default values if nothing
 	 * was set previously.
-	 * @param filter set the scan device filter. by setting a filter, only the devices specified will
-	 *               be reported to the application, any other detected devices will be ignored.
+	 * @param deviceFilter set the scan device filter, see BleDeviceFilter. By setting a filter, only the devices specified will
+	 *                     be reported to the application, any other detected devices will be ignored.
 	 */
-	public void startIntervalScan(BleDeviceFilter filter) {
-		_ble.setScanFilter(filter);
+	public void startIntervalScan(int deviceFilter) {
+		_ble.setScanFilter(deviceFilter);
 		startIntervalScan();
 	}
 

@@ -90,7 +90,7 @@ public class BleExt extends Logging implements IWriteCallback {
 
 	// filter, used to filter devices based on "type", eg. only report crownstone devices, or
 	// only report guidestone devices
-	private BleDeviceFilter _scanFilter = BleDeviceFilter.all;
+	private int _scanFilter = BleDeviceFilter.ALL;
 
 	//	private ArrayList<BleIbeaconFilter> _iBeaconFilter = new ArrayList<>();
 	private BleIbeaconRanging _iBeaconRanger = new BleIbeaconRanging();
@@ -149,15 +149,15 @@ public class BleExt extends Logging implements IWriteCallback {
 	 * pass through the filter and be reported to the application, any other detected devices
 	 * will be ignored.
 	 *
-	 * @param filter the filter to be used
+	 * @param deviceFilter the scan device filter, see BleDeviceFilter.
 	 */
-	public void setScanFilter(BleDeviceFilter filter) {
-		if (_scanFilter != filter) {
+	public void setScanFilter(int deviceFilter) {
+		if (_scanFilter != deviceFilter) {
 			synchronized (BleExt.class) {
 				_devices.clear();
 			}
 		}
-		_scanFilter = filter;
+		_scanFilter = deviceFilter;
 	}
 
 	/**
@@ -165,7 +165,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	 *
 	 * @return the device filter
 	 */
-	public BleDeviceFilter getScanFilter() {
+	public int getScanFilter() {
 		return _scanFilter;
 	}
 
@@ -483,29 +483,34 @@ public class BleExt extends Logging implements IWriteCallback {
 					// Just update rssi
 				}
 				else {
-					switch (_scanFilter) {
-						case iBeacon:
-							if (!device.isIBeacon()) return;
-							break;
-						case anyStone:
-							// TODO: how to deal with stones in dfu mode?
-							if (!device.isStone() && !device.isDfuMode()) return;
-							break;
-						case crownstonePlug:
-							if (!device.isCrownstonePlug()) return;
-							break;
-						case crownstoneBuiltin:
-							if (!device.isCrownstoneBuiltin()) return;
-							break;
-						case guidestone:
-							if (!device.isGuidestone()) return;
-							break;
-						case setupStone:
-							if (!device.isSetupMode()) return;
-							break;
-						case all:
-							// return any device that was detected
-							break;
+					boolean passed = false;
+
+					if ((_scanFilter & BleDeviceFilter.ALL) != 0) {
+						passed = true;
+					}
+					else if ((_scanFilter & BleDeviceFilter.IBEACON) != 0 && device.isIBeacon()) {
+						passed = true;
+					}
+					else if ((_scanFilter & BleDeviceFilter.ANYSTONE) != 0 && (device.isStone() || device.isDfuMode())) {
+						passed = true;
+					}
+					else if ((_scanFilter & BleDeviceFilter.CROWNSTONE_PLUG) != 0 && device.isCrownstonePlug()) {
+						passed = true;
+					}
+					else if ((_scanFilter & BleDeviceFilter.CROWNSTONE_BUILTIN) != 0 && device.isCrownstoneBuiltin()) {
+						passed = true;
+					}
+					else if ((_scanFilter & BleDeviceFilter.GUIDESTONE) != 0 && device.isGuidestone()) {
+						passed = true;
+					}
+					else if ((_scanFilter & BleDeviceFilter.SETUPSTONE) != 0 && device.isSetupMode()) {
+						passed = true;
+					}
+					else if ((_scanFilter & BleDeviceFilter.DFUSTONE) != 0 && device.isDfuMode()) {
+						passed = true;
+					}
+					if (!passed) {
+						return;
 					}
 				}
 
