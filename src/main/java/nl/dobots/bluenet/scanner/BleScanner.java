@@ -7,6 +7,7 @@ import android.os.Handler;
 import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.Locale;
 
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
@@ -84,7 +85,45 @@ public class BleScanner {
 		_ble.setEventListener(_btEventListener);
 	}
 
+	/**
+	 * 
+	 */
+	private void initBluetooth() {
+		getLogger().LOGi(TAG, "initBluetooth");
+		_ble.init(this, new IStatusCallback() {
+			@Override
+			public void onSuccess() {
+				getLogger().LOGi(TAG, "successfully initialized BLE");
+				_initialized = true;
 
+				// if scanning enabled, resume scanning
+				if (_running || _wasRunning) {
+					_running = true;
+					_intervalScanHandler.removeCallbacksAndMessages(null);
+					_intervalScanHandler.postDelayed(_startScanRunnable, 100);
+				}
+			}
+
+			@Override
+			public void onError(int error) {
+				switch (error) {
+					case BleErrors.ERROR_BLE_PERMISSION_MISSING: {
+						onPermissionsMissing();
+						break;
+					}
+					case BleErrors.ERROR_BLUETOOTH_NOT_ENABLED: {
+						getLogger().LOGe(TAG, "Failed to enable bluetooth!!");
+						_running = false;
+						sendEvent(EventListener.Event.BLUETOOTH_NOT_ENABLED);
+						break;
+					}
+					default:
+						getLogger().LOGe(TAG, "Init Error: " + error);
+				}
+				_initialized = false;
+			}
+		});
+	}
 
 	/**
 	 * The runnable executed when a scan interval starts. It calls startIntervalScan
@@ -401,7 +440,17 @@ public class BleScanner {
 
 
 
+	/**
+	 * Helper function to notify ScanDeviceListeners
+	 * @param device the scanned device
+	 */
+	private void notifyDeviceScanned(BleDevice device) {
+		getLogger().LOGv(TAG, String.format(Locale.US, "scanned device: %s [%d] (%d) %s", device.getAddress(), device.getRssi(), device.getOccurrences(), device.getName()));
 
+		for (ScanDeviceListener listener : _scanDeviceListeners) {
+			listener.onDeviceScanned(device);
+		}
+	}
 
 	/**
 	 * Helper function to notify IntervalScanListeners when a scan interval starts
