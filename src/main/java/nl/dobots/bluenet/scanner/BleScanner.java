@@ -2,6 +2,7 @@ package nl.dobots.bluenet.scanner;
 
 import android.app.Activity;
 import android.bluetooth.le.ScanCallback;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
 import android.util.Log;
@@ -53,12 +54,13 @@ public class BleScanner {
 	private static final int START_SCAN_NUM_RETRIES = 5;
 	private static final int START_SCAN_RETRY_DELAY = 100;
 
-	// the library
+	// The bluenet library
 	private BleExt _ble;
 
+	// Logger
 	private BleLog _logger;
 
-	// the interval scan handler, handles stop, start, pause, etc.
+	// The interval scan handler, handles stop, start, pause, etc.
 	private Handler _intervalScanHandler = null;
 
 	// Keep up a list of listeners to notify
@@ -66,10 +68,12 @@ public class BleScanner {
 	private ArrayList<ScanBeaconListener> _scanBeaconListeners = new ArrayList<>();
 	private ArrayList<EventListener> _eventListeners = new ArrayList<>();
 
-	// values and flags used at runtime
+	// Whether or not to parse service data. Not parsing should save batteries.
+	private boolean _parseServiceData = true;
+
+	// Values and flags used at runtime
 	private int _scanPause = DEFAULT_SCAN_PAUSE;
 	private int _scanInterval = DEFAULT_SCAN_INTERVAL;
-	private int _scanFilter = BleDeviceFilter.ALL;
 	private boolean _running = false;
 	private boolean _wasRunning = false;
 	private boolean _initialized = false;
@@ -86,11 +90,12 @@ public class BleScanner {
 	}
 
 	/**
-	 * 
+	 * Initializes the BLE Modules and tries to enable the Bluetooth adapter.
+	 * Will ask for permissions and to turn on bluetooth and location services.
 	 */
-	private void initBluetooth() {
+	private void initBluetooth(Context context) {
 		getLogger().LOGi(TAG, "initBluetooth");
-		_ble.init(this, new IStatusCallback() {
+		_ble.init(context, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
 				getLogger().LOGi(TAG, "successfully initialized BLE");
@@ -498,44 +503,37 @@ public class BleScanner {
 		}
 	}
 
-
-
-
-
-
-
-
 	public void requestPermissions(Activity activity) {
 		_ble.requestPermissions(activity);
 	}
 
-	public void onPermissionGranted() {
-		sendEvent(EventListener.Event.BLE_PERMISSIONS_GRANTED);
-	}
+//	public void onPermissionGranted() {
+//		sendEvent(EventListener.Event.BLE_PERMISSIONS_GRANTED);
+//	}
 
-	int permissionRetryCount = 0;
+//	int permissionRetryCount = 0;
 
-	public void onPermissionDenied() {
-//		onEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
-		if (++permissionRetryCount < 2) {
-			onPermissionsMissing();
-		} else {
-			sendEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
-		}
-	}
+//	public void onPermissionDenied() {
+////		onEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
+//		if (++permissionRetryCount < 2) {
+//			onPermissionsMissing();
+//		} else {
+//			sendEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
+//		}
+//	}
 
 	private void onPermissionsMissing() {
 		getLogger().LOGe(TAG, "Ble permissions missing, need to call BleExt.requestPermissions first!!");
 		_running = false;
-//					onEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
-		Intent intent = new Intent(BleScanService.this, BluetoothPermissionRequest.class);
-		intent.setFlags(FLAG_ACTIVITY_NEW_TASK);
-		startActivity(intent);
+////					onEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
+//		Intent intent = new Intent(BleScanService.this, BluetoothPermissionRequest.class);
+//		intent.setFlags(FLAG_ACTIVITY_NEW_TASK);
+//		startActivity(intent);
 	}
 
-	public boolean handlePermissionResult(int requestCode, String[] permissions, int[] grantResults, IStatusCallback statusCallback) {
-		return _ble.handlePermissionResult(requestCode, permissions, grantResults, statusCallback);
-	}
+//	public boolean handlePermissionResult(int requestCode, String[] permissions, int[] grantResults, IStatusCallback statusCallback) {
+//		return _ble.handlePermissionResult(requestCode, permissions, grantResults, statusCallback);
+//	}
 
 
 

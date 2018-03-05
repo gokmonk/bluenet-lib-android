@@ -78,7 +78,10 @@ public class BleCore extends Logging {
 	private static final int LOCATION_SERVICE_ENABLE_TIMEOUT = 30000;
 
 	// the permission request code for requesting location (needed to use ble)
-	private static final int PERMISSIONS_REQUEST_LOCATION = 101;
+	private static final int REQ_CODE_PERMISSIONS_LOCATION = 101;
+
+	// the request code to enable bluetooth
+	private static final int REQ_CODE_ENABLE_BLUETOOOTH = 102;
 
 	// bluetooth manager, used to check connection state of devices.
 	private BluetoothManager _bluetoothManager;
@@ -100,12 +103,26 @@ public class BleCore extends Logging {
 	//	@SuppressLint("NewApi")
 	private ScanCallback _coreScanCallback;
 
-	// flags to keep track of state
+	// True when bluetooth is on
 	private boolean _bluetoothReady = false;
+
+	// True when bluetooth is ready to be used (not scanning)
+	private boolean _bluetoothInitialized = false;
+
+	// True when location services are on
 	private boolean _locationServicesReady;
 
+	// True when ble scanner is ready to be used
+	private boolean _scannerInitialized = false;
+
 	// check if the broadcast receiver is registered
-	private boolean _receiverRegistered = false;
+//	private boolean _receiverRegistered = false;
+
+	// True when bluetooth receiver is registered
+	private boolean _receiverRegisteredBluetooth = false;
+
+	// True when location broadcast receiver is registered
+	private boolean _receiverRegisteredLocation = false;
 
 	// flag to keep track of active bluetooth reset
 	private boolean _resettingBle = false;
@@ -344,8 +361,13 @@ public class BleCore extends Logging {
 	// callbacks used to notify events
 	// scan callback is informed about scan errors and scanned devices
 	private IScanCallback _scanCallback = null;
-	// init callback is informed about success or error of init call (cleared after a trigger)
-	private IStatusCallback _initializeCallback = null;
+
+	// Callback for bluetooth init.
+	private IStatusCallback _initializeBluetoothCallback = null;
+
+	// Callback for scanner init.
+	private IStatusCallback _initializeScannerCallback = null;
+
 	// event callback is informed about changes in bluetooth state and location services
 	private IDataCallback _eventCallback = null;
 	// connection callback is informed about success / failure of a connect and disconnect calls
@@ -411,10 +433,9 @@ public class BleCore extends Logging {
 	}
 
 	/**
-	 * Broadcast receiver used to handle Bluetooth Events, i.e. turning on and off of the
-	 * Bluetooth Adapter
+	 * Broadcast receiver used to handle bluetooth events, i.e. turning bluetooth on/off.
 	 */
-	private BroadcastReceiver _receiver = new BroadcastReceiver() {
+	private BroadcastReceiver _receiverBluetooth = new BroadcastReceiver() {
 		@Override
 		public void onReceive(Context context, Intent intent) {
 
@@ -423,12 +444,14 @@ public class BleCore extends Logging {
 				switch (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
 					case BluetoothAdapter.STATE_OFF: {
 						_bluetoothReady = false;
+						// TODO: _bluetoothInitialized = false;
 
 						// if bluetooth is turned off inform state callback about the change
 						sendEvent(BleCoreTypes.EVT_BLUETOOTH_OFF);
 
 						_connections = new HashMap<>();
 						_scanning = false;
+
 
 						// if bluetooth state turns off because of a reset, enable it again
 						if (_resettingBle) {
@@ -440,13 +463,11 @@ public class BleCore extends Logging {
 					case BluetoothAdapter.STATE_ON: {
 						_bluetoothReady = true;
 
-//						if (Build.VERSION.SDK_INT >= 21) {
-							_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
-							_scanSettings = new ScanSettings.Builder()
-									.setScanMode(_scanMode)
-									.build();
-							_scanFilters = new ArrayList<>();
-//						}
+//							_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
+//							_scanSettings = new ScanSettings.Builder()
+//									.setScanMode(_scanMode)
+//									.build();
+//							_scanFilters = new ArrayList<>();
 
 						// if bluetooth is turned on inform state callback about the change
 						sendEvent(BleCoreTypes.EVT_BLUETOOTH_ON);
@@ -454,58 +475,72 @@ public class BleCore extends Logging {
 						// if bluetooth state turns on because of a reset, then reset was completed
 						if (_resettingBle) {
 							_resettingBle = false;
-						} else {
-							// if location services are ready, notify success
-							if (_locationServicesReady) {
-//								_initialized = true;
-								// inform the callback about the enabled bluetooth
-								if (_initializeCallback != null) {
-									_initializeCallback.onSuccess();
-									_initializeCallback = null;
-								}
-							} else {
-								// otherwise, request to enable location services
-								checkLocationServices();
-							}
 						}
-						// bluetooth was successfully enabled, cancel the timeout
-						_timeoutHandler.removeCallbacksAndMessages(null);
+//						else {
+//							// if location services are ready, notify success
+//							if (_locationServicesReady) {
+////								_initialized = true;
+//								// inform the callback about the enabled bluetooth
+//								if (_initializeCallback != null) {
+//									_initializeCallback.onSuccess();
+//									_initializeCallback = null;
+//								}
+//							} else {
+//								// otherwise, request to enable location services
+//								checkLocationServices();
+//							}
+//						}
+//						// bluetooth was successfully enabled, cancel the timeout
+//						_timeoutHandler.removeCallbacksAndMessages(null);
 
 						break;
 					}
 				}
-			} else if (intent.getAction().equals(LocationManager.PROVIDERS_CHANGED_ACTION)) {
+			}
+		}
+	};
+
+	/**
+	 * Broadcast receiver used to handle location events, i.e. turning location services on/off.
+	 */
+	private BroadcastReceiver _receiverLocation = new BroadcastReceiver() {
+		@Override
+		public void onReceive(Context context, Intent intent) {
+
+			if (intent.getAction().equals(LocationManager.PROVIDERS_CHANGED_ACTION)) {
 
 				// PROVIDERS_CHANGED_ACTION  are also triggered if mode is changed, so only
 				// create events if the _locationsServicesReady flag changes
 
 				if (isLocationServicesEnabled()) {
-					if (!_locationServicesReady) {
-						// if bluetooth is ready, notify success
-						if (_bluetoothReady) {
-//							_initialized = true;
-							if (_initializeCallback != null) {
-								_initializeCallback.onSuccess();
-								_initializeCallback = null;
-							}
-						} else {
-							// otherwise, request to enable bluetooth
-							checkBluetooth();
-						}
-					}
+//					if (!_locationServicesReady) {
+//						// if bluetooth is ready, notify success
+//						if (_bluetoothReady) {
+////							_initialized = true;
+//							if (_initializeCallback != null) {
+//								_initializeCallback.onSuccess();
+//								_initializeCallback = null;
+//							}
+//						} else {
+//							// otherwise, request to enable bluetooth
+//							checkBluetooth();
+//						}
+//					}
 					_locationServicesReady = true;
 
-					// if location services are turned on inform state callback about the change
 					sendEvent(BleCoreTypes.EVT_LOCATION_SERVICES_ON);
-				} else {
+				}
+				else {
 					_locationServicesReady = false;
 
-					// if location services are turned off inform state callback about the change
 					sendEvent(BleCoreTypes.EVT_LOCATION_SERVICES_OFF);
 				}
 			}
 		}
 	};
+
+
+
 
 	/**
 	 * Request location permissions. Needed for api 23 and newer
@@ -518,25 +553,25 @@ public class BleCore extends Logging {
 				PERMISSIONS_REQUEST_LOCATION);
 	}
 
-	/**
-	 * @return return true if permission result was handled, false otherwise. if true, then
-	 *   the result will be passed using the callback.onSuccess or callback.onError functions
-	 *   also if true, init is automatically recalled
-	 */
-	public boolean handlePermissionResult(int requestCode, String[] permissions, int[] grantResults, IStatusCallback callback) {
-		switch (requestCode) {
-			case PERMISSIONS_REQUEST_LOCATION: {
-				if (grantResults.length > 0 &&	grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-					init(_context, _initializeCallback);
-					callback.onSuccess();
-				} else {
-					callback.onError(BleErrors.ERROR_BLE_PERMISSION_MISSING);
-				}
-				return true;
-			}
-		}
-		return false;
-	}
+//	/**
+//	 * @return return true if permission result was handled, false otherwise. if true, then
+//	 *   the result will be passed using the callback.onSuccess or callback.onError functions
+//	 *   also if true, init is automatically recalled
+//	 */
+//	public boolean handlePermissionResult(int requestCode, String[] permissions, int[] grantResults, IStatusCallback callback) {
+//		switch (requestCode) {
+//			case PERMISSIONS_REQUEST_LOCATION: {
+//				if (grantResults.length > 0 &&	grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+//					init(_context, _initializeCallback);
+//					callback.onSuccess();
+//				} else {
+//					callback.onError(BleErrors.ERROR_BLE_PERMISSION_MISSING);
+//				}
+//				return true;
+//			}
+//		}
+//		return false;
+//	}
 
 	/**
 	 * Returns the hardware address of the local Bluetooth adapter.
@@ -589,152 +624,304 @@ public class BleCore extends Logging {
 		}
 	}
 
+
 	/**
-	 * Initializes the BLE Modules and tries to enable the Bluetooth adapter. Note, the callback
-	 * provided as parameter will persist. The callback will be triggered whenever the state of
-	 * the bluetooth adapter changes. That means if the user turns off bluetooth, then the onError
-	 * of the callback will be triggered. And again if the user turns bluetooth on, the onSuccess
-	 * will be triggered. If the user denies enabling bluetooth, then onError will be called after
-	 * a timeout expires
-	 * @param context the context used to enable bluetooth, this can be a service or an activity
-	 * @param callback callback, used to report back init was successful or not
+	 * Initializes the bluetooth, but not the scanner.
+	 * Checks if bluetooth is on and if bluetooth permissions are there.
+	 * Requires context to be set.
+	 *
+	 * @param activity the activity required to use bluetooth, ask for permission, etc.
+	 * @param callback the callback to be notified about success or failure
 	 */
-	@SuppressLint("NewApi")
-	public void init(Context context, IStatusCallback callback) {
-		_context = context;
+	public void initBluetooth(Activity activity, IStatusCallback callback) {
+		if (_initializeBluetoothCallback != null) {
+			callback.onError(BleErrors.ERROR_BUSY);
+		}
+		_initializeBluetoothCallback = callback;
 
-		_initializeCallback = callback;
+		initBluetooth(activity);
+	}
 
-		getLogger().LOGi(TAG, "Initialize BLE hardware");
-		// check first if phone has bluetooth le
-		if (!context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE))
-		{
-			getLogger().LOGe(TAG, "Can't use library without BLE hardware.");
-			callback.onError(BleErrors.ERROR_BLE_HARDWARE_MISSING);
+	/**
+	 * Initializes the bluetooth, but not the scanner.
+	 * Checks if bluetooth is on and if bluetooth permissions are there.
+	 * Requires context to be set.
+	 *
+	 * @param activity the activity required to use bluetooth, ask for permission, etc.
+	 */
+	private void initBluetooth(Activity activity) {
+		getLogger().LOGi(TAG, "initBluetooth");
+
+		if (_bluetoothInitialized) {
+			getLogger().LOGi(TAG, "Already initialized bluetooth");
+			_initializeBluetoothCallback.onSuccess();
 			return;
 		}
 
-		// if api newer than 23, need to check for location permission
-		if (Build.VERSION.SDK_INT >= 23) {
-			int permissionCheck = ContextCompat.checkSelfPermission(context,
-					Manifest.permission.ACCESS_COARSE_LOCATION);
-			if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
-				getLogger().LOGe(TAG, "BLE permissions not granted!! Abort.");
-				callback.onError(BleErrors.ERROR_BLE_PERMISSION_MISSING);
-				return;
-			}
+		if (_context == null) {
+			getLogger().LOGi(TAG, "No context");
+			_initializeBluetoothCallback.onError(BleErrors.ERROR_WRONG_STATE);
+			return;
 		}
 
-		_bluetoothManager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
+		// Check if phone has bluetooth LE
+		if (!_context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
+			getLogger().LOGe(TAG, "No BLE hardware");
+			_initializeBluetoothCallback.onError(BleErrors.ERROR_BLE_HARDWARE_MISSING);
+			return;
+		}
+
+		_bluetoothManager = (BluetoothManager) _context.getSystemService(Context.BLUETOOTH_SERVICE);
 		_bluetoothAdapter = _bluetoothManager.getAdapter();
 
-		// if api newer than 21, use the BluetoothLeScanner object to scan
-//		if (Build.VERSION.SDK_INT >= 21) {
-			_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
-			_scanSettings = new ScanSettings.Builder()
-					.setScanMode(_scanMode)
-					.build();
-			_scanFilters = new ArrayList<>();
-//		}
-
-		// register the broadcast receiver for bluetooth action state changes and location manager
-		// action changes
-		if (!_receiverRegistered) {
-			_context.registerReceiver(_receiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
-			_context.registerReceiver(_receiver, new IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION));
-			_receiverRegistered = true;
+		// Register the broadcast receiver for bluetooth action state changes
+		if (!_receiverRegisteredBluetooth) {
+			_context.registerReceiver(_receiverBluetooth, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
+			_receiverRegisteredBluetooth = true;
 		}
 
-		// check if bluetooth is enabled, otherwise ask to enable
-		checkBluetooth();
-
-		// if bluetooth is ready, check if location services are enabled, otherwise ask to enable
-		if (_bluetoothReady) {
-			checkLocationServices();
+		// check if bluetooth is enabled
+		if (!_bluetoothAdapter.isEnabled()) {
+			getLogger().LOGw(TAG, "bluetooth not enabled");
+			_initializeBluetoothCallback.onError(BleErrors.ERROR_BLUETOOTH_NOT_ENABLED);
+			return;
 		}
+		_initializeBluetoothCallback.onSuccess();
+	}
 
-		// initialize is done if both bluetooth and location services are ready
-		if (_bluetoothReady && _locationServicesReady) {
-			// TODO: got a NullPointerException (on _initializeCallback) here after disabling location service and waiting for a while, how is that possible?
-			if (_initializeCallback != null) {
-				_initializeCallback.onSuccess();
-				_initializeCallback = null;
-			}
-			else {
-				getLogger().LOGe(TAG, "Huh? cb == null");
-			}
+
+	/**
+	 * Initializes the bluetooth scanner.
+	 * Checks if bluetooth and location services are on, and if permissions are there.
+	 * Requires context to be set.
+	 *
+	 * @param activity the activity required to use bluetooth, ask for permission, etc.
+	 * @param callback the callback to be notified about success or failure
+	 */
+	public void initScanner(Activity activity, final IStatusCallback callback) {
+		if (_initializeScannerCallback != null) {
+			callback.onError(BleErrors.ERROR_BUSY);
 		}
+		_initializeScannerCallback = callback;
 
+		initScanner(activity);
 	}
 
 	/**
-	 * Check if location services are enabled. if api < 23 always return true,
-	 * if not enabled, show the LocationRequest activity
+	 * Initializes the bluetooth scanner.
+	 * Checks if bluetooth and location services are on, and if permissions are there.
+	 * Requires context to be set.
+	 *
+	 * @param activity the activity required to use bluetooth, ask for permission, etc.
 	 */
-	private void checkLocationServices() {
-		getLogger().LOGd(TAG, "checkLocationServices");
-		if (Build.VERSION.SDK_INT < 23) {
-			_locationServicesReady = true;
-			return;
-		}
-		_locationServicesReady = false;
+	private void initScanner(Activity activity) {
+		getLogger().LOGi(TAG, "initScanner");
 
-		if (isLocationServicesEnabled()) {
-			_locationServicesReady = true;
+		if (_scannerInitialized) {
+			getLogger().LOGi(TAG, "Already initialized scanner");
+			_initializeScannerCallback.onSuccess();
 			return;
 		}
 
-		getLogger().LOGi(TAG, "request location service");
-		Intent intent = new Intent(_context, LocationRequest.class);
-		intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-		_context.startActivity(intent);
+		if (_context == null) {
+			getLogger().LOGi(TAG, "No context");
+			_initializeScannerCallback.onError(BleErrors.ERROR_WRONG_STATE);
+			return;
+		}
 
-		_timeoutHandler.postDelayed(new Runnable() {
+		initBluetooth(activity, new IStatusCallback() {
 			@Override
-			public void run() {
-				if (!isLocationServicesEnabled()) {
-					if (_initializeCallback != null) {
-						_initializeCallback.onError(BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF);
+			public void onSuccess() {
+				// if api newer than 23, need to check for location permission
+				if (Build.VERSION.SDK_INT >= 23) {
+					int permissionCheck = ContextCompat.checkSelfPermission(_context,
+							Manifest.permission.ACCESS_COARSE_LOCATION);
+					if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
+						getLogger().LOGe(TAG, "BLE scan permissions not granted!! Abort.");
+//						TODO: use ERROR_LOCATION_PERMISSION_MISSING
+						_initializeScannerCallback.onError(BleErrors.ERROR_BLE_PERMISSION_MISSING);
+						return;
 					}
 				}
+
+				// Register the broadcast receiver for location manager changes
+				if (!_receiverRegisteredLocation) {
+					_context.registerReceiver(_receiverLocation, new IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION));
+					_receiverRegisteredLocation = true;
+				}
+
+				if (!isLocationServicesEnabled()) {
+					_initializeScannerCallback.onError(BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF);
+					return;
+				}
+
+				_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
+				_scanSettings = new ScanSettings.Builder()
+						.setScanMode(_scanMode)
+						.build();
+				_scanFilters = new ArrayList<>();
+
+				_scannerInitialized = true;
+				_initializeScannerCallback.onSuccess();
 			}
-		}, LOCATION_SERVICE_ENABLE_TIMEOUT);
+
+			@Override
+			public void onError(int error) {
+				_initializeScannerCallback.onError(error);
+			}
+		});
 	}
+
+
+	/**
+	 * Initializes bluetooth and scanner.
+	 * Checks if bluetooth and location services are on, and if permissions are there.
+	 *
+	 * @param activity the activity required to use bluetooth, ask for permission, etc.
+	 * @param callback the callback to be notified about success or failure
+	 */
+	public void init(Activity activity, final IStatusCallback callback) {
+//		_context = activity.getApplicationContext();
+
+		// initScanner also calls init bluetooth
+		initScanner(activity, callback);
+
+//		_initializeCallback = callback;
+//
+//		getLogger().LOGi(TAG, "Initialize BLE hardware");
+//		// check first if phone has bluetooth le
+//		if (!_context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE))
+//		{
+//			getLogger().LOGe(TAG, "Can't use library without BLE hardware.");
+//			_initializeCallback.onError(BleErrors.ERROR_BLE_HARDWARE_MISSING);
+//			return;
+//		}
+//
+//		// if api newer than 23, need to check for location permission
+//		if (Build.VERSION.SDK_INT >= 23) {
+//			int permissionCheck = ContextCompat.checkSelfPermission(_context,
+//					Manifest.permission.ACCESS_COARSE_LOCATION);
+//			if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
+//				getLogger().LOGe(TAG, "BLE permissions not granted!! Abort.");
+//				_initializeCallback.onError(BleErrors.ERROR_BLE_PERMISSION_MISSING);
+//				return;
+//			}
+//		}
+//
+//		_bluetoothManager = (BluetoothManager) _context.getSystemService(Context.BLUETOOTH_SERVICE);
+//		_bluetoothAdapter = _bluetoothManager.getAdapter();
+//
+//		// if api newer than 21, use the BluetoothLeScanner object to scan
+////		if (Build.VERSION.SDK_INT >= 21) {
+//			_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
+//			_scanSettings = new ScanSettings.Builder()
+//					.setScanMode(_scanMode)
+//					.build();
+//			_scanFilters = new ArrayList<>();
+////		}
+//
+//		// register the broadcast receiver for bluetooth action state changes and location manager
+//		// action changes
+//		if (!_receiverRegistered) {
+//			_context.registerReceiver(_receiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
+//			_context.registerReceiver(_receiver, new IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION));
+//			_receiverRegistered = true;
+//		}
+//
+//		// check if bluetooth is enabled, otherwise ask to enable
+//		checkBluetooth();
+//
+//		// if bluetooth is ready, check if location services are enabled, otherwise ask to enable
+//		if (_bluetoothReady) {
+//			checkLocationServices();
+//		}
+//
+//		// initialize is done if both bluetooth and location services are ready
+//		if (_bluetoothReady && _locationServicesReady) {
+//			// TODO: got a NullPointerException (on _initializeCallback) here after disabling location service and waiting for a while, how is that possible?
+//			if (_initializeCallback != null) {
+//				_initializeCallback.onSuccess();
+//				_initializeCallback = null;
+//			}
+//			else {
+//				getLogger().LOGe(TAG, "Huh? cb == null");
+//			}
+//		}
+
+	}
+
+//	/**
+//	 * Check if location services are enabled. if api < 23 always return true,
+//	 * if not enabled, show the LocationRequest activity
+//	 */
+//	private void checkLocationServices() {
+//		getLogger().LOGd(TAG, "checkLocationServices");
+//
+//		_locationServicesReady = false;
+//		if (isLocationServicesEnabled()) {
+//			_locationServicesReady = true;
+//			return;
+//		}
+//
+//		getLogger().LOGi(TAG, "request location service");
+//		Intent intent = new Intent(_context, LocationRequest.class);
+//		intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+//		_context.startActivity(intent);
+//
+//		// TODO: call onError immediately, and let the user init again when location services were turned on, instead of this timeout.
+//		_timeoutHandler.postDelayed(new Runnable() {
+//			@Override
+//			public void run() {
+//				if (!isLocationServicesEnabled()) {
+//					if (_initializeCallback != null) {
+//						_initializeCallback.onError(BleErrors.ERROR_LOCATION_SERVICES_TURNED_OFF);
+//						// TODO: _initializeCallback = null; ?
+//					}
+//				}
+//			}
+//		}, LOCATION_SERVICE_ENABLE_TIMEOUT);
+//	}
 
 	/**
 	 * Check if bluetooth is enabled. only show one dialog at a time even if function is called
 	 * multiple times.
 	 * If not enabled, show the Bluetooth enable request
 	 */
-	private void checkBluetooth() {
-		getLogger().LOGd(TAG, "checkBluetooth");
+	private void requestEnableBluetooth(Activity activity) {
+		getLogger().LOGd(TAG, "requestEnableBluetooth");
 		_bluetoothReady = false;
-		if (_bleDialogShowing) return;
+//		if (_bleDialogShowing) return;
 
-		if (!_bluetoothAdapter.isEnabled()) {
-			getLogger().LOGi(TAG, "request bluetooth on");
-			_bleDialogShowing = true;
-			Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-			enableBtIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-			_context.startActivity(enableBtIntent);
-			// use a timeout to check if bluetooth was enabled. if bluetooth is enabled
-			// the timeout will be cancelled in the broadcast receiver. if the user denies bluetooth
-			// enabling, this will trigger an error.
-			_timeoutHandler.postDelayed(new Runnable() {
-				@Override
-				public void run() {
-					if (!_bluetoothAdapter.isEnabled()) {
-						_bleDialogShowing = false;
-						if (_initializeCallback != null) {
-							_initializeCallback.onError(BleErrors.ERROR_BLUETOOTH_NOT_ENABLED);
-						}
+		if (_bluetoothAdapter.isEnabled()) {
+			_bluetoothReady = true;
+			getLogger().LOGd(TAG, "Bluetooth already enabled");
+			return;
+		}
+
+		getLogger().LOGi(TAG, "request bluetooth on");
+		_bleDialogShowing = true;
+		Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+		enableBtIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		_context.startActivity(enableBtIntent);
+		activity.startActivityForResult(enableBtIntent, );
+
+		// use a timeout to check if bluetooth was enabled. if bluetooth is enabled
+		// the timeout will be cancelled in the broadcast receiver. if the user denies bluetooth
+		// enabling, this will trigger an error.
+		// TODO: call onError immediately, and let the user init again when bluetooth was turned on, instead of this timeout.
+		_timeoutHandler.postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				if (!_bluetoothAdapter.isEnabled()) {
+					_bleDialogShowing = false;
+					if (_initializeCallback != null) {
+						_initializeCallback.onError(BleErrors.ERROR_BLUETOOTH_NOT_ENABLED);
+						// TODO: _initializeCallback = null; ?
 					}
 				}
-			}, BLUETOOTH_ENABLE_TIMEOUT);
-		} else {
-			getLogger().LOGd(TAG, "Bluetooth already enabled");
-			_bluetoothReady = true;
-		}
+			}
+		}, BLUETOOTH_ENABLE_TIMEOUT);
+
 	}
 
 	/**
@@ -745,6 +932,7 @@ public class BleCore extends Logging {
 	public boolean isLocationServicesEnabled() {
 
 		if (Build.VERSION.SDK_INT < 23) {
+			_locationServicesReady = true;
 			return true;
 		}
 
@@ -752,23 +940,28 @@ public class BleCore extends Logging {
 		boolean isGpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
 		boolean isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
 
-		//Start your Activity if location was enabled:
-		return isGpsEnabled || isNetworkEnabled;
+		_locationServicesReady = isGpsEnabled || isNetworkEnabled;
+		return _locationServicesReady;
 	}
 
 	/**
 	 * Reset all callbacks and unregister the broadcast receiver
 	 */
 	public synchronized void destroy() {
-		if (_receiverRegistered) {
-			_context.unregisterReceiver(_receiver);
-			_receiverRegistered = false;
-		}
-
+		_bluetoothInitialized = false;
 		_bluetoothReady = false;
+		if (_receiverRegisteredBluetooth && _context != null) {
+			_context.unregisterReceiver(_receiverBluetooth);
+		}
+		_receiverRegisteredBluetooth = false;
+
+		_scannerInitialized = false;
 		_locationServicesReady = false;
-//		_connectionCallback = null;
-//		_discoveryCallback = null;
+		if (_receiverRegisteredLocation && _context != null) {
+			_context.unregisterReceiver(_receiverLocation);
+		}
+		_receiverRegisteredLocation = false;
+
 		_initializeCallback = null;
 		_eventCallback = null;
 		_scanCallback = null;
