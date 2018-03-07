@@ -12,12 +12,11 @@ import org.json.JSONObject;
 
 import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
-import nl.dobots.bluenet.utils.Logging;
 
 /**
- * This class wraps around several callback interfaces, and makes sure that the callback is only called 1 time.
+ * Class to wrap around different callback interfaces, to make sure that the callback is only invoked once.
  */
-public class GenericSingleCallback extends SingleCallback<IBaseCallback> {
+public class GenericSingleCallback extends BaseSingleCallback<IBaseCallback> {
 	private static final String TAG = GenericSingleCallback.class.getCanonicalName();
 
 	// Default log level

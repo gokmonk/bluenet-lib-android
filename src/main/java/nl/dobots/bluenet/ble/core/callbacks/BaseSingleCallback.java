@@ -12,10 +12,11 @@ import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.utils.Logging;
 
 /**
- * This class wraps around several callback interfaces, and makes sure that the callback is only called 1 time.
+ * Base class to wrap around callback interfaces, to make sure that the callback is only invoked once.
+ * Derived classes should implement: public synchronized boolean resolve(data).
  */
-public class SingleCallback<T extends IBaseCallback> extends Logging {
-	private static final String TAG = SingleCallback.class.getCanonicalName();
+public class BaseSingleCallback<T extends IBaseCallback> extends Logging {
+	private static final String TAG = BaseSingleCallback.class.getCanonicalName();
 
 	// default log level
 	private static final int LOG_LEVEL = Log.WARN;

@@ -404,7 +404,7 @@ public class BleCore extends Logging {
 	/**
 	 * Reset all callbacks and unregister the broadcast receiver
 	 */
-	protected synchronized void destroy() {
+	public synchronized void destroy() {
 		_bluetoothInitialized = false;
 //		_bluetoothReady = false;
 		if (_receiverRegisteredBluetooth && _context != null) {
@@ -655,7 +655,7 @@ public class BleCore extends Logging {
 	 *                 Activity.onActivityResult() implemented, and from there call
 	 *                 BleCore.handleActivityResult().
 	 *                 Set to null when no request should be made.
-	 * @param callback The callback to be notified about whether bluetooth is enabled or not.
+	 * @param callback The callback to be notified about whether location services are enabled.
 	 */
 	private void checkLocationServicesEnabled(@Nullable Activity activity, IStatusCallback callback) {
 		getLogger().LOGi(TAG, "requestEnableLocationServices");
@@ -692,7 +692,7 @@ public class BleCore extends Logging {
 	 *                 Activity.onActivityResult() implemented, and from there call
 	 *                 BleCore.handleActivityResult().
 	 *                 Set to null when no request should be made.
-	 * @param callback The callback to be notified about whether bluetooth is enabled or not.
+	 * @param callback The callback to be notified about whether bluetooth is enabled.
 	 */
 	private void checkBluetoothEnabled(@Nullable Activity activity, IStatusCallback callback) {
 		getLogger().LOGi(TAG, "requestEnableBluetooth");
@@ -729,7 +729,7 @@ public class BleCore extends Logging {
 	 *                 BleCore.handlePermissionResult().
 	 *                 If used from a service, have a look at {@link nl.dobots.bluenet.service.BluetoothPermissionRequest}.
 	 *                 Set to null when no request should be made.
-	 * @param callback The callback to be notified about whether bluetooth is enabled or not.
+	 * @param callback The callback to be notified about whether permissions are granted.
 	 */
 	public void checkLocationServicesPermissions(@Nullable Activity activity, IStatusCallback callback) {
 		getLogger().LOGi(TAG, "checkLocationServicesPermissions");
@@ -799,7 +799,7 @@ public class BleCore extends Logging {
 	}
 
 	/**
-	 * Handles a permission request result.
+	 * Handles a permission request result, simply passed on from Activity.onRequestPermissionsResult().
 	 *
 	 * @return return true if permission result was handled, false otherwise.
 	 */

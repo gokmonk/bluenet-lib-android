@@ -39,7 +39,39 @@ public class BluetoothPermissionRequest extends AppCompatActivity {
 			BleScanService.BleScanBinder binder = (BleScanService.BleScanBinder) service;
 			_service = binder.getService();
 			Log.i(TAG, "request permissions");
-			_service.requestPermissions(BluetoothPermissionRequest.this);
+			_service.requestPermissions(BluetoothPermissionRequest.this, new IStatusCallback() {
+
+				@Override
+				public void onError(int error) {
+					runOnUiThread(new Runnable() {
+						@Override
+						public void run() {
+							AlertDialog.Builder builder = new AlertDialog.Builder(BluetoothPermissionRequest.this);
+							builder.setTitle("Location permission required")
+									.setMessage("Can't scan for bluetooth devices without location service permission."
+											+ "Give this app permission in the Android settings menu."
+									)
+									.setNeutralButton("OK", new DialogInterface.OnClickListener() {
+										@Override
+										public void onClick(DialogInterface dialog, int which) {
+											// permission not granted (same as denied)
+											_service.onPermissionDenied();
+											finish();
+										}
+									});
+							builder.create().show();
+						}
+					});
+				}
+
+				@Override
+				public void onSuccess() {
+					// permission was granted
+					Log.i(TAG, "permission granted");
+					_service.onPermissionGranted();
+					finish();
+				}
+			});
 		}
 
 		@Override
@@ -57,41 +89,7 @@ public class BluetoothPermissionRequest extends AppCompatActivity {
 
 	@Override
 	public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-		if (!_service.handlePermissionResult(requestCode, permissions, grantResults,
-				new IStatusCallback() {
-
-					@Override
-					public void onError(int error) {
-						runOnUiThread(new Runnable() {
-							@Override
-							public void run() {
-								AlertDialog.Builder builder = new AlertDialog.Builder(BluetoothPermissionRequest.this);
-								builder.setTitle("Location permission required")
-										.setMessage("Can't scan for bluetooth devices without location service permission."
-												+ "Give this app permission in the Android settings menu."
-										)
-										.setNeutralButton("OK", new DialogInterface.OnClickListener() {
-											@Override
-											public void onClick(DialogInterface dialog, int which) {
-												// permission not granted (same as denied)
-												_service.onPermissionDenied();
-												finish();
-											}
-										});
-								builder.create().show();
-							}
-						});
-					}
-
-					@Override
-					public void onSuccess() {
-						// permission was granted
-						Log.i(TAG, "permission granted");
-						_service.onPermissionGranted();
-						finish();
-					}
-				}))
-		{
+		if (!_service.handlePermissionResult(requestCode, permissions, grantResults)) {
 			super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 		}
 	}

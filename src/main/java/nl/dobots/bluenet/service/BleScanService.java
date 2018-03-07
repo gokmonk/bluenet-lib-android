@@ -219,12 +219,12 @@ public class BleScanService extends Service {
 		return _binder;
 	}
 
-	private void initBluetooth() {
-		getLogger().LOGi(TAG, "initBluetooth");
-		_ble.init(this, new IStatusCallback() {
+	private void init(Activity activity) {
+		getLogger().LOGi(TAG, "init");
+		_ble.init(activity, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
-				getLogger().LOGi(TAG, "successfully initialized BLE");
+				getLogger().LOGi(TAG, "successfully initialized");
 				_initialized = true;
 
 				// if scanning enabled, resume scanning
@@ -238,7 +238,7 @@ public class BleScanService extends Service {
 			@Override
 			public void onError(int error) {
 				switch (error) {
-					case BleErrors.ERROR_SCAN_PERMISSION_MISSING: {
+					case BleErrors.ERROR_LOCATION_PERMISSION_MISSING: {
 						onPermissionsMissing();
 						break;
 					}
@@ -247,6 +247,10 @@ public class BleScanService extends Service {
 						_running = false;
 						sendEvent(EventListener.Event.BLUETOOTH_NOT_ENABLED);
 						break;
+					}
+					case BleErrors.ERROR_LOCATION_SERVICES_NOT_ENABLED: {
+						// TODO.
+
 					}
 					default:
 						getLogger().LOGe(TAG, "Init Error: " + error);
@@ -569,7 +573,7 @@ public class BleScanService extends Service {
 			// set wasScanning flag to true so that once bluetooth is enabled, and we receive
 			// the event, the service will automatically start scanning
 			_wasRunning = true;
-			initBluetooth();
+//			TODO: initBluetooth();
 		} else if (!_running) {
 			getLogger().LOGi(TAG, "Start scan");
 			_running = true;
@@ -844,8 +848,8 @@ public class BleScanService extends Service {
 		editor.commit();
 	}
 
-	public void requestPermissions(Activity activity) {
-		_ble.requestPermissions(activity);
+	public void requestPermissions(Activity activity, IStatusCallback callback) {
+		_ble.requestPermissions(activity, callback);
 	}
 
 	public void onPermissionGranted() {
@@ -872,8 +876,8 @@ public class BleScanService extends Service {
 		startActivity(intent);
 	}
 
-	public boolean handlePermissionResult(int requestCode, String[] permissions, int[] grantResults, IStatusCallback statusCallback) {
-		return _ble.handlePermissionResult(requestCode, permissions, grantResults, statusCallback);
+	public boolean handlePermissionResult(int requestCode, String[] permissions, int[] grantResults) {
+		return _ble.handlePermissionResult(requestCode, permissions, grantResults);
 	}
 
 	public void enableCloudUpload(IScanListCallback scanCB) {
