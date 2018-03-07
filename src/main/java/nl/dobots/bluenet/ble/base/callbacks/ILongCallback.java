@@ -1,5 +1,7 @@
 package nl.dobots.bluenet.ble.base.callbacks;
 
+import nl.dobots.bluenet.ble.core.callbacks.IBaseCallback;
+
 /**
  * Copyright (c) 2017 Bart van Vliet <bart@dobots.nl>. All rights reserved.
  * <p/>

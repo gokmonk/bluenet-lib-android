@@ -238,7 +238,7 @@ public class BleScanService extends Service {
 			@Override
 			public void onError(int error) {
 				switch (error) {
-					case BleErrors.ERROR_BLE_PERMISSION_MISSING: {
+					case BleErrors.ERROR_SCAN_PERMISSION_MISSING: {
 						onPermissionsMissing();
 						break;
 					}

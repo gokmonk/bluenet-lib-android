@@ -44,16 +44,15 @@ public class BleErrors {
 	public static final int ERROR_SUBSCRIBE_FAILED = 232;
 	public static final int ERROR_DESCRIPTOR_SET_FAILED = 233;
 	public static final int ERROR_UNSUBSCRIBE_NOTIFICATION_FAILED = 234;
-	public static final int ERROR_BLE_PERMISSION_MISSING = 235;
+	public static final int ERROR_LOCATION_PERMISSION_MISSING = 235;
 	public static final int WRONG_CALLBACK = 236;
 	public static final int NO_SUBSCRIBER_ID = 237;
 	public static final int ERROR_RECOVER_MODE_DISABLED = 238;
 	public static final int ERROR_NOT_IN_RECOVERY_MODE = 239;
-	public static final int ERROR_LOCATION_PERMISSION_MISSING = 240;
-
+	public static final int ERROR_LOCATION_SERVICES_NOT_ENABLED = 240;
 	public static final int ERROR_VALIDATION_FAILED = 241;
 	public static final int ERROR_LOCATION_SERVICES_TURNED_OFF = 242;
-
+	public static final int ERROR_WRONG_PARAMETERS = 243;
 	public static final int ERROR_WRONG_PAYLOAD_SIZE = 244;
 	public static final int ERROR_MSG_PARSING = 245;
 	public static final int ERROR_REFRESH_FAILED = 246;
@@ -65,6 +64,8 @@ public class BleErrors {
     public static final int ERROR_WRONG_ACTION = 251;
     public static final int ERROR_ALREADY_SUBSCRIBED = 252;
     public static final int ERROR_DESCRIPTOR_WRITE_FAILED = 253;
+    public static final int ERROR_NO_CONTEXT = 254;
+
 
 
 	// BleBase

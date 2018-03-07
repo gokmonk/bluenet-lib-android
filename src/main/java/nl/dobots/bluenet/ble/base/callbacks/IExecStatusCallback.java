@@ -1,5 +1,6 @@
 package nl.dobots.bluenet.ble.base.callbacks;
 
+import nl.dobots.bluenet.ble.core.callbacks.IBaseCallback;
 import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
 
 /**

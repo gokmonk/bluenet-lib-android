@@ -2,8 +2,6 @@ package nl.dobots.bluenet.ble.core.callbacks;
 
 import org.json.JSONObject;
 
-import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
-
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
  * <p/>

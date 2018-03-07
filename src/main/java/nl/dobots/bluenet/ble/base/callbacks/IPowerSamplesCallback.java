@@ -1,6 +1,7 @@
 package nl.dobots.bluenet.ble.base.callbacks;
 
 import nl.dobots.bluenet.ble.base.structs.PowerSamples;
+import nl.dobots.bluenet.ble.core.callbacks.IBaseCallback;
 
 /**
  * Copyright (c) 2016 Dominik Egger <dominik@dobots.nl>. All rights reserved.

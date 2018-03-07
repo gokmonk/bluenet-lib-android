@@ -4,6 +4,8 @@ import android.support.annotation.Nullable;
 
 import org.json.JSONObject;
 
+import nl.dobots.bluenet.ble.core.callbacks.IBaseCallback;
+
 /**
  * Copyright (c) 2015 Bart van Vliet <bart@dobots.nl>. All rights reserved.
  * <p/>

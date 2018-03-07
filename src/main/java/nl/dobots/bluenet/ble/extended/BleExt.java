@@ -17,10 +17,9 @@ import java.util.HashMap;
 
 import nl.dobots.bluenet.ble.base.BleBase;
 import nl.dobots.bluenet.ble.base.BleBaseEncryption;
-import nl.dobots.bluenet.ble.base.BleConfiguration;
 import nl.dobots.bluenet.ble.core.BleCoreTypes;
 import nl.dobots.bluenet.ble.extended.callbacks.EventListener;
-import nl.dobots.bluenet.ble.base.callbacks.IBaseCallback;
+import nl.dobots.bluenet.ble.core.callbacks.IBaseCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IBooleanCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IByteArrayCallback;
 import nl.dobots.bluenet.ble.core.callbacks.IDataCallback;
@@ -1201,7 +1200,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	 *                 the library function @handlePermissionResult.
 	 */
 	public void requestPermissions(Activity activity) {
-		_bleBase.requestPermissions(activity);
+		_bleBase.requestScanPermissions(activity);
 	}
 
 	/**

@@ -3,7 +3,6 @@ package nl.dobots.bluenet.scanner;
 import android.app.Activity;
 import android.bluetooth.le.ScanCallback;
 import android.content.Context;
-import android.content.Intent;
 import android.os.Handler;
 import android.util.Log;
 
@@ -12,18 +11,13 @@ import java.util.Locale;
 
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
-import nl.dobots.bluenet.ble.extended.BleDeviceFilter;
 import nl.dobots.bluenet.ble.extended.BleExt;
 import nl.dobots.bluenet.ble.extended.callbacks.EventListener;
 import nl.dobots.bluenet.ble.extended.callbacks.IBleDeviceCallback;
 import nl.dobots.bluenet.ble.extended.structs.BleDevice;
-import nl.dobots.bluenet.service.BleScanService;
-import nl.dobots.bluenet.service.BluetoothPermissionRequest;
 import nl.dobots.bluenet.service.callbacks.ScanBeaconListener;
 import nl.dobots.bluenet.service.callbacks.ScanDeviceListener;
 import nl.dobots.bluenet.utils.BleLog;
-
-import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 
 /**
  * Copyright (c) 2018 Crownstone
@@ -112,7 +106,7 @@ public class BleScanner {
 			@Override
 			public void onError(int error) {
 				switch (error) {
-					case BleErrors.ERROR_BLE_PERMISSION_MISSING: {
+					case BleErrors.ERROR_SCAN_PERMISSION_MISSING: {
 						onPermissionsMissing();
 						break;
 					}
