@@ -65,6 +65,7 @@ public class BleErrors {
     public static final int ERROR_ALREADY_SUBSCRIBED = 252;
     public static final int ERROR_DESCRIPTOR_WRITE_FAILED = 253;
     public static final int ERROR_NO_CONTEXT = 254;
+	public static final int ERROR_NOT_READY = 255;
 
 
 
