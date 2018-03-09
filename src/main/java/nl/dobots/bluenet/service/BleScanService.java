@@ -23,10 +23,10 @@ import nl.dobots.bluenet.ble.extended.BleExt;
 import nl.dobots.bluenet.ble.extended.structs.BleDevice;
 import nl.dobots.bluenet.ble.extended.structs.BleDeviceMap;
 import nl.dobots.bluenet.ble.extended.callbacks.EventListener;
-import nl.dobots.bluenet.service.callbacks.IntervalScanListener;
-import nl.dobots.bluenet.service.callbacks.ScanBeaconListener;
-import nl.dobots.bluenet.service.callbacks.ScanDeviceListener;
-import nl.dobots.bluenet.service.callbacks.IScanListCallback;
+import nl.dobots.bluenet.scanner.callbacks.IntervalScanListener;
+import nl.dobots.bluenet.scanner.callbacks.ScanBeaconListener;
+import nl.dobots.bluenet.scanner.callbacks.ScanDeviceListener;
+import nl.dobots.bluenet.scanner.callbacks.IScanListCallback;
 import nl.dobots.bluenet.utils.BleLog;
 
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;

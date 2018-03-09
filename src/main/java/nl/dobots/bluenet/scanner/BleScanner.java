@@ -1,278 +1,157 @@
 package nl.dobots.bluenet.scanner;
 
 import android.app.Activity;
-import android.bluetooth.le.ScanCallback;
+import android.app.Notification;
+import android.content.ComponentName;
 import android.content.Context;
-import android.os.Handler;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.os.IBinder;
 import android.support.annotation.Nullable;
-import android.util.Log;
-
-import java.util.ArrayList;
-import java.util.Locale;
 
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
-import nl.dobots.bluenet.ble.extended.BleExt;
-import nl.dobots.bluenet.ble.extended.callbacks.EventListener;
-import nl.dobots.bluenet.ble.extended.callbacks.IBleDeviceCallback;
-import nl.dobots.bluenet.ble.extended.structs.BleDevice;
-import nl.dobots.bluenet.service.callbacks.ScanBeaconListener;
-import nl.dobots.bluenet.service.callbacks.ScanDeviceListener;
+import nl.dobots.bluenet.ble.core.callbacks.StatusSingleCallback;
+import nl.dobots.bluenet.service.BleScanService;
 import nl.dobots.bluenet.utils.BleLog;
 
 /**
- * Copyright (c) 2018 Crownstone
- *
- * @author Bart van Vliet
+ * Class that can be used for scanning.
  */
-
 public class BleScanner {
 	private static final String TAG = BleScanner.class.getCanonicalName();
 
-	/**
-	 * Default log level
-	 */
-	private static final int DEFAULT_LOG_LEVEL = Log.INFO;
+	private Context _context = null;
+	private Activity _activity = null;
 
-	/**
-	 * Default values for scan interval and pause
-	 */
-	private static final int DEFAULT_SCAN_INTERVAL = 60000;
-	private static final int DEFAULT_SCAN_PAUSE = 100;
-
-	/**
-	 * Sometimes stopScan() didn't work properly, resulting in a failure at startScan().
-	 * We will retry to call stopScan for a couple of times with some delay
-	 */
-	private static final int STOP_SCAN_NUM_RETRIES = 5;
-	private static final int STOP_SCAN_RETRY_DELAY = 100;
-	private static final int START_SCAN_NUM_RETRIES = 5;
-	private static final int START_SCAN_RETRY_DELAY = 100;
-
-	// The bluenet library
-	private BleExt _ble;
-
-	// Logger
-	private BleLog _logger;
-
-	// The interval scan handler, handles stop, start, pause, etc.
-	private Handler _intervalScanHandler = null;
-
-	// Keep up a list of listeners to notify
-	private ArrayList<ScanDeviceListener> _scanDeviceListeners = new ArrayList<>();
-	private ArrayList<ScanBeaconListener> _scanBeaconListeners = new ArrayList<>();
-	private ArrayList<EventListener> _eventListeners = new ArrayList<>();
-
-	// Whether or not to parse service data. Not parsing should save batteries.
-	private boolean _parseServiceData = true;
-
-	// Values and flags used at runtime
-	private int _scanPause = DEFAULT_SCAN_PAUSE;
-	private int _scanInterval = DEFAULT_SCAN_INTERVAL;
-	private boolean _running = false;
-	private boolean _wasRunning = false;
 	private boolean _initialized = false;
-	private boolean _scanning = false;
+	private StatusSingleCallback _initCallback = new StatusSingleCallback();
 
-	private int _stopScanRetryNum = 0;
-	private int _startScanRetryNum = 0;
+	// Without service
+	private boolean            _initializedScanner = false;
+	private BleIntervalScanner _intervalScanner = null;
 
-	public BleScanner() {
-		_logger = new BleLog(DEFAULT_LOG_LEVEL);
-		_ble = new BleExt();
-		_ble.setLogger(_logger);
-		_ble.setEventListener(_btEventListener);
-	}
+	// With service
+	private boolean            _initializedScanService = false;
+	private BleScanService     _scanService = null;
+	private Notification       _notification = null;
+	private Integer            _notificationId = null;
+
 
 	/**
-	 * Initializes the bluetooth scanner.
-	 * Checks if bluetooth and location services are on, and if permissions are there.
+	 * Initialize the scanner.
 	 *
-	 * @param activity The activity required to use bluetooth, ask for permission, etc.
-	 * @param callback The callback to be notified about success or failure.
+	 * @param runInBackground Whether to run the scanner in the background.
+	 * @param activity        The activity required to use bluetooth, ask for permission, etc.
+	 *                        It's best when this activity has Activity.onActivityResult() implemented,
+	 *                        and from there call BleCore.handleActivityResult().
+	 *                        Also, this activity should best have Activity.onRequestPermissionsResult()
+	 *                        implemented, and from there call BleCore.handlePermissionResult().
+	 * @param callback        The callback to be notified about success or failure.
+	 * @param notification
+	 * @param notificationId
 	 */
-	public void init(@Nullable Activity activity, final IStatusCallback callback) {
-		getLogger().LOGi(TAG, "init");
+	public void init(boolean runInBackground, Activity activity, IStatusCallback callback, @Nullable Notification notification, @Nullable Integer notificationId) {
 		if (_initialized) {
-			getLogger().LOGi(TAG, "Already initialized");
+			BleLog.getInstance().LOGe(TAG, "Already initialized");
+			callback.onSuccess();
+			return;
+		}
+		if (activity == null || activity.isDestroyed()) {
+			BleLog.getInstance().LOGe(TAG, "Missing activity");
+			callback.onError(BleErrors.ERROR_NO_CONTEXT);
+			return;
+		}
+		_activity = activity;
+		_context = activity.getApplicationContext();
+		if (!_initCallback.setCallback(callback)) {
+			BleLog.getInstance().LOGe(TAG, "busy");
+			callback.onError(BleErrors.ERROR_BUSY);
+		}
+		if (runInBackground) {
+			initScanService();
+		}
+		else {
+			initScanner(callback);
 		}
 
-		_ble.init(activity, new IStatusCallback() {
+	}
+
+
+	/**
+	 * Change whether to run scanner in background.
+	 *
+	 * @param enable          Whether to run the scanner in the background.
+	 */
+	public void runInBackground(boolean enable, @Nullable Notification notification, @Nullable Integer notificationId, IStatusCallback callback) {
+		if (!_initialized) {
+			BleLog.getInstance().LOGe(TAG, "Not initialized");
+			return;
+		}
+		if (enable && !_initializedScanService) {
+			deinitScanner();
+			initScanService();
+		}
+		else if (!enable && !_initializedScanner) {
+			deinitScanService();
+			initScanner(callback);
+		}
+	}
+
+	/**
+	 * Stops scanning, stops any service, and destroys the ble library.
+	 */
+	public void destroy() {
+		deinitScanService();
+		deinitScanner();
+	}
+
+
+	/**
+	 * Start scanning.
+	 */
+	public void startScanning() {
+
+	}
+
+	/**
+	 * Stop scanning.
+	 */
+	public void stopScanning() {
+
+	}
+
+
+
+
+
+
+
+
+	private void initScanService() {
+		// create and bind to the BleScanService
+		BleLog.getInstance().LOGi(TAG, "binding to service..");
+		Intent intent = new Intent(_context, BleScanService.class);
+//		intent.putExtra(BleScanService.EXTRA_LOG_LEVEL, );
+//		intent.putExtra(BleScanService.EXTRA_FILE_LOG_LEVEL, );
+		boolean success = _context.bindService(intent, _serviceConnection, Context.BIND_AUTO_CREATE);
+		BleLog.getInstance().LOGi(TAG, "successfully bound to service: " + success);
+	}
+
+	private void deinitScanService() {
+		if (_initializedScanService) {
+			_context.unbindService(_serviceConnection);
+			_initializedScanService = false;
+			_scanService = null;
+		}
+	}
+
+	private void initScanner(final IStatusCallback callback) {
+		_intervalScanner = new BleIntervalScanner();
+		_intervalScanner.init(_activity, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
-				getLogger().LOGi(TAG, "Successfully initialized");
-				_initialized = true;
-				callback.onSuccess();
-			}
-
-			@Override
-			public void onError(int error) {
-				getLogger().LOGw(TAG, "Init error: " + error);
-				_initialized = false;
-				callback.onError(error);
-			}
-		});
-	}
-
-	/**
-	 * The runnable executed when a scan interval starts. It calls startIntervalScan
-	 * on the library, and posts the stopScanRunnable, to stop the scan at the end of the scan
-	 * interval. If a device was detected, all ScanDeviceListeners will be informed with the
-	 * device as a parameter.
-	 * Additionally, an onScanStart event is issued to all IntervalScanListeners to notify them
-	 * about the start of the scan interval.
-	 */
-	private Runnable _startScanRunnable = new Runnable() {
-		@Override
-		public void run() {
-//			if (isScanActive()) {
-//				getLogger().LOGw(TAG, "already scanning ...");
-//				return;
-//			}
-
-			getLogger().LOGd(TAG, "starting scan interval ...");
-			_ble.startScan(false, new IBleDeviceCallback() {
-
-				@Override
-				public void onSuccess() {
-					getLogger().LOGd(TAG, "... scan interval started");
-					_scanning = true;
-					_stopScanRetryNum = 0;
-					_startScanRetryNum = 0;
-
-					onIntervalScanStart();
-					if (_scanPause > 0) {
-						_intervalScanHandler.postDelayed(_stopScanRunnable, _scanInterval);
-					}
-				}
-
-				@Override
-				public void onDeviceScanned(BleDevice device) {
-					notifyDeviceScanned(device);
-				}
-
-				@Override
-				public void onError(int error) {
-//					_running = false; // TODO: why do we have to set it to false here? It breaks the retries.
-					getLogger().LOGe(TAG, "... scan interval start error: " + error);
-					boolean sendError = true;
-
-					if (error == BleErrors.ERROR_ALREADY_SCANNING) {
-						// TODO: quickly stop AND start, right now it can take a long time to start again.
-						// Retry to stop scanning
-						if (_stopScanRetryNum++ < STOP_SCAN_NUM_RETRIES) {
-							// Cancel the stopScanRunnable that was posted after the line onIntervalScanStart() below.
-							_intervalScanHandler.removeCallbacks(_stopScanRunnable);
-							_intervalScanHandler.postDelayed(_stopScanRunnable, STOP_SCAN_RETRY_DELAY);
-							sendError = false;
-						}
-					}
-					if (error == ScanCallback.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED) {
-						if (_startScanRetryNum++ < START_SCAN_NUM_RETRIES) {
-							getLogger().LOGi(TAG, "Retrying to start ...");
-							// Cancel the stopScanRunnable that was posted after the line onIntervalScanStart() below.
-							_intervalScanHandler.removeCallbacks(_stopScanRunnable);
-							_intervalScanHandler.postDelayed(_startScanRunnable, START_SCAN_RETRY_DELAY);
-							sendError = false;
-						}
-					}
-
-					if (sendError) {
-						_running = false;
-						sendEvent(EventListener.Event.BLUETOOTH_START_SCAN_ERROR);
-					}
-				}
-			});
-		}
-	};
-
-	/**
-	 * The stopScanRunnable takes care of stopping the interval scan at the end of the scan
-	 * interval. It issues an onScanEnd event to all IntervalScanListeners to inform them about
-	 * the end of the scan interval, then posts the startScanRunnable to start the next scan
-	 * interval once the scan pause expired.
-	 */
-	private Runnable _stopScanRunnable = new Runnable() {
-		@Override
-		public void run() {
-			getLogger().LOGd(TAG, "pausing scan interval ...");
-			_ble.stopScan(new IStatusCallback() {
-				@Override
-				public void onSuccess() {
-					getLogger().LOGd(TAG, "... scan interval paused");
-					_scanning = false;
-
-					onIntervalScanEnd();
-					if (_running) {
-						getLogger().LOGi(TAG, "running");
-						_intervalScanHandler.postDelayed(_startScanRunnable, _scanPause);
-					}
-					else {
-						getLogger().LOGi(TAG, "not running");
-					}
-				}
-
-				@Override
-				public void onError(int error) {
-					getLogger().LOGe(TAG, "... scan interval pause error: " + error);
-					_intervalScanHandler.postDelayed(_startScanRunnable, _scanPause);
-					sendEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
-				}
-			});
-		}
-	};
-
-
-
-	/**
-	 * Tell the service to start scanning for devices with the given interval and pause
-	 * durations and setting a device filter.
-	 *
-	 * @param scanInterval The scan interval in ms, the service scans for this amount of time before
-	 *                     pausing again
-	 * @param scanPause    The scan pause in ms, the service pauses for this amount of time before starting
-	 *                     a new scan
-	 * @param deviceFilter Set the scan device filter, see BleDeviceFilter. By setting a filter, only the devices specified will
-	 *                     be reported to the application, any other detected devices will be ignored.
-	 * @param callback     The callback to be notified about success or failure.
-	 */
-	public void startIntervalScan(int scanInterval, int scanPause, int deviceFilter, IStatusCallback callback) {
-		this._scanInterval = scanInterval;
-		this._scanPause = scanPause;
-		startIntervalScan(deviceFilter, callback);
-	}
-
-	/**
-	 * Tell the service to start scanning for devices and report only devices specified by the filter.
-	 * This will use the scan interval and pause values set earlier, or the default values if nothing
-	 * was set previously.
-	 *
-	 * @param deviceFilter set the scan device filter, see BleDeviceFilter. By setting a filter, only the devices specified will
-	 *                     be reported to the application, any other detected devices will be ignored.
-	 * @param callback     The callback to be notified about success or failure.
-	 */
-	public void startIntervalScan(int deviceFilter, IStatusCallback callback) {
-		_ble.setScanFilter(deviceFilter);
-		startIntervalScan(callback);
-	}
-
-	/**
-	 * Tell the service to start scanning for devices and report any devices found.
-	 * This will use the scan interval and pause values set earlier, or the default values if nothing
-	 * was set previously.
-	 *
-	 * @param callback     The callback to be notified about success or failure.
-	 */
-	public void startIntervalScan(final IStatusCallback callback) {
-//		setScanningState(true);
-		getLogger().LOGi(TAG, "startIntervalScan with interval=" + _scanInterval + " pause=" + _scanPause);
-
-		_ble.getBleBase().checkScannerReady(false, null, new IStatusCallback() {
-			@Override
-			public void onSuccess() {
-				_running = true;
-				_intervalScanHandler.removeCallbacksAndMessages(null);
-				_intervalScanHandler.post(_startScanRunnable);
+				_initializedScanner = true;
 				callback.onSuccess();
 			}
 
@@ -283,260 +162,60 @@ public class BleScanner {
 		});
 	}
 
-	/**
-	 * Sop interval scanning. the service will go into pause.
-	 */
-	public void stopIntervalScan() {
-		if (_running) {
-			getLogger().LOGi(TAG, "Stop scan");
-			_intervalScanHandler.removeCallbacksAndMessages(null);
-			_running = false;
-//			setScanningState(false);
-			_ble.stopScan(new IStatusCallback() {
-				@Override
-				public void onSuccess() {
-					getLogger().LOGi(TAG, "scan stopped");
-				}
-
-				@Override
-				public void onError(int error) {
-					getLogger().LOGe(TAG, "Failed to stop scan: " + error);
-					sendEvent(EventListener.Event.BLUETOOTH_STOP_SCAN_ERROR);
-				}
-			});
+	private void deinitScanner() {
+		if (_initializedScanner) {
+			_initializedScanner = false;
+			_intervalScanner.destroy();
+			_intervalScanner = null;
 		}
 	}
 
-	/**
-	 * Check if interval scanning was started.
-	 * @return true if interval scanning is started, false if the service is paused.
-	 */
-	public boolean isRunning() {
-		return _running;
-	}
 
-	/**
-	 * Check if currently scanning for devices.
-	 * @return true if currently scanning, false if currently pausing.
-	 */
-	public boolean isScanActive() {
-		return _scanning;
-	}
+	// if the service was connected successfully, the service connection gives us access to the service
+	private ServiceConnection _serviceConnection = new ServiceConnection() {
+		@Override
+		public void onServiceConnected(ComponentName name, IBinder service) {
+			BleLog.getInstance().LOGi(TAG, "connected to ble scan service ...");
+			// get the service from the binder
+			BleScanService.BleScanBinder binder = (BleScanService.BleScanBinder) service;
+			_scanService = binder.getService();
 
-	/**
-	 * Callback handling bluetooth connection state changes. If bluetooth is turned
-	 * off, an event BLUETOOTH_TURNED_OFF is sent to all EventListeners, if bluetooth is turned on
-	 * an event BLUETOOTH_TURNED_ON is sent to all EventListeners.
-	 * The service will also automatically pause scanning if bluetooth is turned off, and
-	 * resume scanning if bluetooth is turned on again (only if it was scanning before it was turned off)
-	 */
-	private EventListener _btEventListener = new EventListener() {
+			// register as event listener. Events, like bluetooth initialized, and bluetooth turned
+			// off events will be triggered by the service, so we know if the user turned bluetooth
+			// on or off
+			_scanService.registerEventListener(BleScanner.this);
+
+			// register as a scan device listener. If you want to get an event every time a device
+			// is scanned, then this is the choice for you.
+			_scanService.registerScanDeviceListener(BleScanner.this);
+			// register as an interval scan listener. If you only need to know the list of scanned
+			// devices at every end of an interval, then this is better. additionally it also informs
+			// about the start of an interval.
+			_scanService.registerIntervalScanListener(BleScanner.this);
+
+//			// set the scan interval (for how many ms should the service scan for devices)
+//			_scanService.setScanInterval(SCAN_INTERVAL_IN_SPHERE);
+//			// set the scan pause (how many ms should the service wait before starting the next scan)
+//			_scanService.setScanPause(SCAN_PAUSE_IN_SPHERE);
+
+			_scanService.startForeground(_notificationId, _notification);
+
+//			_iBeaconRanger = bleExt.getIbeaconRanger();
+//			_iBeaconRanger.setRssiThreshold(IBEACON_RANGING_MIN_RSSI);
+//			_iBeaconRanger.registerListener(BluenetBridge.this);
+//			BleLog.getInstance().LOGd(TAG, "registered: " + BluenetBridge.this);
+
+			_initializedScanService = true;
+		}
 
 		@Override
-		public void onEvent(Event event) {
-			// will (also) be called whenever bluetooth is disabled
-
-			switch (event) {
-				case BLUETOOTH_TURNED_ON: {
-					getLogger().LOGd(TAG, "Bluetooth turned on");
-
-					if (_ble.getBleBase().isReady()) {
-						_initialized = true;
-
-						if (_running || _wasRunning) {
-							_running = true;
-							_intervalScanHandler.removeCallbacksAndMessages(null);
-							_intervalScanHandler.postDelayed(_startScanRunnable, 100);
-						}
-					}
-					break;
-				}
-				case BLUETOOTH_TURNED_OFF: {
-					getLogger().LOGe(TAG, "Bluetooth turned off!!");
-
-					_initialized = false;
-					_scanning = false;
-					_intervalScanHandler.removeCallbacksAndMessages(null);
-
-					// if bluetooth was turned off and scanning is enabled, issue a notification that present
-					// detection won't work without BLE ...
-					if (_running) {
-						_wasRunning = true;
-						stopIntervalScan();
-					} else {
-						_wasRunning = false;
-					}
-					break;
-				}
-				case LOCATION_SERVICES_TURNED_ON: {
-					getLogger().LOGd(TAG, "Location Services turned on");
-
-					if (_ble.getBleBase().isReady()) {
-						_initialized = true;
-
-						if (_running || _wasRunning) {
-							_running = true;
-							_intervalScanHandler.removeCallbacksAndMessages(null);
-							_intervalScanHandler.postDelayed(_startScanRunnable, 100);
-						}
-					}
-					break;
-				}
-				case LOCATION_SERVICES_TURNED_OFF: {
-					getLogger().LOGe(TAG, "Location Services turned off!!");
-
-					_initialized = false;
-					_scanning = false;
-					_intervalScanHandler.removeCallbacksAndMessages(null);
-
-					if (_running) {
-						_wasRunning = true;
-						stopIntervalScan();
-					} else {
-						_wasRunning = false;
-					}
-					break;
-				}
-			}
-			sendEvent(event);
+		public void onServiceDisconnected(ComponentName name) {
+			// Only called when the service has crashed or has been killed, not when we unbind.
+			BleLog.getInstance().LOGi(TAG, "disconnected from service");
+			_scanService = null;
+//			_iBeaconRanger = null;
+			_initializedScanService = false;
 		}
 	};
 
-
-
-
-
-
-
-	/**
-	 * Helper functions to retrieve the current scanning state (scanning or not scanning) from the
-	 * preferences. We store the scanning state because the service can be killed and/or restarted by
-	 * the android OS, and we want to start in the same state as it was before.
-	 * @return
-	 */
-//	private boolean getScanningState() {
-//		SharedPreferences sharedPreferences = getSharedPreferences(BLE_SERVICE_CFG, 0);
-//		return sharedPreferences.getBoolean(SCANNING_STATE, true);
-//	}
-
-	/**
-	 * Helper functions to store the current scanning state (scanning or not scanning) from the
-	 * preferences. We store the scanning state because the service can be killed and/or restarted by
-	 * the android OS, and we want to start in the same state as it was before.
-	 * @return
-	 */
-//	private void setScanningState(boolean scanning) {
-//		SharedPreferences sharedPreferences = getSharedPreferences(BLE_SERVICE_CFG, 0);
-//		SharedPreferences.Editor editor = sharedPreferences.edit();
-//		editor.putBoolean(SCANNING_STATE, scanning);
-//		editor.commit();
-//	}
-
-
-
-
-
-
-	/**
-	 * Helper function to notify ScanDeviceListeners
-	 * @param device the scanned device
-	 */
-	private void notifyDeviceScanned(BleDevice device) {
-		getLogger().LOGv(TAG, String.format(Locale.US, "scanned device: %s [%d] (%d) %s", device.getAddress(), device.getRssi(), device.getOccurrences(), device.getName()));
-
-		for (ScanDeviceListener listener : _scanDeviceListeners) {
-			listener.onDeviceScanned(device);
-		}
-	}
-
-	/**
-	 * Helper function to notify IntervalScanListeners when a scan interval starts
-	 */
-	private void onIntervalScanStart() {
-		sendEvent(EventListener.Event.SCAN_INTERVAL_START);
-	}
-
-	/**
-	 * Helper function to notify IntervalScanListeners when a scan interval ends
-	 */
-	private void onIntervalScanEnd() {
-		sendEvent(EventListener.Event.SCAN_INTERVAL_END);
-	}
-
-
-	/**
-	 * Register as an EventListener. Whenever an event, such as bluetooth state change, is triggerd
-	 * the onEvent function is called
-	 * @param listener the listener to register
-	 */
-	public void registerEventListener(EventListener listener) {
-		if (!_eventListeners.contains(listener)) {
-			_eventListeners.add(listener);
-		}
-	}
-
-	/**
-	 * Unregister from the service
-	 * @param listener the listener to unregister
-	 */
-	public void unregisterEventListener(EventListener listener) {
-		if (_eventListeners.contains(listener)) {
-			_eventListeners.remove(listener);
-		}
-	}
-
-	/**
-	 * Helper function to notify EventListeners
-	 * @param event
-	 */
-	private void sendEvent(EventListener.Event event) {
-		for (EventListener listener : _eventListeners) {
-			listener.onEvent(event);
-		}
-	}
-
-	public void requestPermissions(Activity activity) {
-		_ble.requestPermissions(activity);
-	}
-
-//	public void onPermissionGranted() {
-//		sendEvent(EventListener.Event.BLE_PERMISSIONS_GRANTED);
-//	}
-
-//	int permissionRetryCount = 0;
-
-//	public void onPermissionDenied() {
-////		onEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
-//		if (++permissionRetryCount < 2) {
-//			onPermissionsMissing();
-//		} else {
-//			sendEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
-//		}
-//	}
-
-	private void onPermissionsMissing() {
-		getLogger().LOGe(TAG, "Ble permissions missing, need to call BleExt.requestPermissions first!!");
-		_running = false;
-////					onEvent(EventListener.Event.BLE_PERMISSIONS_MISSING);
-//		Intent intent = new Intent(BleScanService.this, BluetoothPermissionRequest.class);
-//		intent.setFlags(FLAG_ACTIVITY_NEW_TASK);
-//		startActivity(intent);
-	}
-
-//	public boolean handlePermissionResult(int requestCode, String[] permissions, int[] grantResults, IStatusCallback statusCallback) {
-//		return _ble.handlePermissionResult(requestCode, permissions, grantResults, statusCallback);
-//	}
-
-
-
-
-
-
-	public BleLog getLogger() {
-		if (_logger != null) {
-			return _logger;
-		} else {
-			return BleLog.getInstance();
-		}
-	}
 }

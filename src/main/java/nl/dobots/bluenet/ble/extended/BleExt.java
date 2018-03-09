@@ -295,11 +295,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	}
 
 	/**
-	 * Initializes the BLE Modules and tries to enable the Bluetooth adapter.
-	 *
-	 * @param activity The activity required to use bluetooth, ask for permission, etc.
-	 *                 Only the application context of the activity will be stored for later use.
-	 * @param callback The callback to be notified about success or failure.
+	 * @see BleCore#init(Activity, IStatusCallback)
 	 */
 	public void init(Activity activity, final IStatusCallback callback) {
 		_bleBase.init(activity, new IStatusCallback() {
@@ -1190,38 +1186,14 @@ public class BleExt extends Logging implements IWriteCallback {
 	}
 
 	/**
-	 * Check for location services permissions. Needed for scanning since api 23 (android 6.0).
-	 * If no permission, and activity is given, then request user for it.
-	 *
-	 * @param activity An activity is needed for the request. This activity should have
-	 *                 Activity.onRequestPermissionsResult() implemented, and from there call
-	 *                 BleCore.handlePermissionResult().
-	 *                 If used from a service, have a look at {@link nl.dobots.bluenet.service.BluetoothPermissionRequest}.
-	 *                 Set to null when no request should be made.
-	 * @param callback The callback to be notified about whether bluetooth is enabled or not.
+	 * @see BleCore#checkLocationServicesPermissions(boolean, Activity, IStatusCallback)
 	 */
-	public void requestPermissions(@Nullable Activity activity, @Nullable final IStatusCallback callback) {
-		_bleBase.checkLocationServicesPermissions(activity, new IStatusCallback() {
-			@Override
-			public void onSuccess() {
-				if (callback != null) {
-					callback.onSuccess();
-				}
-			}
-
-			@Override
-			public void onError(int error) {
-				if (callback != null) {
-					callback.onError(error);
-				}
-			}
-		});
+	public void checkLocationServicesPermissions(boolean requestEnable, @Nullable Activity activity, IStatusCallback callback) {
+		_bleBase.checkLocationServicesPermissions(requestEnable, activity, callback);
 	}
 
 	/**
-	 * Handles a permission request result, simply passed on from Activity.onRequestPermissionsResult().
-	 *
-	 * @return return true if permission result was handled, false otherwise.
+	 * @see BleCore#handlePermissionResult(int, String[], int[])
 	 */
 	public boolean handlePermissionResult(int requestCode, String[] permissions, int[] grantResults) {
 		return _bleBase.handlePermissionResult(requestCode, permissions, grantResults);

@@ -26,8 +26,8 @@ import java.util.List;
 
 import nl.dobots.bluenet.ble.extended.structs.BleDevice;
 import nl.dobots.bluenet.ble.extended.callbacks.EventListener;
-import nl.dobots.bluenet.service.callbacks.IntervalScanListener;
-import nl.dobots.bluenet.service.callbacks.ScanDeviceListener;
+import nl.dobots.bluenet.scanner.callbacks.IntervalScanListener;
+import nl.dobots.bluenet.scanner.callbacks.ScanDeviceListener;
 
 /**
  * Copyright (c) 2015 Bart van Vliet <bart@dobots.nl>. All rights reserved.

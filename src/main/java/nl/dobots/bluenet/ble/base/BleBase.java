@@ -57,7 +57,7 @@ public class BleBase extends BleCore {
 //	private Handler _handler = new Handler();
 	private Handler _handler;
 
-	private boolean _encryptionEnabled = false;
+	private boolean _encryptionEnabled = true;
 	private EncryptionKeys _encryptionKeys = null;
 	private EncryptionSessionData _encryptionSessionData = null;
 	private boolean _setupMode = false;

@@ -1,4 +1,6 @@
-package nl.dobots.bluenet.service.callbacks;
+package nl.dobots.bluenet.scanner.callbacks;
+
+import nl.dobots.bluenet.ble.extended.structs.BleDevice;
 
 /**
  * Copyright (c) 2015 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -13,13 +15,12 @@ package nl.dobots.bluenet.service.callbacks;
  * version 3 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  * <p/>
- * Created on 11-8-15
+ * Created on 4-8-15
  *
  * @author Dominik Egger
  */
-public interface IntervalScanListener {
+public interface ScanDeviceListener {
 
-	void onScanStart();
-	void onScanEnd();
+	void onDeviceScanned(BleDevice device);
 
 }

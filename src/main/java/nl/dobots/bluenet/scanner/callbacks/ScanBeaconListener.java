@@ -1,4 +1,4 @@
-package nl.dobots.bluenet.service.callbacks;
+package nl.dobots.bluenet.scanner.callbacks;
 
 import nl.dobots.bluenet.ble.extended.structs.BleDevice;
 

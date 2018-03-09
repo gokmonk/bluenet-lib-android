@@ -79,6 +79,9 @@ public class BleCore extends Logging {
 	// Timeout for a location service enable request. If timeout expires, en error is created.
 	private static final int LOCATION_SERVICE_ENABLE_TIMEOUT = 30000;
 
+	// Timeout for a location permission request. If timeout expires, en error is created.
+	private static final int LOCATION_PERMISSION_TIMEOUT = 30000;
+
 	// The permission request code for requesting location (required for ble scanning).
 	private static final int REQ_CODE_PERMISSIONS_LOCATION = 101;
 
@@ -435,7 +438,8 @@ public class BleCore extends Logging {
 	 * Checks if bluetooth is on and if bluetooth permissions are there.
 	 *
 	 * @param activity The activity required to use bluetooth, ask for permission, etc.
-	 *                 Only the application context of the activity will be stored for later use.
+	 *                 It's best when this activity has Activity.onActivityResult() implemented,
+	 *                 and from there call BleCore.handleActivityResult().
 	 * @param callback The callback to be notified about success or failure.
 	 */
 	public void initBluetooth(Activity activity, IStatusCallback callback) {
@@ -450,7 +454,8 @@ public class BleCore extends Logging {
 	 * Checks if bluetooth is on and if bluetooth permissions are there.
 	 *
 	 * @param activity The activity required to use bluetooth, ask for permission, etc.
-	 *                 Only the application context of the activity will be stored for later use.
+	 *                 It's best when this activity has Activity.onActivityResult() implemented,
+	 *                 and from there call BleCore.handleActivityResult().
 	 */
 	private void initBluetooth(Activity activity) {
 		getLogger().LOGi(TAG, "initBluetooth");
@@ -508,7 +513,10 @@ public class BleCore extends Logging {
 	 * Checks if bluetooth and location services are on, and if permissions are there.
 	 *
 	 * @param activity The activity required to use bluetooth, ask for permission, etc.
-	 *                 Only the application context of the activity will be stored for later use.
+	 *                 It's best when this activity has Activity.onActivityResult() implemented,
+	 *                 and from there call BleCore.handleActivityResult().
+	 *                 Also this activity should best have Activity.onRequestPermissionsResult() implemented,
+	 *                 and from there call BleCore.handlePermissionResult().
 	 * @param callback The callback to be notified about success or failure.
 	 */
 	public void initScanner(Activity activity, final IStatusCallback callback) {
@@ -523,7 +531,10 @@ public class BleCore extends Logging {
 	 * Checks if bluetooth and location services are on, and if permissions are there.
 	 *
 	 * @param activity The activity required to use bluetooth, ask for permission, etc.
-	 *                 Only the application context of the activity will be stored for later use.
+	 *                 It's best when this activity has Activity.onActivityResult() implemented,
+	 *                 and from there call BleCore.handleActivityResult().
+	 *                 Also, this activity should best have Activity.onRequestPermissionsResult()
+	 *                 implemented, and from there call BleCore.handlePermissionResult().
 	 */
 	private void initScanner(final Activity activity) {
 		getLogger().LOGi(TAG, "initScanner");
@@ -538,7 +549,7 @@ public class BleCore extends Logging {
 			@Override
 			public void onSuccess() {
 
-				checkLocationServicesPermissions(activity, new IStatusCallback() {
+				checkLocationServicesPermissions(true, activity, new IStatusCallback() {
 					@Override
 					public void onSuccess() {
 
@@ -593,7 +604,10 @@ public class BleCore extends Logging {
 	 * Checks if bluetooth and location services are on, and if permissions are there.
 	 *
 	 * @param activity The activity required to use bluetooth, ask for permission, etc.
-	 *                 Only the application context of the activity will be stored for later use.
+	 *                 It's best when this activity has Activity.onActivityResult() implemented,
+	 *                 and from there call BleCore.handleActivityResult().
+	 *                 Also, this activity should best have Activity.onRequestPermissionsResult()
+	 *                 implemented, and from there call BleCore.handlePermissionResult().
 	 * @param callback The callback to be notified about success or failure.
 	 */
 	public void init(Activity activity, final IStatusCallback callback) {
@@ -672,13 +686,31 @@ public class BleCore extends Logging {
 	}
 
 	/**
+	 * Check if location permissions are granted.
+	 *
+	 * @return True when permissions are granted.
+	 */
+	private boolean isLocationPermissionGranted() {
+		if (Build.VERSION.SDK_INT < 23) {
+			return true;
+		}
+		if (_context == null) {
+			getLogger().LOGw(TAG, "no context");
+			return false;
+		}
+		int permissionCheck = ContextCompat.checkSelfPermission(_context, Manifest.permission.ACCESS_COARSE_LOCATION);
+		return (permissionCheck == PackageManager.PERMISSION_GRANTED);
+	}
+
+	/**
 	 * Check if location services are enabled.
 	 * Optionally: If not enabled, then request user for it.
 	 *
 	 * @param requestEnable True when the user may be requested to enable bluetooth and location services.
-	 * @param activity      Optional: activity for the request. This activity should have
-	 *                      Activity.onActivityResult() implemented, and from there call
-	 *                      BleCore.handleActivityResult().
+	 * @param activity      Optional: activity for the request, else a cached activity is used.
+	 *                      It's best when this activity has Activity.onActivityResult() implemented,
+	 *                      and from there call BleCore.handleActivityResult().
+	 *                      Otherwise, a timeout is used to check the result.
 	 * @param callback The callback to be notified about whether location services are enabled.
 	 */
 	private void checkLocationServicesEnabled(boolean requestEnable, @Nullable Activity activity, IStatusCallback callback) {
@@ -739,9 +771,10 @@ public class BleCore extends Logging {
 	 * Optionally: If not enabled, then request user for it.
 	 *
 	 * @param requestEnable True when the user may be requested to enable bluetooth.
-	 * @param activity      Optional: activity for the request. This activity should have
-	 *                      Activity.onActivityResult() implemented, and from there call
-	 *                      BleCore.handleActivityResult().
+	 * @param activity      Optional: activity for the request, else a cached activity is used.
+	 *                      It's best when this activity has Activity.onActivityResult() implemented,
+	 *                      and from there call BleCore.handleActivityResult().
+	 *                      Otherwise, a timeout is used to check the result.
 	 * @param callback      The callback to be notified about whether bluetooth is enabled.
 	 */
 	private void checkBluetoothEnabled(boolean requestEnable, @Nullable Activity activity, IStatusCallback callback) {
@@ -799,16 +832,17 @@ public class BleCore extends Logging {
 
 	/**
 	 * Check for location services permissions. Needed for scanning since api 23.
-	 * If no permission, and activity is given, then request user for it.
+	 * Optionally: If no permission, then request user for it.
 	 *
-	 * @param activity An activity is needed for the request. This activity should have
-	 *                 Activity.onRequestPermissionsResult() implemented, and from there call
-	 *                 BleCore.handlePermissionResult().
-	 *                 If used from a service, have a look at {@link nl.dobots.bluenet.service.BluetoothPermissionRequest}.
-	 *                 Set to null when no request should be made.
+	 * @param requestEnable True when the user may be requested to enable bluetooth.
+	 * @param activity      Optional: activity for the request, else a cached activity is used.
+	 *                      It's best when this activity has Activity.onRequestPermissionsResult() implemented,
+	 *                      and from there call BleCore.handlePermissionResult().
+	 *                      Otherwise, a timeout is used to check the result.
+	 *                      If used from a service, have a look at {@link nl.dobots.bluenet.service.BluetoothPermissionRequest}.
 	 * @param callback The callback to be notified about whether permissions are granted.
 	 */
-	public void checkLocationServicesPermissions(@Nullable Activity activity, IStatusCallback callback) {
+	public void checkLocationServicesPermissions(boolean requestEnable, @Nullable Activity activity, IStatusCallback callback) {
 		getLogger().LOGi(TAG, "checkLocationServicesPermissions");
 
 		updateActivity(activity);
@@ -818,20 +852,20 @@ public class BleCore extends Logging {
 			return;
 		}
 
-		boolean havePermission = true;
-		if (Build.VERSION.SDK_INT >= 23) {
-			int permissionCheck = ContextCompat.checkSelfPermission(_context,
-					Manifest.permission.ACCESS_COARSE_LOCATION);
-			havePermission = (permissionCheck == PackageManager.PERMISSION_GRANTED);
-		}
-		if (havePermission) {
-			getLogger().LOGw(TAG, "Already have location permission");
+		if (isLocationPermissionGranted()) {
+			getLogger().LOGd(TAG, "Already have location permission");
 			callback.onSuccess();
 			return;
 		}
 
-		if (!isActivityValid()) {
+		if (!requestEnable) {
 			getLogger().LOGd(TAG, "No location permission");
+			callback.onError(BleErrors.ERROR_LOCATION_PERMISSION_MISSING);
+			return;
+		}
+
+		if (!isActivityValid()) {
+			getLogger().LOGd(TAG, "No activity to request location permission");
 			callback.onError(BleErrors.ERROR_LOCATION_PERMISSION_MISSING);
 			return;
 		}
@@ -845,7 +879,23 @@ public class BleCore extends Logging {
 		ActivityCompat.requestPermissions(_activity,
 				new String[] {Manifest.permission.ACCESS_COARSE_LOCATION},
 				REQ_CODE_PERMISSIONS_LOCATION);
+
+		// Set a timeout to check if location permission are granted, to make sure the callback is called.
+		// The timeout _can_ be cancelled in handlePermissionResult().
+		_timeoutHandler.postDelayed(_requestLocationPermissionTimeout, LOCATION_PERMISSION_TIMEOUT);
 	}
+
+	private Runnable _requestLocationPermissionTimeout = new Runnable() {
+		@Override
+		public void run() {
+			if (isLocationPermissionGranted()) {
+				_requestLocationPermissionCallback.resolve();
+			}
+			else {
+				_requestLocationPermissionCallback.reject(BleErrors.ERROR_LOCATION_PERMISSION_MISSING);
+			}
+		}
+	};
 
 
 	/**
@@ -887,6 +937,8 @@ public class BleCore extends Logging {
 	public boolean handlePermissionResult(int requestCode, String permissions[], int[] grantResults) {
 		switch (requestCode) {
 			case REQ_CODE_PERMISSIONS_LOCATION: {
+				// Cancel the location permission request timeout, if any.
+				_timeoutHandler.removeCallbacks(_requestEnableBluetoothTimeout);
 				if (grantResults.length > 0 &&	grantResults[0] == PackageManager.PERMISSION_GRANTED) {
 					// Permission granted.
 					_requestLocationPermissionCallback.resolve();
@@ -1044,9 +1096,10 @@ public class BleCore extends Logging {
 	 * Optionally: If not ready, then request user for it.
 	 *
 	 * @param requestEnable True when the user may be requested to enable bluetooth.
-	 * @param activity      Optional: activity for the request. This activity should have
-	 *                      Activity.onActivityResult() implemented, and from there call
-	 *                      BleCore.handleActivityResult().
+	 * @param activity      Optional: activity for the request, else a cached activity is used.
+	 *                      It's best when this activity has Activity.onActivityResult() implemented,
+	 *                      and from there call BleCore.handleActivityResult().
+	 *                      Otherwise, a timeout is used to check the result.
 	 * @param callback      The callback to be notified about whether bluetooth is ready.
 	 */
 	public void checkBluetoothReady(boolean requestEnable, @Nullable final Activity activity, final IStatusCallback callback) {
@@ -1067,9 +1120,12 @@ public class BleCore extends Logging {
 	 * Optionally: If not ready, then request user for it.
 	 *
 	 * @param requestEnable True when the user may be requested to enable bluetooth and location services.
-	 * @param activity      Optional: activity for the request. This activity should have
-	 *                      Activity.onActivityResult() implemented, and from there call
-	 *                      BleCore.handleActivityResult().
+	 * @param activity      Optional: activity for the request, else a cached activity is used.
+	 *                      It's best when this activity has Activity.onActivityResult() implemented,
+	 *                      and from there call BleCore.handleActivityResult().
+	 *                      Also, this activity should best have Activity.onRequestPermissionsResult()
+	 *                      implemented, and from there call BleCore.handlePermissionResult().
+	 *                      Otherwise, a timeout is used to check the result.
 	 * @param callback The callback to be notified about whether the scanner is ready.
 	 */
 	public void checkScannerReady(final boolean requestEnable, @Nullable final Activity activity, final IStatusCallback callback) {
