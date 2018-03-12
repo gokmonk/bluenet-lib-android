@@ -34,9 +34,9 @@ public class BleIntervalScanner {
 	private static final int DEFAULT_LOG_LEVEL = Log.INFO;
 
 	/**
-	 * Default values for scan interval and pause
+	 * Default values for scan interval.
 	 */
-	private static final int DEFAULT_SCAN_INTERVAL = 60000;
+	private static final int DEFAULT_SCAN_DURATION = 60000;
 	private static final int DEFAULT_SCAN_PAUSE = 100;
 
 	/**
@@ -67,7 +67,7 @@ public class BleIntervalScanner {
 
 	// Values and flags used at runtime
 	private int _scanPause = DEFAULT_SCAN_PAUSE;
-	private int _scanInterval = DEFAULT_SCAN_INTERVAL;
+	private int _scanDuration = DEFAULT_SCAN_DURATION;
 	private boolean _running = false;
 	private boolean _wasRunning = false;
 	private boolean _scanning = false;
@@ -107,7 +107,11 @@ public class BleIntervalScanner {
 	 * Close the library and release all callbacks
 	 */
 	public void destroy() {
+		getLogger().LOGi(TAG, "onDestroy");
 		_intervalScanHandler.removeCallbacksAndMessages(null);
+		if (_running) {
+			_ble.stopScan(null); // don' t care if it worked or not, so don' t need a callback
+		}
 		_ble.destroy();
 	}
 
@@ -139,7 +143,7 @@ public class BleIntervalScanner {
 
 					onIntervalScanStart();
 					if (_scanPause > 0) {
-						_intervalScanHandler.postDelayed(_stopScanRunnable, _scanInterval);
+						_intervalScanHandler.postDelayed(_stopScanRunnable, _scanDuration);
 					}
 				}
 
@@ -220,49 +224,57 @@ public class BleIntervalScanner {
 	};
 
 
-
 	/**
-	 * Tell the service to start scanning for devices with the given interval and pause
-	 * durations and setting a device filter.
+	 * Set the scan interval: scan duration and pause.
+	 * The scanner will scan for [duration] ms, and then pause for [pause] ms.
+	 * The sum of duration and pause should be larger than 5s.
 	 *
-	 * @param scanInterval The scan interval in ms, the service scans for this amount of time before
-	 *                     pausing again
-	 * @param scanPause    The scan pause in ms, the service pauses for this amount of time before starting
-	 *                     a new scan
-	 * @param deviceFilter Set the scan device filter, see BleDeviceFilter. By setting a filter, only the devices specified will
-	 *                     be reported to the application, any other detected devices will be ignored.
-	 * @param callback     The callback to be notified about success or failure.
+	 * @param scanDuration Scan duration in ms.
+	 * @param scanPause Scan pause in ms. Set to 0 for an endless scan.
 	 */
-	public void startIntervalScan(int scanInterval, int scanPause, int deviceFilter, IStatusCallback callback) {
-		this._scanInterval = scanInterval;
-		this._scanPause = scanPause;
-		startIntervalScan(deviceFilter, callback);
+	public void setScanInterval(int scanDuration, int scanPause) {
+		_scanDuration = scanDuration;
+		_scanPause = scanPause;
 	}
 
 	/**
-	 * Tell the service to start scanning for devices and report only devices specified by the filter.
-	 * This will use the scan interval and pause values set earlier, or the default values if nothing
-	 * was set previously.
-	 *
-	 * @param deviceFilter set the scan device filter, see BleDeviceFilter. By setting a filter, only the devices specified will
-	 *                     be reported to the application, any other detected devices will be ignored.
-	 * @param callback     The callback to be notified about success or failure.
+	 * Get the currently set scan duration.
 	 */
-	public void startIntervalScan(int deviceFilter, IStatusCallback callback) {
+	public int getScanDuration() {
+		return _scanDuration;
+	}
+
+	/**
+	 * Get the currently set scan pause.
+	 */
+	public int getScanPause() {
+		return _scanPause;
+	}
+
+	/**
+	 * @see BleExt#setScanFilter(int)
+	 */
+	public void setScanFilter(int deviceFilter) {
 		_ble.setScanFilter(deviceFilter);
-		startIntervalScan(callback);
 	}
 
 	/**
-	 * Tell the service to start scanning for devices and report any devices found.
-	 * This will use the scan interval and pause values set earlier, or the default values if nothing
-	 * was set previously.
+	 * @see BleExt#getScanFilter()
+	 */
+	public int getScanFilter() {
+		return _ble.getScanFilter();
+	}
+
+
+
+	/**
+	 * Start scanning with already set interval and filter.
+	 * Scanned devices will be reported back to registered ScanDeviceListeners.
 	 *
 	 * @param callback     The callback to be notified about success or failure.
 	 */
 	public void startIntervalScan(final IStatusCallback callback) {
-//		setScanningState(true);
-		getLogger().LOGi(TAG, "startIntervalScan with interval=" + _scanInterval + " pause=" + _scanPause);
+		getLogger().LOGi(TAG, "startIntervalScan with duration=" + _scanDuration + " pause=" + _scanPause);
 
 		_ble.getBleBase().checkScannerReady(false, null, new IStatusCallback() {
 			@Override
@@ -281,14 +293,13 @@ public class BleIntervalScanner {
 	}
 
 	/**
-	 * Stop interval scanning. the service will go into pause.
+	 * Stop interval scanning.
 	 */
 	public void stopIntervalScan() {
 		if (_running) {
 			getLogger().LOGi(TAG, "Stop scan");
 			_intervalScanHandler.removeCallbacksAndMessages(null);
 			_running = false;
-//			setScanningState(false);
 			_ble.stopScan(new IStatusCallback() {
 				@Override
 				public void onSuccess() {
@@ -393,20 +404,6 @@ public class BleIntervalScanner {
 		}
 	};
 
-
-
-	/**
-	 * Helper function to notify ScanDeviceListeners
-	 * @param device the scanned device
-	 */
-	private void notifyDeviceScanned(BleDevice device) {
-		getLogger().LOGv(TAG, String.format(Locale.US, "scanned device: %s [%d] (%d) %s", device.getAddress(), device.getRssi(), device.getOccurrences(), device.getName()));
-
-		for (ScanDeviceListener listener : _scanDeviceListeners) {
-			listener.onDeviceScanned(device);
-		}
-	}
-
 	/**
 	 * Helper function to notify IntervalScanListeners when a scan interval starts
 	 */
@@ -421,25 +418,15 @@ public class BleIntervalScanner {
 		sendEvent(EventListener.Event.SCAN_INTERVAL_END);
 	}
 
-
 	/**
-	 * Register as an EventListener. Whenever an event, such as bluetooth state change, is triggerd
-	 * the onEvent function is called
-	 * @param listener the listener to register
+	 * Helper function to notify ScanDeviceListeners
+	 * @param device the scanned device
 	 */
-	public void registerEventListener(EventListener listener) {
-		if (!_eventListeners.contains(listener)) {
-			_eventListeners.add(listener);
-		}
-	}
+	private void notifyDeviceScanned(BleDevice device) {
+		getLogger().LOGv(TAG, String.format(Locale.US, "scanned device: %s [%d] (%d) %s", device.getAddress(), device.getRssi(), device.getOccurrences(), device.getName()));
 
-	/**
-	 * Unregister from the service
-	 * @param listener the listener to unregister
-	 */
-	public void unregisterEventListener(EventListener listener) {
-		if (_eventListeners.contains(listener)) {
-			_eventListeners.remove(listener);
+		for (ScanDeviceListener listener : _scanDeviceListeners) {
+			listener.onDeviceScanned(device);
 		}
 	}
 
@@ -453,17 +440,58 @@ public class BleIntervalScanner {
 		}
 	}
 
+
+
+	/**
+	 * Register an EventListener.
+	 * Whenever an event happens, the onEvent function is called.
+	 * @param listener The listener to register.
+	 */
+	public void registerEventListener(EventListener listener) {
+		if (!_eventListeners.contains(listener)) {
+			_eventListeners.add(listener);
+		}
+	}
+
+	/**
+	 * Unregister an EventListener.
+	 * @param listener The listener to unregister.
+	 */
+	public void unregisterEventListener(EventListener listener) {
+		if (_eventListeners.contains(listener)) {
+			_eventListeners.remove(listener);
+		}
+	}
+
+	/**
+	 * Register a ScanDeviceListener.
+	 * Whenever a device is scanned, the onDeviceScanned function is called.
+	 * @param listener The listener to register.
+	 */
+	public void registerScanDeviceListener(ScanDeviceListener listener) {
+		if (!_scanDeviceListeners.contains(listener)) {
+			_scanDeviceListeners.add(listener);
+		}
+	}
+
+	/**
+	 * Unregister an ScanDeviceListener.
+	 * @param listener The listener to unregister.
+	 */
+	public void unregisterScanDeviceListener(ScanDeviceListener listener) {
+		if (_scanDeviceListeners.contains(listener)) {
+			_scanDeviceListeners.remove(listener);
+		}
+	}
+
+
+
 	/**
 	 * @see nl.dobots.bluenet.ble.core.BleCore#checkLocationServicesPermissions
 	 */
 	public void checkLocationServicesPermissions(boolean requestEnable, @Nullable Activity activity, IStatusCallback callback) {
 		_ble.checkLocationServicesPermissions(requestEnable, activity, callback);
 	}
-
-
-
-
-
 
 
 
