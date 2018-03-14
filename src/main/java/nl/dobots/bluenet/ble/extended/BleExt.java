@@ -90,7 +90,7 @@ public class BleExt extends Logging implements IWriteCallback {
 
 	// filter, used to filter devices based on "type", eg. only report crownstone devices, or
 	// only report guidestone devices
-	private int _scanFilter = BleDeviceFilter.ALL;
+	private BleDeviceFilter _scanFilter;
 
 	//	private ArrayList<BleIbeaconFilter> _iBeaconFilter = new ArrayList<>();
 	private BleIbeaconRanging _iBeaconRanger = new BleIbeaconRanging();
@@ -151,7 +151,8 @@ public class BleExt extends Logging implements IWriteCallback {
 	 *
 	 * @param deviceFilter the scan device filter, see BleDeviceFilter.
 	 */
-	public void setScanFilter(int deviceFilter) {
+	public void setScanFilter(BleDeviceFilter deviceFilter) {
+		getLogger().LOGi(TAG, "setScanFilter " + deviceFilter);
 		if (_scanFilter != deviceFilter) {
 			synchronized (BleExt.class) {
 				_devices.clear();
@@ -165,7 +166,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	 *
 	 * @return the device filter
 	 */
-	public int getScanFilter() {
+	public BleDeviceFilter getScanFilter() {
 		return _scanFilter;
 	}
 
@@ -318,6 +319,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	 * Close the library and release all callbacks
 	 */
 	public void destroy() {
+		getLogger().LOGi(TAG, "destroy");
 		_handler.removeCallbacksAndMessages(null);
 		_iBeaconRanger.destroy();
 		_bleBase.destroy();
@@ -475,34 +477,28 @@ public class BleExt extends Logging implements IWriteCallback {
 					// Just update rssi
 				}
 				else {
-					boolean passed = false;
-
-					if ((_scanFilter & BleDeviceFilter.ALL) != 0) {
-						passed = true;
-					}
-					else if ((_scanFilter & BleDeviceFilter.IBEACON) != 0 && device.isIBeacon()) {
-						passed = true;
-					}
-					else if ((_scanFilter & BleDeviceFilter.ANYSTONE) != 0 && (device.isStone() || device.isDfuMode())) {
-						passed = true;
-					}
-					else if ((_scanFilter & BleDeviceFilter.CROWNSTONE_PLUG) != 0 && device.isCrownstonePlug()) {
-						passed = true;
-					}
-					else if ((_scanFilter & BleDeviceFilter.CROWNSTONE_BUILTIN) != 0 && device.isCrownstoneBuiltin()) {
-						passed = true;
-					}
-					else if ((_scanFilter & BleDeviceFilter.GUIDESTONE) != 0 && device.isGuidestone()) {
-						passed = true;
-					}
-					else if ((_scanFilter & BleDeviceFilter.SETUPSTONE) != 0 && device.isSetupMode()) {
-						passed = true;
-					}
-					else if ((_scanFilter & BleDeviceFilter.DFUSTONE) != 0 && device.isDfuMode()) {
-						passed = true;
-					}
-					if (!passed) {
-						return;
+					switch (_scanFilter) {
+						case iBeacon:
+							if (!device.isIBeacon()) return;
+							break;
+						case anyStone:
+							// TODO: how to deal with stones in dfu mode?
+							if (!device.isStone() && !device.isDfuMode()) return;
+							break;
+						case crownstonePlug:
+							if (!device.isCrownstonePlug()) return;
+							break;
+						case crownstoneBuiltin:
+							if (!device.isCrownstoneBuiltin()) return;
+							break;
+						case guidestone:
+							if (!device.isGuidestone()) return;
+							break;
+						case setupStone:
+							if (!device.isSetupMode()) return;
+							break;
+						case all:
+							break;
 					}
 				}
 

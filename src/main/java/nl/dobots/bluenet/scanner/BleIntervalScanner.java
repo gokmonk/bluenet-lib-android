@@ -3,6 +3,7 @@ package nl.dobots.bluenet.scanner;
 import android.app.Activity;
 import android.bluetooth.le.ScanCallback;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.support.annotation.Nullable;
 import android.util.Log;
 
@@ -11,6 +12,7 @@ import java.util.Locale;
 
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
+import nl.dobots.bluenet.ble.extended.BleDeviceFilter;
 import nl.dobots.bluenet.ble.extended.BleExt;
 import nl.dobots.bluenet.ble.extended.callbacks.EventListener;
 import nl.dobots.bluenet.ble.extended.callbacks.IBleDeviceCallback;
@@ -58,9 +60,9 @@ public class BleIntervalScanner {
 	private Handler _intervalScanHandler = null;
 
 	// Keep up a list of listeners to notify
+	private ArrayList<EventListener>      _eventListeners = new ArrayList<>();
 	private ArrayList<ScanDeviceListener> _scanDeviceListeners = new ArrayList<>();
 	private ArrayList<ScanBeaconListener> _scanBeaconListeners = new ArrayList<>();
-	private ArrayList<EventListener> _eventListeners = new ArrayList<>();
 
 	// Whether or not to parse service data. Not parsing should save batteries.
 	private boolean _parseServiceData = true;
@@ -80,6 +82,10 @@ public class BleIntervalScanner {
 		_ble = new BleExt();
 		_ble.setLogger(_logger);
 		_ble.setEventListener(_btEventListener);
+
+		HandlerThread handlerThread = new HandlerThread("IntervalScanHandler");
+		handlerThread.start();
+		_intervalScanHandler = new Handler(handlerThread.getLooper());
 	}
 
 	/**
@@ -252,16 +258,16 @@ public class BleIntervalScanner {
 	}
 
 	/**
-	 * @see BleExt#setScanFilter(int)
+	 * @see BleExt#setScanFilter(BleDeviceFilter)
 	 */
-	public void setScanFilter(int deviceFilter) {
+	public void setScanFilter(BleDeviceFilter deviceFilter) {
 		_ble.setScanFilter(deviceFilter);
 	}
 
 	/**
 	 * @see BleExt#getScanFilter()
 	 */
-	public int getScanFilter() {
+	public BleDeviceFilter getScanFilter() {
 		return _ble.getScanFilter();
 	}
 
@@ -346,7 +352,7 @@ public class BleIntervalScanner {
 
 			switch (event) {
 				case BLUETOOTH_TURNED_ON: {
-					getLogger().LOGd(TAG, "Bluetooth turned on");
+					getLogger().LOGi(TAG, "Bluetooth turned on");
 
 					if (_ble.getBleBase().isScannerReady()) {
 						if (_running || _wasRunning) {
@@ -484,6 +490,28 @@ public class BleIntervalScanner {
 		}
 	}
 
+	/**
+	 * Register a ScanBeaconListener.
+	 * Whenever a device is scanned, the onBeaconScanned function is called.
+	 * @param listener The listener to register.
+	 */
+	public void registerScanBeaconListener(ScanBeaconListener listener) {
+		if (!_scanBeaconListeners.contains(listener)) {
+			_scanBeaconListeners.add(listener);
+		}
+	}
+
+	/**
+	 * Unregister an ScanBeaconListener.
+	 * @param listener The listener to unregister.
+	 */
+	public void unregisterScanBeaconListener(ScanBeaconListener listener) {
+		if (_scanBeaconListeners.contains(listener)) {
+			_scanBeaconListeners.remove(listener);
+		}
+	}
+
+
 
 
 	/**
@@ -501,5 +529,15 @@ public class BleIntervalScanner {
 		} else {
 			return BleLog.getInstance();
 		}
+	}
+
+	/**
+	 * Get the extended ble lib, used by this scanner.
+	 * Warning: only use methods that don't have anything to do with scanning.
+	 *
+	 * @return Extended ble lib.
+	 */
+	public BleExt getBleExt() {
+		return _ble;
 	}
 }

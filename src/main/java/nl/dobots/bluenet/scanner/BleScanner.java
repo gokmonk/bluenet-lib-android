@@ -9,11 +9,14 @@ import android.content.ServiceConnection;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
 
+import java.util.ArrayList;
+
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.core.callbacks.StatusSingleCallback;
+import nl.dobots.bluenet.ble.extended.BleDeviceFilter;
 import nl.dobots.bluenet.ble.extended.callbacks.EventListener;
-import nl.dobots.bluenet.ble.extended.structs.BleDevice;
+import nl.dobots.bluenet.scanner.callbacks.ScanBeaconListener;
 import nl.dobots.bluenet.scanner.callbacks.ScanDeviceListener;
 import nl.dobots.bluenet.service.BleScanService;
 import nl.dobots.bluenet.utils.BleLog;
@@ -21,11 +24,12 @@ import nl.dobots.bluenet.utils.BleLog;
 /**
  * Class that can be used for scanning.
  */
-public class BleScanner implements EventListener, ScanDeviceListener {
+public class BleScanner {
 	private static final String TAG = BleScanner.class.getCanonicalName();
 
-	private Context _context = null;
-	private Activity _activity = null;
+	// Cache
+	private Context            _context = null;
+	private Activity           _activity = null;
 
 	private boolean _initialized = false;
 	private StatusSingleCallback _initCallback = new StatusSingleCallback();
@@ -34,7 +38,7 @@ public class BleScanner implements EventListener, ScanDeviceListener {
 	private boolean            _settingsInitialized = false;
 	private int                _scanDuration;
 	private int                _scanPause;
-	private int                _scanFilter;
+	private BleDeviceFilter    _scanFilter;
 
 	// Without service
 	private boolean            _initializedScanner = false;
@@ -47,6 +51,10 @@ public class BleScanner implements EventListener, ScanDeviceListener {
 	private Notification       _notification = null;
 	private Integer            _notificationId = null;
 
+	// Listeners
+	private ArrayList<ScanDeviceListener> _scanDeviceListeners = new ArrayList<>();
+	private ArrayList<EventListener>      _eventListeners = new ArrayList<>();
+	private ArrayList<ScanBeaconListener> _scanBeaconListeners = new ArrayList<>();
 
 	/**
 	 * Initialize the scanner.
@@ -57,11 +65,11 @@ public class BleScanner implements EventListener, ScanDeviceListener {
 	 *                        and from there call BleCore.handleActivityResult().
 	 *                        Also, this activity should best have Activity.onRequestPermissionsResult()
 	 *                        implemented, and from there call BleCore.handlePermissionResult().
+	 * @param notification    Optional, but required to run in the background.
+	 * @param notificationId  Id of the notification.
 	 * @param callback        The callback to be notified about success or failure.
-	 * @param notification
-	 * @param notificationId
 	 */
-	public void init(boolean runInBackground, Activity activity, final IStatusCallback callback, @Nullable Notification notification, @Nullable Integer notificationId) {
+	public void init(boolean runInBackground, Activity activity, @Nullable Notification notification, @Nullable Integer notificationId, final IStatusCallback callback) {
 		if (_initialized) {
 			BleLog.getInstance().LOGe(TAG, "Already initialized");
 			callback.onSuccess();
@@ -80,6 +88,7 @@ public class BleScanner implements EventListener, ScanDeviceListener {
 		IStatusCallback initCallback = new IStatusCallback() {
 			@Override
 			public void onSuccess() {
+				_initialized = true;
 				cacheScannerSettings(getScanner());
 				callback.onSuccess();
 			}
@@ -90,14 +99,14 @@ public class BleScanner implements EventListener, ScanDeviceListener {
 			}
 		};
 
-		if (!_initCallback.setCallback(callback)) {
+		if (!_initCallback.setCallback(initCallback)) {
 			BleLog.getInstance().LOGe(TAG, "busy");
-			callback.onError(BleErrors.ERROR_BUSY);
+			initCallback.onError(BleErrors.ERROR_BUSY);
 			return;
 		}
 
 		if (runInBackground) {
-			initScanService();
+			initScanService(notification, notificationId);
 		}
 		else {
 			initScanner();
@@ -110,6 +119,9 @@ public class BleScanner implements EventListener, ScanDeviceListener {
 	 * Change whether to run scanner in background.
 	 *
 	 * @param enable          Whether to run the scanner in the background.
+	 * @param notification    Required to run in the background.
+	 * @param notificationId  Id of the notification.
+	 * @param callback        The callback to be notified about success or failure.
 	 */
 	public void runInBackground(boolean enable, @Nullable Notification notification, @Nullable Integer notificationId, IStatusCallback callback) {
 		if (!_initialized) {
@@ -144,14 +156,24 @@ public class BleScanner implements EventListener, ScanDeviceListener {
 	 * Start scanning.
 	 */
 	public void startScanning() {
+		getIntervalScanner().startIntervalScan(new IStatusCallback() {
+			@Override
+			public void onSuccess() {
+				BleLog.getInstance().LOGi(TAG, "Started scanning");
+			}
 
+			@Override
+			public void onError(int error) {
+				BleLog.getInstance().LOGe(TAG, "Failed to start scanning: " + error);
+			}
+		});
 	}
 
 	/**
 	 * Stop scanning.
 	 */
 	public void stopScanning() {
-
+		getIntervalScanner().stopIntervalScan();
 	}
 
 	/**
@@ -167,10 +189,10 @@ public class BleScanner implements EventListener, ScanDeviceListener {
 	}
 
 	/**
-	 * @see BleIntervalScanner#setScanFilter(int)
+	 * @see BleIntervalScanner#setScanFilter(BleDeviceFilter)
 	 */
-	public void setScanFilter(int deviceFilter) {
-		_deviceFilter = deviceFilter;
+	public void setScanFilter(BleDeviceFilter deviceFilter) {
+		_scanFilter = deviceFilter;
 		BleIntervalScanner scanner = getScanner();
 		if (scanner != null) {
 			scanner.setScanFilter(deviceFilter);
@@ -178,56 +200,126 @@ public class BleScanner implements EventListener, ScanDeviceListener {
 	}
 
 	/**
-	 * Register an EventListener.
-	 * Whenever an event happens, the onEvent function is called.
-	 * @param listener The listener to register.
+	 * @see BleIntervalScanner#registerEventListener(EventListener)
 	 */
 	public void registerEventListener(EventListener listener) {
 		if (!_eventListeners.contains(listener)) {
 			_eventListeners.add(listener);
 		}
+		BleIntervalScanner scanner = getScanner();
+		if (scanner != null) {
+			scanner.registerEventListener(listener);
+		}
 	}
 
 	/**
-	 * Unregister an EventListener.
-	 * @param listener The listener to unregister.
+	 * @see BleIntervalScanner#unregisterEventListener(EventListener)
 	 */
 	public void unregisterEventListener(EventListener listener) {
 		if (_eventListeners.contains(listener)) {
 			_eventListeners.remove(listener);
 		}
+		BleIntervalScanner scanner = getScanner();
+		if (scanner != null) {
+			scanner.unregisterEventListener(listener);
+		}
 	}
 
 	/**
-	 * Register a ScanDeviceListener.
-	 * Whenever a device is scanned, the onDeviceScanned function is called.
-	 * @param listener The listener to register.
+	 * @see BleIntervalScanner#registerScanDeviceListener(ScanDeviceListener)
 	 */
 	public void registerScanDeviceListener(ScanDeviceListener listener) {
 		if (!_scanDeviceListeners.contains(listener)) {
 			_scanDeviceListeners.add(listener);
 		}
+		BleIntervalScanner scanner = getScanner();
+		if (scanner != null) {
+			scanner.registerScanDeviceListener(listener);
+		}
 	}
 
 	/**
-	 * Unregister an ScanDeviceListener.
-	 * @param listener The listener to unregister.
+	 * @see BleIntervalScanner#unregisterScanDeviceListener(ScanDeviceListener)
 	 */
 	public void unregisterScanDeviceListener(ScanDeviceListener listener) {
 		if (_scanDeviceListeners.contains(listener)) {
 			_scanDeviceListeners.remove(listener);
 		}
+		BleIntervalScanner scanner = getScanner();
+		if (scanner != null) {
+			scanner.unregisterScanDeviceListener(listener);
+		}
+	}
+
+	/**
+	 * @see BleIntervalScanner#registerScanBeaconListener(ScanBeaconListener)
+	 */
+	public void registerScanBeaconListener(ScanBeaconListener listener) {
+		if (!_scanBeaconListeners.contains(listener)) {
+			_scanBeaconListeners.add(listener);
+		}
+	}
+
+	/**
+	 * @see BleIntervalScanner#unregisterScanBeaconListener(ScanBeaconListener)
+	 */
+	public void unregisterScanBeaconListener(ScanBeaconListener listener) {
+		if (_scanBeaconListeners.contains(listener)) {
+			_scanBeaconListeners.remove(listener);
+		}
+	}
+
+	/**
+	 * Get the currently used interval scanner.
+	 * Warning: becomes invalid when changing whether to run in background.
+	 *
+	 * @return Currently used interval scanner.
+	 */
+	public BleIntervalScanner getIntervalScanner() {
+		return getScanner();
 	}
 
 
 
 
+	private void initScanner() {
+		_intervalScanner = new BleIntervalScanner();
+		_intervalScanner.init(_activity, new IStatusCallback() {
+			@Override
+			public void onSuccess() {
+//				_intervalScanner.registerEventListener(BleScanner.this);
+//				_intervalScanner.registerScanDeviceListener(BleScanner.this);
+				applyScannerSettings(_intervalScanner);
+				registerListeners(_intervalScanner);
+				_initializedScanner = true;
+				_initCallback.resolve();
+			}
 
+			@Override
+			public void onError(int error) {
+				_initCallback.reject(error);
+			}
+		});
+	}
 
+	private void deinitScanner() {
+		if (_initializedScanner) {
+			_initializedScanner = false;
+			cacheScannerSettings(_intervalScanner);
+			_intervalScanner.destroy();
+			_intervalScanner = null;
+		}
+	}
 
+	private void initScanService(@Nullable Notification notification, @Nullable Integer notificationId) {
+		// Cache notification
+		if (notification != null) {
+			_notification = notification;
+		}
+		if (notificationId != null) {
+			_notificationId = notificationId;
+		}
 
-
-	private void initScanService() {
 		// create and bind to the BleScanService
 		BleLog.getInstance().LOGi(TAG, "binding to service..");
 		Intent intent = new Intent(_context, BleScanService.class);
@@ -247,31 +339,55 @@ public class BleScanner implements EventListener, ScanDeviceListener {
 		}
 	}
 
-	private void initScanner() {
-		_intervalScanner = new BleIntervalScanner();
-		_intervalScanner.init(_activity, new IStatusCallback() {
-			@Override
-			public void onSuccess() {
-				_initializedScanner = true;
-				applyScannerSettings(_intervalScanner);
-				_initCallback.resolve();
-			}
+	// if the service was connected successfully, the service connection gives us access to the service
+	private ServiceConnection _serviceConnection = new ServiceConnection() {
+		@Override
+		public void onServiceConnected(ComponentName name, IBinder service) {
+			BleLog.getInstance().LOGi(TAG, "connected to ble scan service ...");
+			// get the service from the binder
+			BleScanService.BleScanBinder binder = (BleScanService.BleScanBinder) service;
+			_scanService = binder.getService();
+			_scanService.init(_activity, new IStatusCallback() {
+				@Override
+				public void onSuccess() {
+					_scanServiceScanner = _scanService.getScanner();
+//					_scanServiceScanner.registerEventListener(BleScanner.this);
+//					_scanServiceScanner.registerScanDeviceListener(BleScanner.this);
+					applyScannerSettings(_scanServiceScanner);
+					registerListeners(_scanServiceScanner);
 
-			@Override
-			public void onError(int error) {
-				_initCallback.reject(error);
-			}
-		});
-	}
 
-	private void deinitScanner() {
-		if (_initializedScanner) {
-			_initializedScanner = false;
-			cacheScannerSettings(_intervalScanner);
-			_intervalScanner.destroy();
-			_intervalScanner = null;
+//					_iBeaconRanger = bleExt.getIbeaconRanger();
+//					_iBeaconRanger.setRssiThreshold(IBEACON_RANGING_MIN_RSSI);
+//					_iBeaconRanger.registerListener(BluenetBridge.this);
+//					BleLog.getInstance().LOGd(TAG, "registered: " + BluenetBridge.this);
+
+					_scanService.startForeground(_notificationId, _notification);
+					_initializedScanService = true;
+					_initCallback.resolve();
+				}
+
+				@Override
+				public void onError(int error) {
+					BleLog.getInstance().LOGe(TAG, "Scan service init failed: " + error);
+					// TODO: is this enough?
+					_scanService = null;
+					_context.unbindService(_serviceConnection);
+					_initCallback.reject(error);
+				}
+			});
 		}
-	}
+
+		@Override
+		public void onServiceDisconnected(ComponentName name) {
+			// Only called when the service has crashed or has been killed, not when we unbind.
+			BleLog.getInstance().LOGi(TAG, "disconnected from service");
+			_scanService = null;
+			_scanServiceScanner = null;
+//			_iBeaconRanger = null;
+			_initializedScanService = false;
+		}
+	};
 
 	/**
 	 * Get the scanner that's currently in use.
@@ -307,62 +423,17 @@ public class BleScanner implements EventListener, ScanDeviceListener {
 		scanner.setScanFilter(_scanFilter);
 	}
 
-
-	// if the service was connected successfully, the service connection gives us access to the service
-	private ServiceConnection _serviceConnection = new ServiceConnection() {
-		@Override
-		public void onServiceConnected(ComponentName name, IBinder service) {
-			BleLog.getInstance().LOGi(TAG, "connected to ble scan service ...");
-			// get the service from the binder
-			BleScanService.BleScanBinder binder = (BleScanService.BleScanBinder) service;
-			_scanService = binder.getService();
-			_scanService.init(_activity, new IStatusCallback() {
-				@Override
-				public void onSuccess() {
-					_scanServiceScanner = _scanService.getScanner();
-					_scanServiceScanner.registerEventListener(BleScanner.this);
-					_scanServiceScanner.registerScanDeviceListener(BleScanner.this);
-					applyScannerSettings(_scanServiceScanner);
-
-//					_iBeaconRanger = bleExt.getIbeaconRanger();
-//					_iBeaconRanger.setRssiThreshold(IBEACON_RANGING_MIN_RSSI);
-//					_iBeaconRanger.registerListener(BluenetBridge.this);
-//					BleLog.getInstance().LOGd(TAG, "registered: " + BluenetBridge.this);
-
-					_scanService.startForeground(_notificationId, _notification);
-					_initializedScanService = true;
-					_initCallback.resolve();
-				}
-
-				@Override
-				public void onError(int error) {
-					BleLog.getInstance().LOGe(TAG, "Scan service init failed: " + error);
-					// TODO: is this enough?
-					_scanService = null;
-					_context.unbindService(_serviceConnection);
-					_initCallback.reject(error);
-				}
-			});
+	// Register cached listeners.
+	private void registerListeners(BleIntervalScanner scanner) {
+		for (EventListener listener: _eventListeners) {
+			scanner.registerEventListener(listener);
 		}
-
-		@Override
-		public void onServiceDisconnected(ComponentName name) {
-			// Only called when the service has crashed or has been killed, not when we unbind.
-			BleLog.getInstance().LOGi(TAG, "disconnected from service");
-			_scanService = null;
-			_scanServiceScanner = null;
-//			_iBeaconRanger = null;
-			_initializedScanService = false;
+		for (ScanDeviceListener listener: _scanDeviceListeners) {
+			scanner.registerScanDeviceListener(listener);
 		}
-	};
-
-	@Override
-	public void onDeviceScanned(BleDevice device) {
-
+		for (ScanBeaconListener listener: _scanBeaconListeners) {
+			scanner.registerScanBeaconListener(listener);
+		}
 	}
 
-	@Override
-	public void onEvent(Event event) {
-
-	}
 }

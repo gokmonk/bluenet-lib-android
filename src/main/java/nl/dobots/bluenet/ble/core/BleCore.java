@@ -412,6 +412,7 @@ public class BleCore extends Logging {
 	 * Reset all callbacks and unregister the broadcast receiver
 	 */
 	public synchronized void destroy() {
+		getLogger().LOGi(TAG, "destroy");
 		if (_receiverRegisteredBluetooth && _context != null) {
 			_context.unregisterReceiver(_receiverBluetooth);
 		}
@@ -966,6 +967,7 @@ public class BleCore extends Logging {
 			if (intent.getAction().equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
 				switch (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
 					case BluetoothAdapter.STATE_ON: {
+						getLogger().LOGi(TAG, "bluetooth on");
 						// Cancel the bluetooth enable request timeout, if any.
 						_timeoutHandler.removeCallbacks(_requestEnableBluetoothTimeout);
 						if (_requestEnableBluetoothCallback.isCallbackSet()) {
@@ -987,6 +989,7 @@ public class BleCore extends Logging {
 						break;
 					}
 					case BluetoothAdapter.STATE_OFF: {
+						getLogger().LOGi(TAG, "bluetooth off");
 						sendEvent(BleCoreTypes.EVT_BLUETOOTH_OFF);
 
 						// TODO: this has to happen after event has been sent?
@@ -2658,6 +2661,7 @@ public class BleCore extends Logging {
 	 * @param mode scan mode to be set, see {@link ScanSettings}
 	 */
 	public void setScanMode(int mode) {
+		getLogger().LOGd(TAG, "setScanMode: " + mode);
 		_scanSettings = new ScanSettings.Builder()
 				.setScanMode(mode)
 				.build();

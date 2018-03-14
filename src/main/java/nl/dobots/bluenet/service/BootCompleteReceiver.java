@@ -38,8 +38,8 @@ public class BootCompleteReceiver extends BroadcastReceiver {
 
 	@Override
 	public void onReceive(Context context, Intent intent) {
-		Intent startServiceIntent = new Intent(context, BleScanService.class);
-		startServiceIntent.putExtra(BleScanService.EXTRA_AUTO_START, true);
-		context.startService(startServiceIntent);
+//		Intent startServiceIntent = new Intent(context, BleScanService.class);
+//		startServiceIntent.putExtra(BleScanService.EXTRA_AUTO_START, true);
+//		context.startService(startServiceIntent);
 	}
 }
