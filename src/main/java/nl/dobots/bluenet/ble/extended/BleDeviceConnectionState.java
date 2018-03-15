@@ -10,7 +10,7 @@ public enum BleDeviceConnectionState {
 
 	uninitialized,
 	initialized,
-	scanning,
+//	scanning,
 	connecting,
 	connected,
 	disconnecting,

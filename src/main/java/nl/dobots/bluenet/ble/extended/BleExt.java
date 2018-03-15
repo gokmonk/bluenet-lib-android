@@ -269,6 +269,9 @@ public class BleExt extends Logging implements IWriteCallback {
 				if (state != null) {
 					switch (state) {
 						case BleCoreTypes.EVT_BLUETOOTH_ON: {
+							if (_connectionState != BleDeviceConnectionState.uninitialized) {
+								_connectionState = BleDeviceConnectionState.initialized;
+							}
 							listener.onEvent(EventListener.Event.BLUETOOTH_TURNED_ON);
 							break;
 						}
@@ -323,6 +326,21 @@ public class BleExt extends Logging implements IWriteCallback {
 		_handler.removeCallbacksAndMessages(null);
 		_iBeaconRanger.destroy();
 		_bleBase.destroy();
+	}
+
+
+	/**
+	 * @see BleCore#checkBluetoothReady(boolean, Activity, IStatusCallback)
+	 */
+	public void checkBluetoothReady(boolean makeReady, @Nullable final Activity activity, final IStatusCallback callback) {
+		_bleBase.checkBluetoothReady(makeReady, activity, callback);
+	}
+
+	/**
+	 * @see BleCore#checkScannerReady(boolean, Activity, IStatusCallback)
+	 */
+	public void checkScannerReady(final boolean makeReady, @Nullable final Activity activity, final IStatusCallback callback) {
+		_bleBase.checkScannerReady(makeReady, activity, callback);
 	}
 
 	/**
@@ -418,13 +436,13 @@ public class BleExt extends Logging implements IWriteCallback {
 //	private boolean startEndlessScan(final IBleDeviceCallback callback, @Nullable final IBleBeaconCallback beaconCallback) {
 	private void startEndlessScan(final IBleDeviceCallback callback) {
 //		checkConnectionState(BleDeviceConnectionState.initialized, null);
-		if (_connectionState != BleDeviceConnectionState.initialized) {
-			getLogger().LOGe(TAG, "State is not initialized: %s", _connectionState.toString());
-			callback.onError(BleErrors.ERROR_WRONG_STATE);
-			return;
-		}
+//		if (_connectionState != BleDeviceConnectionState.initialized) {
+//			getLogger().LOGe(TAG, "State is not initialized: %s", _connectionState.toString());
+//			callback.onError(BleErrors.ERROR_WRONG_STATE);
+//			return;
+//		}
 
-		_connectionState = BleDeviceConnectionState.scanning;
+//		_connectionState = BleDeviceConnectionState.scanning;
 
 		_bleBase.startEndlessScan(new IBleDeviceCallback() {
 			@Override
@@ -593,31 +611,7 @@ public class BleExt extends Logging implements IWriteCallback {
 
 			_connectionState = BleDeviceConnectionState.connecting;
 
-//			IDataCallback connectCallback = new IDataCallback() {
-//				@Override
-//				public void onData(JSONObject json) {
-//					String status = BleCore.getStatus(json);
-//					if (status == "connected") {
-//						onConnect();
-//						callback.onSuccess();
-//					} else {
-//						getLogger().LOGe(TAG, "wrong status received: %s", status);
-//						_connectionState = BleDeviceConnectionState.initialized;
-//						callback.onError(BleErrors.ERROR_CONNECT_FAILED);
-//					}
-//				}
-//
-//				@Override
-//				public void onError(int error) {
-//					_connectionState = BleDeviceConnectionState.initialized;
-//
-//					if (!retry(error)) {
-//						callback.onError(error);
-//					} else {
-//						connect(address, callback);
-//					}
-//				}
-//			};
+
 			IStatusCallback connectCallback = new IStatusCallback() {
 				@Override
 				public void onSuccess() {
@@ -1501,18 +1495,16 @@ public class BleExt extends Logging implements IWriteCallback {
 	 * @return true if device is connected, false otherwise
 	 */
 	public boolean isConnected(IBaseCallback callback) {
-//		if (checkConnectionState(BleDeviceConnectionState.connected, callback)) {
 		if (checkConnectionState(BleDeviceConnectionState.connected, null) &&
 				_bleBase.isDeviceConnected(_targetAddress)) {
 			return true;
-		} else {
+		}
+		else {
 			if (callback != null) {
 				callback.onError(BleErrors.ERROR_NOT_CONNECTED);
 			}
 			return false;
 		}
-//		}
-//		return false;
 	}
 
 	/**
@@ -1530,7 +1522,7 @@ public class BleExt extends Logging implements IWriteCallback {
 			case connected:
 			case disconnecting: {
 				if (callback != null) {
-					getLogger().LOGd(TAG, "disconnecting..");
+					getLogger().LOGd(TAG, "not disconnected: ", _connectionState.toString());
 					callback.onError(BleErrors.ERROR_WRONG_STATE);
 				}
 				return false;
@@ -1540,25 +1532,25 @@ public class BleExt extends Logging implements IWriteCallback {
 		}
 	}
 
-	/**
-	 * Check if ble is initialized: ready to be used to connect or to start scanning.
-	 * This means it will also return false when it currently is connecting, connected, disconnecting or scanning.
-	 *
-	 * @param callback callback to be notified with an error if we are not disconnected. provide
-	 *                 null if no notification is necessary, in which case the return value
-	 *                 should be enough.
-	 * @return true when initialized, false when uninitialized, connecting, connected, disconnecting, or scanning
-	 */
-	public boolean isInitialized(IBaseCallback callback) {
-		if (checkConnectionState(BleDeviceConnectionState.initialized, null)) {
-			return true;
-		} else {
-			if (callback != null) {
-				callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
-			}
-			return false;
-		}
-	}
+//	/**
+//	 * Check if ble is initialized: ready to be used to connect or to start scanning.
+//	 * This means it will also return false when it currently is connecting, connected, disconnecting or scanning.
+//	 *
+//	 * @param callback callback to be notified with an error if we are not disconnected. provide
+//	 *                 null if no notification is necessary, in which case the return value
+//	 *                 should be enough.
+//	 * @return true when initialized, false when uninitialized, connecting, connected, disconnecting, or scanning
+//	 */
+//	public boolean isInitialized(IBaseCallback callback) {
+//		if (checkConnectionState(BleDeviceConnectionState.initialized, null)) {
+//			return true;
+//		} else {
+//			if (callback != null) {
+//				callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
+//			}
+//			return false;
+//		}
+//	}
 
 	/**
 	 * Helper function to check if we are already / still connected, and if a delayed disconnect is

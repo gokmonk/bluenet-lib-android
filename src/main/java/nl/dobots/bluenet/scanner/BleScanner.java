@@ -30,6 +30,7 @@ public class BleScanner {
 	// Cache
 	private Context            _context = null;
 	private Activity           _activity = null;
+	private boolean            _runInBackground = false;
 
 	private boolean _initialized = false;
 	private StatusSingleCallback _initCallback = new StatusSingleCallback();
@@ -39,6 +40,7 @@ public class BleScanner {
 	private int                _scanDuration;
 	private int                _scanPause;
 	private BleDeviceFilter    _scanFilter;
+	private int                _scanMode;
 
 	// Without service
 	private boolean            _initializedScanner = false;
@@ -151,20 +153,42 @@ public class BleScanner {
 		deinitScanner();
 	}
 
+	/**
+	 * @return Whether the scanner was initialized.
+	 */
+	public boolean isInitialized() {
+		return _initialized;
+	}
+
+	public void checkReady(boolean makeReady, boolean runInBackground, Activity activity, final IStatusCallback callback) {
+		if (!_initialized) {
+			if (makeReady) {
+				init(runInBackground, activity, null, null, callback);
+			}
+			return;
+		}
+		getIntervalScanner().checkReady(makeReady, activity, callback);
+	}
 
 	/**
 	 * Start scanning.
 	 */
-	public void startScanning() {
+	public void startScanning(@Nullable final IStatusCallback callback) {
 		getIntervalScanner().startIntervalScan(new IStatusCallback() {
 			@Override
 			public void onSuccess() {
 				BleLog.getInstance().LOGi(TAG, "Started scanning");
+				if (callback != null) {
+					callback.onSuccess();
+				}
 			}
 
 			@Override
 			public void onError(int error) {
 				BleLog.getInstance().LOGe(TAG, "Failed to start scanning: " + error);
+				if (callback != null) {
+					callback.onError(error);
+				}
 			}
 		});
 	}
@@ -197,6 +221,24 @@ public class BleScanner {
 		if (scanner != null) {
 			scanner.setScanFilter(deviceFilter);
 		}
+	}
+
+	/**
+	 * @see BleIntervalScanner#setScanMode(int)
+	 */
+	public void setScanMode(int scanMode) {
+		_scanMode = scanMode;
+		BleIntervalScanner scanner = getScanner();
+		if (scanner != null) {
+			scanner.setScanMode(scanMode);
+		}
+	}
+
+	/**
+	 * @see BleIntervalScanner#getScanMode()
+	 */
+	public int getScanmode() {
+		return getScanner().getScanMode();
 	}
 
 	/**
@@ -412,6 +454,7 @@ public class BleScanner {
 		_scanDuration = scanner.getScanDuration();
 		_scanPause =    scanner.getScanPause();
 		_scanFilter =   scanner.getScanFilter();
+		_scanMode =     scanner.getScanMode();
 	}
 
 	// Apply the settings from cache to a scanner.
@@ -421,6 +464,7 @@ public class BleScanner {
 		}
 		scanner.setScanInterval(_scanDuration, _scanPause);
 		scanner.setScanFilter(_scanFilter);
+		scanner.setScanMode(_scanMode);
 	}
 
 	// Register cached listeners.

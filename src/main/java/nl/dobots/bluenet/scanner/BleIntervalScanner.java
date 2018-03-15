@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Locale;
 
 import nl.dobots.bluenet.ble.cfg.BleErrors;
+import nl.dobots.bluenet.ble.core.BleCore;
 import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.extended.BleDeviceFilter;
 import nl.dobots.bluenet.ble.extended.BleExt;
@@ -119,6 +120,13 @@ public class BleIntervalScanner {
 			_ble.stopScan(null); // don' t care if it worked or not, so don' t need a callback
 		}
 		_ble.destroy();
+	}
+
+	/**
+	 * @see BleExt#checkScannerReady(boolean, Activity, IStatusCallback)
+	 */
+	public void checkReady(final boolean makeReady, @Nullable final Activity activity, final IStatusCallback callback) {
+		_ble.checkScannerReady(makeReady, activity, callback);
 	}
 
 	/**
@@ -271,6 +279,20 @@ public class BleIntervalScanner {
 		return _ble.getScanFilter();
 	}
 
+	/**
+	 * @see BleCore#setScanMode(int)
+	 */
+	public void setScanMode(int scanMode) {
+		_ble.getBleBase().setScanMode(scanMode);
+	}
+
+	/**
+	 * @see BleCore#getScanMode()
+	 */
+	public int getScanMode() {
+		return _ble.getBleBase().getScanMode();
+	}
+
 
 
 	/**
@@ -355,6 +377,7 @@ public class BleIntervalScanner {
 					getLogger().LOGi(TAG, "Bluetooth turned on");
 
 					if (_ble.getBleBase().isScannerReady()) {
+						getLogger().LOGi(TAG, "running=" + _running + " wasRunning=" + _wasRunning);
 						if (_running || _wasRunning) {
 							_running = true;
 							_intervalScanHandler.removeCallbacksAndMessages(null);
@@ -372,6 +395,7 @@ public class BleIntervalScanner {
 					// if bluetooth was turned off and scanning is enabled, issue a notification that present
 					// detection won't work without BLE ...
 					if (_running) {
+						getLogger().LOGi(TAG, "Set waRunning to true");
 						_wasRunning = true;
 						stopIntervalScan();
 					}

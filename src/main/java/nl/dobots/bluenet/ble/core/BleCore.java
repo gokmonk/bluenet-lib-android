@@ -74,7 +74,7 @@ public class BleCore extends Logging {
 	private static final int LOG_LEVEL = Log.VERBOSE;
 
 	// Timeout for a bluetooth enable request. If timeout expires, an error is created.
-	private static final int BLUETOOTH_ENABLE_TIMEOUT = 30000;
+	private static final int BLUETOOTH_ENABLE_TIMEOUT = 5000;
 
 	// Timeout for a location service enable request. If timeout expires, en error is created.
 	private static final int LOCATION_SERVICE_ENABLE_TIMEOUT = 30000;
@@ -1098,16 +1098,19 @@ public class BleCore extends Logging {
 	 * Check if bluetooth is ready to be used.
 	 * Optionally: If not ready, then request user for it.
 	 *
-	 * @param requestEnable True when the user may be requested to enable bluetooth.
+	 * @param makeReady     Set to true when bluetooth should be made ready. This also means
+	 *                      the user may be requested to enable bluetooth and location services.
 	 * @param activity      Optional: activity for the request, else a cached activity is used.
 	 *                      It's best when this activity has Activity.onActivityResult() implemented,
 	 *                      and from there call BleCore.handleActivityResult().
 	 *                      Otherwise, a timeout is used to check the result.
 	 * @param callback      The callback to be notified about whether bluetooth is ready.
 	 */
-	public void checkBluetoothReady(boolean requestEnable, @Nullable final Activity activity, final IStatusCallback callback) {
+	public void checkBluetoothReady(boolean makeReady, @Nullable final Activity activity, final IStatusCallback callback) {
 		if (!isBluetoothInitialized()) {
-			// TODO: maybe init instead?
+			if (makeReady) {
+				initBluetooth(activity, callback);
+			}
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return;
 		}
@@ -1115,14 +1118,15 @@ public class BleCore extends Logging {
 			callback.onSuccess();
 			return;
 		}
-		checkBluetoothEnabled(requestEnable, activity, callback);
+		checkBluetoothEnabled(makeReady, activity, callback);
 	}
 
 	/**
 	 * Check if scanner is ready to be used.
 	 * Optionally: If not ready, then request user for it.
 	 *
-	 * @param requestEnable True when the user may be requested to enable bluetooth and location services.
+	 * @param makeReady     Set to true when the scanner should be made ready. This also means
+	 *                      the user may be requested to enable bluetooth and location services.
 	 * @param activity      Optional: activity for the request, else a cached activity is used.
 	 *                      It's best when this activity has Activity.onActivityResult() implemented,
 	 *                      and from there call BleCore.handleActivityResult().
@@ -1131,9 +1135,12 @@ public class BleCore extends Logging {
 	 *                      Otherwise, a timeout is used to check the result.
 	 * @param callback The callback to be notified about whether the scanner is ready.
 	 */
-	public void checkScannerReady(final boolean requestEnable, @Nullable final Activity activity, final IStatusCallback callback) {
+	public void checkScannerReady(final boolean makeReady, @Nullable final Activity activity, final IStatusCallback callback) {
 		if (!isScannerInitialized()) {
-			// TODO: maybe init instead?
+			if (makeReady) {
+				initScanner(activity, callback);
+				return;
+			}
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return;
 		}
@@ -1141,11 +1148,10 @@ public class BleCore extends Logging {
 			callback.onSuccess();
 			return;
 		}
-		checkBluetoothEnabled(requestEnable, activity, new IStatusCallback() {
+		checkBluetoothEnabled(makeReady, activity, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
-				// No need to pass on the activity, as it's cached.
-				checkLocationServicesEnabled(requestEnable, null, callback);
+				checkLocationServicesEnabled(makeReady, activity, callback);
 			}
 
 			@Override
@@ -2542,9 +2548,9 @@ public class BleCore extends Logging {
 
 		if (isScanning()) {
 			//TODO: register another callback?
-			getLogger().LOGe(TAG, "already scanning");
-			callback.onError(BleErrors.ERROR_ALREADY_SCANNING);
-			return;
+			getLogger().LOGw(TAG, "already scanning");
+//			callback.onError(BleErrors.ERROR_ALREADY_SCANNING);
+//			return;
 		}
 
 		_scanCallback = callback;
@@ -2627,6 +2633,9 @@ public class BleCore extends Logging {
 //			return;
 //		}
 
+		_scanCallback = null;
+		_scanning = false;
+
 		// TODO: just call it a success?
 		if (!isScannerReady()) {
 			getLogger().LOGe(TAG, "not ready");
@@ -2635,9 +2644,6 @@ public class BleCore extends Logging {
 		}
 
 		_leScanner.stopScan(_coreScanCallback);
-
-		_scanCallback = null;
-		_scanning = false;
 
 		if (callback != null) {
 			callback.onSuccess();
@@ -2666,6 +2672,13 @@ public class BleCore extends Logging {
 				.setScanMode(mode)
 				.build();
 		_scanMode = mode;
+	}
+
+	/**
+	 * @return Current scan mode, see {@link ScanSettings}
+	 */
+	public int getScanMode() {
+		return _scanMode;
 	}
 
 	/**
