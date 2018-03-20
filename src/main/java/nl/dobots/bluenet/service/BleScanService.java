@@ -84,11 +84,12 @@ public class BleScanService extends Service {
 	@Override
 	public void onCreate() {
 		super.onCreate();
-		getLogger().LOGi(TAG, "Create scan service");
 
 		INSTANCE = this;
 
+		// Create logger before logging anything.
 		_logger = new BleLog(LOG_LEVEL);
+		getLogger().LOGi(TAG, "Create scan service");
 		_scanner = new BleIntervalScanner();
 //		_ble = new BleExt();
 //		_ble.setLogger(_logger);
