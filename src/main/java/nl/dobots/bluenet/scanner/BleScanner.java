@@ -52,6 +52,8 @@ public class BleScanner {
 	private BleIntervalScanner _scanServiceScanner = null;
 	private Notification       _notification = null;
 	private Integer            _notificationId = null;
+	// Used to cache whether to init scanner with makeReady.
+	private boolean            _makeScanServiceReady = false;
 
 	// Listeners
 	private ArrayList<ScanDeviceListener> _scanDeviceListeners = new ArrayList<>();
@@ -61,6 +63,8 @@ public class BleScanner {
 	/**
 	 * Initialize the scanner.
 	 *
+	 * @param makeReady       Set to true when the scanner should be made ready. This also means
+	 *                        the user may be requested to enable bluetooth and location services.
 	 * @param runInBackground Whether to run the scanner in the background.
 	 * @param activity        The activity required to use bluetooth, ask for permission, etc.
 	 *                        It's best when this activity has Activity.onActivityResult() implemented,
@@ -71,7 +75,7 @@ public class BleScanner {
 	 * @param notificationId  Id of the notification.
 	 * @param callback        The callback to be notified about success or failure.
 	 */
-	public void init(boolean runInBackground, Activity activity, @Nullable Notification notification, @Nullable Integer notificationId, final IStatusCallback callback) {
+	public void init(boolean makeReady, boolean runInBackground, Activity activity, @Nullable Notification notification, @Nullable Integer notificationId, final IStatusCallback callback) {
 		if (_initialized) {
 			BleLog.getInstance().LOGe(TAG, "Already initialized");
 			callback.onSuccess();
@@ -108,10 +112,10 @@ public class BleScanner {
 		}
 
 		if (runInBackground) {
-			initScanService(notification, notificationId);
+			initScanService(makeReady, notification, notificationId);
 		}
 		else {
-			initScanner();
+			initScanner(makeReady);
 		}
 
 	}
@@ -120,12 +124,14 @@ public class BleScanner {
 	/**
 	 * Change whether to run scanner in background.
 	 *
+	 * @param makeReady       Set to true when the scanner should be made ready. This also means
+	 *                        the user may be requested to enable bluetooth and location services.
 	 * @param enable          Whether to run the scanner in the background.
 	 * @param notification    Required to run in the background.
 	 * @param notificationId  Id of the notification.
 	 * @param callback        The callback to be notified about success or failure.
 	 */
-	public void runInBackground(boolean enable, @Nullable Notification notification, @Nullable Integer notificationId, IStatusCallback callback) {
+	public void runInBackground(boolean makeReady, boolean enable, @Nullable Notification notification, @Nullable Integer notificationId, IStatusCallback callback) {
 		if (!_initialized) {
 			BleLog.getInstance().LOGe(TAG, "Not initialized");
 			return;
@@ -137,11 +143,11 @@ public class BleScanner {
 		}
 		if (enable && !_initializedScanService) {
 			deinitScanner();
-			initScanService(notification, notificationId);
+			initScanService(makeReady, notification, notificationId);
 		}
 		else if (!enable && !_initializedScanner) {
 			deinitScanService();
-			initScanner();
+			initScanner(makeReady);
 		}
 	}
 
@@ -160,21 +166,41 @@ public class BleScanner {
 		return _initialized;
 	}
 
-	public void checkReady(boolean makeReady, boolean runInBackground, Activity activity, final IStatusCallback callback) {
-		if (!_initialized) {
-			if (makeReady) {
-				init(runInBackground, activity, null, null, callback);
+	public void checkReady(boolean makeReady, boolean runInBackground, @Nullable Activity activity, @Nullable final IStatusCallback callback) {
+		IStatusCallback checkCallback = new IStatusCallback() {
+			@Override
+			public void onSuccess() {
+				if (callback != null) {
+					callback.onSuccess();
+				}
 			}
-			return;
+
+			@Override
+			public void onError(int error) {
+				if (callback != null) {
+					callback.onError(error);
+				}
+			}
+		};
+
+		if (!_initialized) {
+//			if (makeReady) {
+				init(makeReady, runInBackground, activity, null, null, checkCallback);
+				return;
+//			}
+//			else {
+//				callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
+//			}
 		}
-		getIntervalScanner().checkReady(makeReady, activity, callback);
+		getIntervalScanner().checkReady(makeReady, activity, checkCallback);
 	}
 
 	/**
 	 * Start scanning.
+	 * Should be done after init.
 	 */
 	public void startScanning(@Nullable final IStatusCallback callback) {
-		getIntervalScanner().startIntervalScan(new IStatusCallback() {
+		getScanner().startIntervalScan(new IStatusCallback() {
 			@Override
 			public void onSuccess() {
 				BleLog.getInstance().LOGi(TAG, "Started scanning");
@@ -195,13 +221,15 @@ public class BleScanner {
 
 	/**
 	 * Stop scanning.
+	 * Should be done after init.
 	 */
 	public void stopScanning() {
-		getIntervalScanner().stopIntervalScan();
+		getScanner().stopIntervalScan();
 	}
 
 	/**
 	 * @see BleIntervalScanner#setScanInterval(int, int)
+	 * Should be done after init.
 	 */
 	public void setScanInterval(int scanDuration, int scanPause) {
 		_scanDuration = scanDuration;
@@ -214,6 +242,7 @@ public class BleScanner {
 
 	/**
 	 * @see BleIntervalScanner#setScanFilter(BleDeviceFilter)
+	 * Should be done after init.
 	 */
 	public void setScanFilter(BleDeviceFilter deviceFilter) {
 		_scanFilter = deviceFilter;
@@ -225,6 +254,7 @@ public class BleScanner {
 
 	/**
 	 * @see BleIntervalScanner#setScanMode(int)
+	 * Should be done after init.
 	 */
 	public void setScanMode(int scanMode) {
 		_scanMode = scanMode;
@@ -236,6 +266,7 @@ public class BleScanner {
 
 	/**
 	 * @see BleIntervalScanner#getScanMode()
+	 * Should be done after init.
 	 */
 	public int getScanmode() {
 		return getScanner().getScanMode();
@@ -324,9 +355,9 @@ public class BleScanner {
 
 
 
-	private void initScanner() {
+	private void initScanner(boolean makeReady) {
 		_intervalScanner = new BleIntervalScanner();
-		_intervalScanner.init(_activity, new IStatusCallback() {
+		_intervalScanner.init(makeReady, _activity, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
 //				_intervalScanner.registerEventListener(BleScanner.this);
@@ -353,7 +384,7 @@ public class BleScanner {
 		}
 	}
 
-	private void initScanService(@Nullable Notification notification, @Nullable Integer notificationId) {
+	private void initScanService(boolean makeReady, @Nullable Notification notification, @Nullable Integer notificationId) {
 		// Cache notification
 		if (notification != null) {
 			_notification = notification;
@@ -363,6 +394,7 @@ public class BleScanner {
 		}
 
 		// create and bind to the BleScanService
+		_makeScanServiceReady = makeReady;
 		BleLog.getInstance().LOGi(TAG, "binding to service..");
 		Intent intent = new Intent(_context, BleScanService.class);
 //		intent.putExtra(BleScanService.EXTRA_LOG_LEVEL, );
@@ -389,7 +421,7 @@ public class BleScanner {
 			// get the service from the binder
 			BleScanService.BleScanBinder binder = (BleScanService.BleScanBinder) service;
 			_scanService = binder.getService();
-			_scanService.init(_activity, new IStatusCallback() {
+			_scanService.init(_makeScanServiceReady, _activity, new IStatusCallback() {
 				@Override
 				public void onSuccess() {
 					_scanServiceScanner = _scanService.getScanner();

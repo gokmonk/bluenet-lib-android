@@ -90,12 +90,12 @@ public class BleIntervalScanner {
 	}
 
 	/**
-	 * @see BleExt#init(Activity, IStatusCallback)
+	 * @see BleExt#init(boolean, Activity, IStatusCallback)
 	 */
-	public void init(@Nullable Activity activity, final IStatusCallback callback) {
+	public void init(boolean makeReady, @Nullable Activity activity, final IStatusCallback callback) {
 		getLogger().LOGi(TAG, "init");
 
-		_ble.init(activity, new IStatusCallback() {
+		_ble.init(makeReady, activity, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
 				getLogger().LOGi(TAG, "Successfully initialized");

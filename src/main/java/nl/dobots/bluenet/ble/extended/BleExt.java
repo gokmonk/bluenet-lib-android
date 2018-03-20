@@ -299,10 +299,10 @@ public class BleExt extends Logging implements IWriteCallback {
 	}
 
 	/**
-	 * @see BleCore#init(Activity, IStatusCallback)
+	 * @see BleCore#init(boolean, Activity, IStatusCallback)
 	 */
-	public void init(Activity activity, final IStatusCallback callback) {
-		_bleBase.init(activity, new IStatusCallback() {
+	public void init(boolean makeReady, Activity activity, final IStatusCallback callback) {
+		_bleBase.init(makeReady, activity, new IStatusCallback() {
 					@Override
 					public void onSuccess() {
 						_connectionState = BleDeviceConnectionState.initialized;

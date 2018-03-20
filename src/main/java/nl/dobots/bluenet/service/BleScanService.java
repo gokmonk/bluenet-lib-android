@@ -96,10 +96,10 @@ public class BleScanService extends Service {
 	}
 
 	/**
-	 * @see BleIntervalScanner#init(Activity, IStatusCallback)
+	 * @see BleIntervalScanner#init(boolean, Activity, IStatusCallback)
 	 */
-	public void init(@Nullable Activity activity, final IStatusCallback callback) {
-		_scanner.init(activity, callback);
+	public void init(boolean makeReady, @Nullable Activity activity, final IStatusCallback callback) {
+		_scanner.init(makeReady, activity, callback);
 	}
 
 	@Override

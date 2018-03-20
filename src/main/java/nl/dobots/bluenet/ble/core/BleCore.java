@@ -438,27 +438,31 @@ public class BleCore extends Logging {
 	 * Initializes the bluetooth, but not the scanner.
 	 * Checks if bluetooth is on and if bluetooth permissions are there.
 	 *
-	 * @param activity The activity required to use bluetooth, ask for permission, etc.
-	 *                 It's best when this activity has Activity.onActivityResult() implemented,
-	 *                 and from there call BleCore.handleActivityResult().
-	 * @param callback The callback to be notified about success or failure.
+	 * @param makeReady Set to true when bluetooth should be made ready. This also means
+	 *                  the user may be requested to enable bluetooth.
+	 * @param activity  The activity required to use bluetooth, ask for permission, etc.
+	 *                  It's best when this activity has Activity.onActivityResult() implemented,
+	 *                  and from there call BleCore.handleActivityResult().
+	 * @param callback  The callback to be notified about success or failure.
 	 */
-	public void initBluetooth(Activity activity, IStatusCallback callback) {
+	public void initBluetooth(boolean makeReady, Activity activity, IStatusCallback callback) {
 		if (!_initializeBluetoothCallback.setCallback(callback)) {
 			callback.onError(BleErrors.ERROR_BUSY);
 		}
-		initBluetooth(activity);
+		initBluetooth(makeReady, activity);
 	}
 
 	/**
 	 * Initializes the bluetooth, but not the scanner.
 	 * Checks if bluetooth is on and if bluetooth permissions are there.
 	 *
-	 * @param activity The activity required to use bluetooth, ask for permission, etc.
-	 *                 It's best when this activity has Activity.onActivityResult() implemented,
-	 *                 and from there call BleCore.handleActivityResult().
+	 * @param makeReady Set to true when bluetooth should be made ready. This also means
+	 *                  the user may be requested to enable bluetooth.
+	 * @param activity  The activity required to use bluetooth, ask for permission, etc.
+	 *                  It's best when this activity has Activity.onActivityResult() implemented,
+	 *                  and from there call BleCore.handleActivityResult().
 	 */
-	private void initBluetooth(Activity activity) {
+	private void initBluetooth(boolean makeReady, Activity activity) {
 		getLogger().LOGi(TAG, "initBluetooth");
 
 		if (_bluetoothInitialized) {
@@ -492,7 +496,7 @@ public class BleCore extends Logging {
 		}
 
 		// Check if bluetooth is enabled, else request
-		checkBluetoothEnabled(true, activity, new IStatusCallback() {
+		checkBluetoothEnabled(makeReady, activity, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
 				getLogger().LOGi(TAG, "Bluetooth initialized");
@@ -513,31 +517,35 @@ public class BleCore extends Logging {
 	 * Initializes the bluetooth scanner.
 	 * Checks if bluetooth and location services are on, and if permissions are there.
 	 *
-	 * @param activity The activity required to use bluetooth, ask for permission, etc.
-	 *                 It's best when this activity has Activity.onActivityResult() implemented,
-	 *                 and from there call BleCore.handleActivityResult().
-	 *                 Also this activity should best have Activity.onRequestPermissionsResult() implemented,
-	 *                 and from there call BleCore.handlePermissionResult().
-	 * @param callback The callback to be notified about success or failure.
+	 * @param makeReady Set to true when the scanner should be made ready. This also means
+	 *                  the user may be requested to enable bluetooth and location services.
+	 * @param activity  The activity required to use bluetooth, ask for permission, etc.
+	 *                  It's best when this activity has Activity.onActivityResult() implemented,
+	 *                  and from there call BleCore.handleActivityResult().
+	 *                  Also this activity should best have Activity.onRequestPermissionsResult() implemented,
+	 *                  and from there call BleCore.handlePermissionResult().
+	 * @param callback  The callback to be notified about success or failure.
 	 */
-	public void initScanner(Activity activity, final IStatusCallback callback) {
+	public void initScanner(boolean makeReady, Activity activity, final IStatusCallback callback) {
 		if (!_initializeScannerCallback.setCallback(callback)) {
 			callback.onError(BleErrors.ERROR_BUSY);
 		}
-		initScanner(activity);
+		initScanner(makeReady, activity);
 	}
 
 	/**
 	 * Initializes the bluetooth scanner.
 	 * Checks if bluetooth and location services are on, and if permissions are there.
 	 *
-	 * @param activity The activity required to use bluetooth, ask for permission, etc.
-	 *                 It's best when this activity has Activity.onActivityResult() implemented,
-	 *                 and from there call BleCore.handleActivityResult().
-	 *                 Also, this activity should best have Activity.onRequestPermissionsResult()
-	 *                 implemented, and from there call BleCore.handlePermissionResult().
+	 * @param makeReady Set to true when the scanner should be made ready. This also means
+	 *                  the user may be requested to enable bluetooth and location services.
+	 * @param activity  The activity required to use bluetooth, ask for permission, etc.
+	 *                  It's best when this activity has Activity.onActivityResult() implemented,
+	 *                  and from there call BleCore.handleActivityResult().
+	 *                  Also, this activity should best have Activity.onRequestPermissionsResult()
+	 *                  implemented, and from there call BleCore.handlePermissionResult().
 	 */
-	private void initScanner(final Activity activity) {
+	private void initScanner(final boolean makeReady, final Activity activity) {
 		getLogger().LOGi(TAG, "initScanner");
 
 		if (_scannerInitialized) {
@@ -546,11 +554,11 @@ public class BleCore extends Logging {
 			return;
 		}
 
-		initBluetooth(activity, new IStatusCallback() {
+		initBluetooth(makeReady, activity, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
 
-				checkLocationServicesPermissions(true, activity, new IStatusCallback() {
+				checkLocationServicesPermissions(makeReady, activity, new IStatusCallback() {
 					@Override
 					public void onSuccess() {
 
@@ -561,7 +569,7 @@ public class BleCore extends Logging {
 							_receiverRegisteredLocation = true;
 						}
 
-						checkLocationServicesEnabled(true, activity, new IStatusCallback() {
+						checkLocationServicesEnabled(makeReady, activity, new IStatusCallback() {
 							@Override
 							public void onSuccess() {
 								_leScanner = _bluetoothAdapter.getBluetoothLeScanner();
@@ -604,16 +612,18 @@ public class BleCore extends Logging {
 	 * Initializes bluetooth and scanner.
 	 * Checks if bluetooth and location services are on, and if permissions are there.
 	 *
-	 * @param activity The activity required to use bluetooth, ask for permission, etc.
-	 *                 It's best when this activity has Activity.onActivityResult() implemented,
-	 *                 and from there call BleCore.handleActivityResult().
-	 *                 Also, this activity should best have Activity.onRequestPermissionsResult()
-	 *                 implemented, and from there call BleCore.handlePermissionResult().
-	 * @param callback The callback to be notified about success or failure.
+	 * @param makeReady Set to true when the scanner should be made ready. This also means
+	 *                  the user may be requested to enable bluetooth and location services.
+	 * @param activity  The activity required to use bluetooth, ask for permission, etc.
+	 *                  It's best when this activity has Activity.onActivityResult() implemented,
+	 *                  and from there call BleCore.handleActivityResult().
+	 *                  Also, this activity should best have Activity.onRequestPermissionsResult()
+	 *                  implemented, and from there call BleCore.handlePermissionResult().
+	 * @param callback  The callback to be notified about success or failure.
 	 */
-	public void init(Activity activity, final IStatusCallback callback) {
+	public void init(boolean makeReady, Activity activity, final IStatusCallback callback) {
 		// initScanner also calls initBluetooth
-		initScanner(activity, callback);
+		initScanner(makeReady, activity, callback);
 	}
 
 
@@ -1099,7 +1109,7 @@ public class BleCore extends Logging {
 	 * Optionally: If not ready, then request user for it.
 	 *
 	 * @param makeReady     Set to true when bluetooth should be made ready. This also means
-	 *                      the user may be requested to enable bluetooth and location services.
+	 *                      the user may be requested to enable bluetooth.
 	 * @param activity      Optional: activity for the request, else a cached activity is used.
 	 *                      It's best when this activity has Activity.onActivityResult() implemented,
 	 *                      and from there call BleCore.handleActivityResult().
@@ -1109,7 +1119,7 @@ public class BleCore extends Logging {
 	public void checkBluetoothReady(boolean makeReady, @Nullable final Activity activity, final IStatusCallback callback) {
 		if (!isBluetoothInitialized()) {
 			if (makeReady) {
-				initBluetooth(activity, callback);
+				initBluetooth(makeReady, activity, callback);
 			}
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
 			return;
@@ -1138,7 +1148,7 @@ public class BleCore extends Logging {
 	public void checkScannerReady(final boolean makeReady, @Nullable final Activity activity, final IStatusCallback callback) {
 		if (!isScannerInitialized()) {
 			if (makeReady) {
-				initScanner(activity, callback);
+				initScanner(makeReady, activity, callback);
 				return;
 			}
 			callback.onError(BleErrors.ERROR_NOT_INITIALIZED);
