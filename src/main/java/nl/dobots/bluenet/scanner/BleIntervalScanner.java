@@ -140,10 +140,10 @@ public class BleIntervalScanner {
 	private Runnable _startScanRunnable = new Runnable() {
 		@Override
 		public void run() {
-//			if (isScanActive()) {
-//				getLogger().LOGw(TAG, "already scanning ...");
-//				return;
-//			}
+			if (isScanActive()) {
+				getLogger().LOGd(TAG, "already scanning");
+				return;
+			}
 
 			getLogger().LOGd(TAG, "starting scan interval ...");
 			_ble.startScan(false, new IBleDeviceCallback() {
@@ -171,6 +171,10 @@ public class BleIntervalScanner {
 //					_running = false; // TODO: why do we have to set it to false here? It breaks the retries.
 					getLogger().LOGe(TAG, "... scan interval start error: " + error);
 					boolean sendError = true;
+
+					if (error == ScanCallback.SCAN_FAILED_ALREADY_STARTED) {
+						sendError = false;
+					}
 
 					if (error == BleErrors.ERROR_ALREADY_SCANNING) {
 						// TODO: quickly stop AND start, right now it can take a long time to start again.
