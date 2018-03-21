@@ -29,7 +29,6 @@ public class BleErrors {
 	public static final int ERROR_WRONG_LENGTH_PARAMETER = 217;
 	public static final int ERROR_EMPTY_VALUE = 218;
 	public static final int ERROR_BLUETOOTH_INITIALIZATION_CANCELLED = 219;
-	public static final int ERROR_BLUETOOTH_TURNED_OFF = 220;
 	public static final int ERROR_BLUETOOTH_NOT_ENABLED = 221;
 	public static final int ERROR_DISCONNECT_FAILED = 222;
 	public static final int ERROR_NO_ADDRESS_PROVIDED = 223;
@@ -51,7 +50,6 @@ public class BleErrors {
 	public static final int ERROR_NOT_IN_RECOVERY_MODE = 239;
 	public static final int ERROR_LOCATION_SERVICES_NOT_ENABLED = 240;
 	public static final int ERROR_VALIDATION_FAILED = 241;
-	public static final int ERROR_LOCATION_SERVICES_TURNED_OFF = 242;
 	public static final int ERROR_WRONG_PARAMETERS = 243;
 	public static final int ERROR_WRONG_PAYLOAD_SIZE = 244;
 	public static final int ERROR_MSG_PARSING = 245;
@@ -66,6 +64,7 @@ public class BleErrors {
     public static final int ERROR_DESCRIPTOR_WRITE_FAILED = 253;
     public static final int ERROR_NO_CONTEXT = 254;
 	public static final int ERROR_NOT_READY = 255;
+	public static final int ERROR_NO_NOTIFICATION = 256;
 
 
 

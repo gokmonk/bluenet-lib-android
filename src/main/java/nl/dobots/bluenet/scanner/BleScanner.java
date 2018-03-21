@@ -15,6 +15,7 @@ import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.core.callbacks.StatusSingleCallback;
 import nl.dobots.bluenet.ble.extended.BleDeviceFilter;
+import nl.dobots.bluenet.ble.extended.BleExt;
 import nl.dobots.bluenet.ble.extended.callbacks.EventListener;
 import nl.dobots.bluenet.scanner.callbacks.ScanBeaconListener;
 import nl.dobots.bluenet.scanner.callbacks.ScanDeviceListener;
@@ -81,6 +82,17 @@ public class BleScanner {
 			callback.onSuccess();
 			return;
 		}
+
+		// Cache notification.
+		// Do this before any return, or else the notification is not cached
+		// as in checkReady the notification is no parameter.
+		if (notification != null) {
+			_notification = notification;
+		}
+		if (notificationId != null) {
+			_notificationId = notificationId;
+		}
+
 		if (activity == null || activity.isDestroyed()) {
 			BleLog.getInstance().LOGe(TAG, "Missing activity");
 			callback.onError(BleErrors.ERROR_NO_CONTEXT);
@@ -112,7 +124,7 @@ public class BleScanner {
 		}
 
 		if (runInBackground) {
-			initScanService(makeReady, notification, notificationId);
+			initScanService(makeReady);
 		}
 		else {
 			initScanner(makeReady);
@@ -143,7 +155,7 @@ public class BleScanner {
 		}
 		if (enable && !_initializedScanService) {
 			deinitScanner();
-			initScanService(makeReady, notification, notificationId);
+			initScanService(makeReady);
 		}
 		else if (!enable && !_initializedScanner) {
 			deinitScanService();
@@ -384,23 +396,20 @@ public class BleScanner {
 		}
 	}
 
-	private void initScanService(boolean makeReady, @Nullable Notification notification, @Nullable Integer notificationId) {
-		// Cache notification
-		if (notification != null) {
-			_notification = notification;
-		}
-		if (notificationId != null) {
-			_notificationId = notificationId;
+	private void initScanService(boolean makeReady) {
+		if (_notification == null || _notificationId == null) {
+			_initCallback.reject(BleErrors.ERROR_NO_NOTIFICATION);
+			return;
 		}
 
 		// create and bind to the BleScanService
 		_makeScanServiceReady = makeReady;
-		BleLog.getInstance().LOGi(TAG, "binding to service..");
+		BleLog.getInstance().LOGi(TAG, "Binding to ble scan service");
 		Intent intent = new Intent(_context, BleScanService.class);
 //		intent.putExtra(BleScanService.EXTRA_LOG_LEVEL, );
 //		intent.putExtra(BleScanService.EXTRA_FILE_LOG_LEVEL, );
 		boolean success = _context.bindService(intent, _serviceConnection, Context.BIND_AUTO_CREATE);
-		BleLog.getInstance().LOGi(TAG, "successfully bound to service: " + success);
+		BleLog.getInstance().LOGi(TAG, "Successfully bound to service: " + success);
 	}
 
 	private void deinitScanService() {
@@ -417,7 +426,7 @@ public class BleScanner {
 	private ServiceConnection _serviceConnection = new ServiceConnection() {
 		@Override
 		public void onServiceConnected(ComponentName name, IBinder service) {
-			BleLog.getInstance().LOGi(TAG, "connected to ble scan service ...");
+			BleLog.getInstance().LOGi(TAG, "Connected to ble scan service ...");
 			// get the service from the binder
 			BleScanService.BleScanBinder binder = (BleScanService.BleScanBinder) service;
 			_scanService = binder.getService();
