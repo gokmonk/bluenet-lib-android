@@ -77,10 +77,10 @@ public class BleCore extends Logging {
 	private static final int BLUETOOTH_ENABLE_TIMEOUT = 5000;
 
 	// Timeout for a location service enable request. If timeout expires, en error is created.
-	private static final int LOCATION_SERVICE_ENABLE_TIMEOUT = 30000;
+	private static final int LOCATION_SERVICE_ENABLE_TIMEOUT = 10000;
 
 	// Timeout for a location permission request. If timeout expires, en error is created.
-	private static final int LOCATION_PERMISSION_TIMEOUT = 30000;
+	private static final int LOCATION_PERMISSION_TIMEOUT = 5000;
 
 	// The permission request code for requesting location (required for ble scanning).
 	private static final int REQ_CODE_PERMISSIONS_LOCATION = 101;
