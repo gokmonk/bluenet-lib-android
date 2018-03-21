@@ -332,6 +332,7 @@ public class BleIntervalScanner {
 			getLogger().LOGi(TAG, "Stop scan");
 			_intervalScanHandler.removeCallbacksAndMessages(null);
 			_running = false;
+			_scanning = false;
 			_ble.stopScan(new IStatusCallback() {
 				@Override
 				public void onSuccess() {
