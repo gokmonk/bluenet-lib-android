@@ -4,6 +4,7 @@ import nl.dobots.bluenet.ble.base.BleBase;
 import nl.dobots.bluenet.ble.base.BleConfiguration;
 import nl.dobots.bluenet.ble.base.callbacks.IExecStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IProgressCallback;
+import nl.dobots.bluenet.ble.base.structs.SetupPacket;
 import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.SimpleExecStatusCallback;
 import nl.dobots.bluenet.ble.base.structs.ControlMsg;
@@ -210,7 +211,26 @@ public class CrownstoneSetup {
 
 					_cancel = false;
 
-					setupStep(1);
+//					setupStep(1);
+
+					SetupPacket setupPacket = new SetupPacket(0, crownstoneId, adminKey, memberKey, guestKey, meshAccessAddress, iBeaconUuid, iBeaconMajor, iBeaconMinor);
+					byte[] payload = setupPacket.toArray();
+
+					ControlMsg controlMsg = new ControlMsg(BluenetConfig.CMD_SETUP, payload.length, payload);
+					_bleExt.writeControl(controlMsg, new IStatusCallback() {
+						@Override
+						public void onSuccess() {
+							_bleExt.getLogger().LOGi(TAG, "success");
+							// Clear cache, as we know that the services will change.
+							_bleExt.disconnectAndClose(true, _statusCallback);
+						}
+
+						@Override
+						public void onError(int error) {
+							_bleExt.getLogger().LOGi(TAG, "error: " + error);
+							_statusCallback.onError(error);
+						}
+					});
 				}
 			}, 500);
 		}
