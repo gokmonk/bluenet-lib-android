@@ -2702,13 +2702,13 @@ public class BleCore extends Logging {
 
 		// Careful: sometimes a scan result is still received after scanning has been stopped.
 		if (_scanCallback != null) {
-			_scanning = true;
+			_scanning = true; // TODO: Is it smart then, to set it to true here?
 
 			JSONObject scanResult = new JSONObject();
 			addDeviceInfo(scanResult, device);
 			addProperty(scanResult, BleCoreTypes.PROPERTY_RSSI, rssi);
 			addBytes(scanResult, BleCoreTypes.PROPERTY_ADVERTISEMENT, scanRecord);
-			setStatus(scanResult, BleCoreTypes.PROPERTY_SCAN_RESULT);
+			setStatus(scanResult, BleCoreTypes.PROPERTY_SCAN_RESULT); // TODO: when is this used?
 
 			_scanCallback.onData(scanResult);
 		}

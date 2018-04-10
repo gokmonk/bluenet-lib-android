@@ -14,6 +14,7 @@ import java.util.UUID;
 import nl.dobots.bluenet.ble.base.structs.CrownstoneServiceData;
 import nl.dobots.bluenet.ble.cfg.BleTypes;
 //import nl.dobots.bluenet.utils.BleLog;
+import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.utils.BleLog;
 import nl.dobots.bluenet.utils.BleUtils;
 
@@ -138,19 +139,20 @@ public class BleDevice {
 			_proximityUuid = (UUID) json.get(BleTypes.PROPERTY_PROXIMITY_UUID);
 			_calibratedRssi = json.getInt(BleTypes.PROPERTY_CALIBRATED_RSSI);
 		}
-		if (isStone()) {
-			if (json.has(BleTypes.PROPERTY_SERVICE_DATA)) {
-				_serviceData = new CrownstoneServiceData(json.getString(BleTypes.PROPERTY_SERVICE_DATA));
-			} else {
-				_serviceData = new CrownstoneServiceData();
-			}
 
+		if (json.has(BleTypes.PROPERTY_SERVICE_DATA)) {
+//			_serviceData = new CrownstoneServiceData(json.getString(BleTypes.PROPERTY_SERVICE_DATA));
+			_serviceData = (CrownstoneServiceData)json.getJSONObject(BleTypes.PROPERTY_SERVICE_DATA);
 			if (_serviceData.isSetupMode()) {
 				_crownstoneMode = CrownstoneMode.setup;
 			} else {
 				_crownstoneMode = CrownstoneMode.normal;
 			}
 		}
+		else {
+			_serviceData = new CrownstoneServiceData();
+		}
+
 		if (json.has(BleTypes.PROPERTY_IS_DFU_MODE) && json.getBoolean(BleTypes.PROPERTY_IS_DFU_MODE)) {
 			_crownstoneMode = CrownstoneMode.dfu;
 //			// Force removal of service data?
@@ -214,19 +216,15 @@ public class BleDevice {
 	public boolean isDfuMode() { return _crownstoneMode == CrownstoneMode.dfu; }
 
 	private DeviceType determineDeviceType(JSONObject json) throws JSONException {
-		if (json.has(BleTypes.PROPERTY_IS_CROWNSTONE_PLUG)) {
-			if (json.getBoolean(BleTypes.PROPERTY_IS_CROWNSTONE_PLUG)) {
-				return DeviceType.crownstonePlug;
-			}
-		}
-		if (json.has(BleTypes.PROPERTY_IS_CROWNSTONE_BUILTIN)) {
-			if (json.getBoolean(BleTypes.PROPERTY_IS_CROWNSTONE_BUILTIN)) {
-				return DeviceType.crownstoneBuiltin;
-			}
-		}
-		if (json.has(BleTypes.PROPERTY_IS_GUIDESTONE)) {
-			if (json.getBoolean(BleTypes.PROPERTY_IS_GUIDESTONE)) {
-				return DeviceType.guidestone;
+		if (json.has(BleTypes.PROPERTY_SERVICE_DATA)) {
+			CrownstoneServiceData serviceData = (CrownstoneServiceData) json.getJSONObject(BleTypes.PROPERTY_SERVICE_DATA);
+			switch (serviceData.getDeviceType()) {
+				case BluenetConfig.DEVICE_CROWNSTONE_PLUG:
+					return DeviceType.crownstonePlug;
+				case BluenetConfig.DEVICE_GUIDESTONE:
+					return DeviceType.guidestone;
+				case BluenetConfig.DEVICE_CROWNSTONE_BUILTIN:
+					return DeviceType.crownstoneBuiltin;
 			}
 		}
 		if (json.has(BleTypes.PROPERTY_IS_IBEACON)) {

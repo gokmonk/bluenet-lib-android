@@ -10,8 +10,9 @@ import nl.dobots.bluenet.ble.core.BleCoreTypes;
  */
 public class BleTypes extends BleCoreTypes {
 
-	public static final String PROPERTY_IS_CROWNSTONE_PLUG = "isCrownstonePlug";
-	public static final String PROPERTY_IS_CROWNSTONE_BUILTIN = "isCrownstoneBuiltin";
+//	public static final String PROPERTY_IS_CROWNSTONE_PLUG = "isCrownstonePlug";
+//	public static final String PROPERTY_IS_CROWNSTONE_BUILTIN = "isCrownstoneBuiltin";
+//	public static final String PROPERTY_IS_GUIDESTONE = "isGuidestone";
 
 	public static final String PROPERTY_CALIBRATED_RSSI = "calibratedRssi";
 	public static final String PROPERTY_MINOR = "minor";
@@ -19,7 +20,7 @@ public class BleTypes extends BleCoreTypes {
 	public static final String PROPERTY_PROXIMITY_UUID = "proximityUuid";
 	public static final String PROPERTY_IS_IBEACON = "isIBeacon";
 
-	public static final String PROPERTY_IS_GUIDESTONE = "isGuidestone";
+
 
 	public static final String PROPERTY_SERVICE_DATA = "serviceData";
 

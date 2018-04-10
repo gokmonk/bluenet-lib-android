@@ -287,15 +287,14 @@ public class BluenetConfig {
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// iBeacon Identifiers
 	public static final int APPLE_COMPANY_ID =                          0x004c;
-	public static final int IBEACON_ADVERTISEMENT_ID =                  0x0215;
+	public static final int IBEACON_ADVERTISEMENT_ID =                  0x0215; // Actually 2 separate fields: type and length
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Crownstone
-	public static final short DOBOTS_COMPANY_ID =                       (short)0x038E;
-	public static final short CROWNSTONE_PLUG_SERVICE_DATA_UUID =       (short)0xC001;
-	public static final short CROWNSTONE_BUILTIN_SERVICE_DATA_UUID =    (short)0xC002;
-	public static final short GUIDESTONE_SERVICE_DATA_UUID =            (short)0xC003;
+	public static final int CROWNSTONE_PLUG_SERVICE_DATA_UUID =         0xC001;
+	public static final int CROWNSTONE_BUILTIN_SERVICE_DATA_UUID =      0xC002;
+	public static final int GUIDESTONE_SERVICE_DATA_UUID =              0xC003;
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -318,9 +317,9 @@ public class BluenetConfig {
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Device Type Identifiers
 	public static final int DEVICE_UNDEF =                              0;
-	public static final int DEVICE_CROWNSTONE =                         1;
+	public static final int DEVICE_CROWNSTONE_PLUG =                    1;
 	public static final int DEVICE_GUIDESTONE =                         2;
-	public static final int DEVICE_FRIDGE =                             3;
+	public static final int DEVICE_CROWNSTONE_BUILTIN =                 3;
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////

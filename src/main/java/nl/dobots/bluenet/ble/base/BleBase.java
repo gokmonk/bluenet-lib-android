@@ -310,48 +310,8 @@ public class BleBase extends BleCore {
 			public void onData(final JSONObject json) {
 				byte[] advertisement = BleCore.getBytes(json, BleCoreTypes.PROPERTY_ADVERTISEMENT);
 
-//				if (Build.VERSION.SDK_INT >= 21) {
-//					ScanRecord scanRecord = ScanRecord.parseFromBytes(advertisement);
-//				}
 //				getLogger().LOGw(TAG, "Advertisment bytes: " + BleUtils.bytesToString(advertisement));
-
-				parseAdvertisement(advertisement, 0xFF, new IByteArrayCallback() {
-					// The callbacks can be called multiple times
-					@Override
-					public void onSuccess(byte[] result) {
-						parseIBeaconData(json, result);
-					}
-
-					@Override
-					public void onError(int error) {
-						getLogger().LOGv(TAG, "json: " + json.toString());
-					}
-				});
-
-				parseAdvertisement(advertisement, 0x16, new IByteArrayCallback() {
-					// The callbacks can be called multiple times
-					@Override
-					public void onSuccess(byte[] result) {
-						parseServiceData(json, result);
-					}
-
-					@Override
-					public void onError(int error) {
-						getLogger().LOGv(TAG, "json: " + json.toString());
-					}
-				});
-				parseAdvertisement(advertisement, 0x06, new IByteArrayCallback() {
-					// The callbacks can be called multiple times
-					@Override
-					public void onSuccess(byte[] result) {
-						parseServiceClass(json, result);
-					}
-
-					@Override
-					public void onError(int error) {
-						getLogger().LOGv(TAG, "json: " + json.toString());
-					}
-				});
+				parseAdvertisement(json, advertisement);
 
 				BleDevice device;
 				try {
@@ -361,125 +321,73 @@ public class BleBase extends BleCore {
 					getLogger().LOGd(TAG, "json: " + json.toString());
 					return;
 				}
-//				getLogger().LOGw(TAG, "Device: " + device.toString());
+				getLogger().LOGw(TAG, "Device: " + device.toString());
 				callback.onDeviceScanned(device);
 			}
 		});
 	}
 
-	private void parseAdvertisement(byte[] scanRecord, int search, IByteArrayCallback callback) {
 
-		ByteBuffer bb = ByteBuffer.wrap(scanRecord);
+	private boolean parseAdvertisement(JSONObject json, byte[] advertisement) {
+		ByteBuffer bb = ByteBuffer.wrap(advertisement);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
 		try {
 			while (bb.hasRemaining()) {
-				int length = BleUtils.toUint8(bb.get());
-				if (length == 0) {
+				int len = BleUtils.toUint8(bb.get());
+				if (len == 0) {
 					// we have reached the end of the valid scan record data
 					// the rest of the buffer should be filled with 0
-					return;
+					return true;
 				}
-
+				// Length also includes the type field
+				if (bb.remaining() < len) {
+					return false;
+				}
 				int type = BleUtils.toUint8(bb.get());
-				if (type == search) {
-					byte[] result = new byte[length - 1];
-					bb.get(result, 0, length - 1);
-					callback.onSuccess(result);
-				} else {
-					// skip length elements
-					bb.position(bb.position() + length - 1); // length also includes the type field, so only advance by length-1
+				byte[] data = new byte[len - 1];
+				bb.get(data, 0, len - 1);
+				getLogger().LOGw(TAG, "len=" + len + " type=" + type);
+				// See: https://www.bluetooth.com/specifications/assigned-numbers/generic-access-profile
+				switch (type) {
+					case 0xFF: {
+						// Manufacturer specific data
+						// See: https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers
+
+						// Try iBeacon
+						parseIBeaconData(json, data);
+						break;
+					}
+					case 0x16: {
+						// Service data - 16-bit UUID
+						// See: https://www.bluetooth.com/specifications/gatt/services
+						// See: https://www.bluetooth.com/specifications/gatt/characteristics
+
+//						parseServiceData(json, data);
+						CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData();
+						if (crownstoneServiceData.parseBytes(data, _encryptionEnabled, EncryptionKeys.getGuestKey(_encryptionKeys))) {
+							BleCore.addProperty(json, BleTypes.PROPERTY_SERVICE_DATA, crownstoneServiceData);
+          				getLogger().LOGw(TAG, "serviceData: " + crownstoneServiceData.toString());
+						}
+						break;
+					}
+					case 0x06: {
+						// Incomplete list of 128-bit Service Class UUIDs
+						parseServiceClass(json, data);
+						break;
+					}
 				}
+
 			}
-		} catch (BufferUnderflowException e) {
-//			getLogger().LOGe(TAG, "failed to parse advertisement, search: %d", search);
+			return true;
+		}
+		catch (BufferUnderflowException e) {
+			getLogger().LOGe(TAG, "parseAdvertisement error: " + BleUtils.bytesToString(advertisement));
 //			e.printStackTrace();
-			callback.onError(BleErrors.ERROR_ADVERTISEMENT_PARSING);
+			return false;
 		}
 	}
 
-	/**
-	 * Helper function to parse manufacturing data of an advertisement/scan response packet. Use
-	 * @parseAdvertisement first to retrieve the manufacturing data (type 0xFF), and pass it to
-	 * this function together with the json object. it will populate the json object with the data
-	 * parsed from the manufacData array.
-	 *
-	 * @param json the json object in which the data should be included
-	 * @param manufacData the byte array containing the manufacturing data
-	 */
-	@Deprecated
-	private void parseDoBotsData(JSONObject json, byte[] manufacData) {
-		ByteBuffer bb = ByteBuffer.wrap(manufacData);
-		bb.order(ByteOrder.LITTLE_ENDIAN);
-
-		int companyId = bb.getShort();
-
-		if (companyId == BluenetConfig.DOBOTS_COMPANY_ID) {
-			try {
-				int deviceType = bb.get();
-				switch (deviceType) {
-					case BluenetConfig.DEVICE_CROWNSTONE: {
-						BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE_PLUG, true);
-						break;
-					}
-					case BluenetConfig.DEVICE_GUIDESTONE: {
-						BleCore.addProperty(json, BleTypes.PROPERTY_IS_GUIDESTONE, true);
-						break;
-					}
-				}
-			} catch (Exception e) {
-				BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE_PLUG, true);
-				getLogger().LOGd(TAG, "old advertisement package: %s", json);
-			}
-		}
-	}
-
-	/**
-	 * Helper function to parse the crownstone service data of an advertisement/scan response packet.
-	 * Use @parseAdvertisement first to retrieve the service data (type 0x16), and pass it to
-	 * this function together with the json object. it will populate the json object with the data
-	 * parsed from the serviceData array.
-	 *
-	 * @param json the json object in which the data should be included
-	 * @param serviceData the byte array containing the service data
-	 */
-	private void parseServiceData(JSONObject json, byte[] serviceData) {
-		ByteBuffer bb = ByteBuffer.wrap(serviceData);
-		bb.order(ByteOrder.LITTLE_ENDIAN);
-
-		if (bb.remaining() < 2) {
-			return;
-		}
-		int serviceUUID = bb.getShort();
-
-		if (serviceUUID == BluenetConfig.CROWNSTONE_PLUG_SERVICE_DATA_UUID) {
-			BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE_PLUG, true);
-//			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData(bb.array(), _encryptionEnabled, _encryptionKeys.getGuestKey());
-			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData();
-			if (crownstoneServiceData.parseBytes(bb.array(), _encryptionEnabled, EncryptionKeys.getGuestKey(_encryptionKeys))) {
-				BleCore.addProperty(json, BleTypes.PROPERTY_SERVICE_DATA, crownstoneServiceData);
-//				getLogger().LOGv(TAG, "serviceData: " + crownstoneServiceData.toString());
-			}
-		}
-		else if (serviceUUID == BluenetConfig.CROWNSTONE_BUILTIN_SERVICE_DATA_UUID) {
-			BleCore.addProperty(json, BleTypes.PROPERTY_IS_CROWNSTONE_BUILTIN, true);
-//			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData(bb.array(), _encryptionEnabled, _encryptionKeys.getGuestKey());
-			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData();
-			if (crownstoneServiceData.parseBytes(bb.array(), _encryptionEnabled, EncryptionKeys.getGuestKey(_encryptionKeys))) {
-				BleCore.addProperty(json, BleTypes.PROPERTY_SERVICE_DATA, crownstoneServiceData);
-//				getLogger().LOGv(TAG, "serviceData: " + crownstoneServiceData.toString());
-			}
-		}
-		else if (serviceUUID == BluenetConfig.GUIDESTONE_SERVICE_DATA_UUID) {
-			BleCore.addProperty(json, BleTypes.PROPERTY_IS_GUIDESTONE, true);
-			// TODO: should probably be GuidestoneServiceData in the future.
-			CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData();
-			if (crownstoneServiceData.parseBytes(bb.array(), _encryptionEnabled, EncryptionKeys.getGuestKey(_encryptionKeys))) {
-				BleCore.addProperty(json, BleTypes.PROPERTY_SERVICE_DATA, crownstoneServiceData);
-//				getLogger().LOGv(TAG, "serviceData: " + crownstoneServiceData.toString());
-			}
-		}
-	}
 
 	/**
 	 * Helper function to parse iBeacon data from a byte array into a JSON object
@@ -508,7 +416,7 @@ public class BleBase extends BleCore {
 		if (bb.remaining() < 2) {
 			return;
 		}
-		int advertisementId = BleUtils.toUint16(bb.getShort());
+		int advertisementId = BleUtils.toUint16(bb.getShort()); // Actually 2 separate fields: type and length
 
 		if (advertisementId == BluenetConfig.IBEACON_ADVERTISEMENT_ID && bb.remaining() >= 16+2+2+1) {
 			BleCore.addProperty(scanResult, BleTypes.PROPERTY_IS_IBEACON, true);

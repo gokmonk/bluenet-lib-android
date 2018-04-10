@@ -42,6 +42,8 @@ public class CrownstoneServiceData extends JSONObject {
 	public static final int TYPE_EXT_ERROR = 5;
 	public static final int TYPE_SETUP =     6;
 
+	public static final int VALIDATION = 0xFA;
+
 
 	// use BleLog.getInstance().setLogLevelPerTag(CrownstoneServiceData.class.getCanonicalName(), <NEW_LOG_LEVEL>)
 	// to change the log level
@@ -63,7 +65,7 @@ public class CrownstoneServiceData extends JSONObject {
 
 	public boolean parseBytes(byte[] bytes, boolean encrypted, byte[] key) {
 		// Includes the service UUID (first 2 bytes)
-		getLogger().LOGv(TAG, "serviceData: " + BleUtils.bytesToString(bytes));
+		getLogger().LOGw(TAG, "serviceData: " + BleUtils.bytesToString(bytes));
 		if (bytes.length < 3) {
 			return false;
 		}
@@ -84,6 +86,10 @@ public class CrownstoneServiceData extends JSONObject {
 					return parseDataV3(bytes, bb.position(), encrypted, key);
 				case 4:
 					return parseDataV4(bytes, bb.position(), encrypted, key);
+				case 5:
+					return parseDataV5(bytes, bb.position(), encrypted, key);
+				case 6:
+					return parseDataV6(bytes, bb.position(), encrypted, key);
 				default:
 					setOpCode(0);
 					return false;
@@ -102,6 +108,7 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 
 		setType(TYPE_V1);
+		setDeviceTypeFromServiceUuid();
 
 		// First parse without decrypting
 		ByteBuffer bb = ByteBuffer.wrap(bytes, offset, bytes.length-offset);
@@ -164,6 +171,8 @@ public class CrownstoneServiceData extends JSONObject {
 			return false;
 		}
 
+		setDeviceTypeFromServiceUuid();
+
 		// First decrypt if encryption is enabled.
 		ByteBuffer bb;
 		if (encrypted) {
@@ -183,21 +192,21 @@ public class CrownstoneServiceData extends JSONObject {
 		int type = BleUtils.toUint8(bb.get());
 		switch (type) {
 			case 0: { // state
-				return parseStatePacket(bb, false);
+				return parseStatePacket(bb, false, false);
 			}
 			case 1: { // error
-				return parseErrorPacket(bb, false);
+				return parseErrorPacket(bb, false, false);
 			}
 			case 2: { // ext state
-				return parseStatePacket(bb, true);
+				return parseStatePacket(bb, true, false);
 			}
 			case 3: { // ext error
-				return parseErrorPacket(bb, true);
+				return parseErrorPacket(bb, true, false);
 			}
 			default:
 				// Use this as default, else service data of another sphere gets no service data at all,
 				// which can result in getting old service data being copied into it.
-				return parseStatePacket(bb, false);
+				return parseStatePacket(bb, false, false);
 //				return false;
 		}
 	}
@@ -207,6 +216,97 @@ public class CrownstoneServiceData extends JSONObject {
 		if (bytes.length - offset < 16) {
 			return false;
 		}
+		setType(TYPE_SETUP);
+
+		setDeviceTypeFromServiceUuid();
+
+		ByteBuffer bb = ByteBuffer.wrap(bytes, offset, bytes.length-offset);
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+
+		int type = BleUtils.toUint8(bb.get());
+		switch (type) {
+			case 0: {
+				setFlagSetup(true);
+				setCrownstoneId(BleUtils.toUint8(bb.get()));
+				setCrownstoneExternalId(-1);
+				parseFlagsBitmask(bb.get());
+				setTemperature(bb.get());
+				double powerFactor = bb.get() / 127.0;
+				setPowerFactor(powerFactor);
+				double powerUsageReal = bb.getShort() / 8.0;
+				setPowerUsageReal(powerUsageReal);
+				setPowerUsageApparent(powerRealToApparent(powerUsageReal, powerFactor));
+				parseErrorBitmask(BleUtils.toUint32(bb.getInt()));
+				byte[] counter = new byte[1];
+				bb.get(counter);
+				setChangingBytes(counter);
+				bb.getInt(); // reserved
+				return true;
+			}
+			default:
+				return false;
+		}
+	}
+
+
+	private boolean parseDataV5(byte[] bytes, int offset, boolean encrypted, byte[] key) {
+		if (bytes.length - offset < 17) {
+			return false;
+		}
+
+		int deviceType = BleUtils.toUint8(bytes[offset]);
+		setDeviceType(deviceType);
+		offset += 1;
+
+		// First decrypt if encryption is enabled.
+		ByteBuffer bb;
+		if (encrypted) {
+			byte[] decryptedBytes = BleBaseEncryption.decryptEcb(bytes, offset, key);
+			if (decryptedBytes == null) {
+				return false;
+			}
+			bb = ByteBuffer.wrap(decryptedBytes);
+//			getLogger().LOGv(TAG, "decrypted: " + BleUtils.bytesToString(decryptedBytes));
+		}
+		else {
+			bb = ByteBuffer.wrap(bytes, offset, bytes.length-offset);
+		}
+		bb.order(ByteOrder.LITTLE_ENDIAN);
+
+		// Parse the (decrypted) data.
+		int type = BleUtils.toUint8(bb.get());
+		switch (type) {
+			case 0: { // state
+				return parseStatePacket(bb, false, true);
+			}
+			case 1: { // error
+				return parseErrorPacket(bb, false, true);
+			}
+			case 2: { // ext state
+				return parseStatePacket(bb, true, true);
+			}
+			case 3: { // ext error
+				return parseErrorPacket(bb, true, true);
+			}
+			default:
+				// Use this as default, else service data of another sphere gets no service data at all,
+				// which can result in getting old service data being copied into it.
+				return parseStatePacket(bb, false, true);
+//				return false;
+		}
+	}
+
+	private boolean parseDataV6(byte[] bytes, int offset, boolean encrypted, byte[] key) {
+		// Never encrypted
+		if (bytes.length - offset < 17) {
+			return false;
+		}
+		setType(TYPE_SETUP);
+
+		int deviceType = BleUtils.toUint8(bytes[offset]);
+		setDeviceType(deviceType);
+		offset += 1;
+
 		ByteBuffer bb = ByteBuffer.wrap(bytes, offset, bytes.length-offset);
 		bb.order(ByteOrder.LITTLE_ENDIAN);
 
@@ -235,7 +335,7 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 	}
 
-	private boolean parseStatePacket(ByteBuffer bb, boolean external) {
+	private boolean parseStatePacket(ByteBuffer bb, boolean external, boolean withRssi) {
 		if (external) {
 			setFlagExternalData(true);
 			setCrownstoneId(-1);
@@ -258,15 +358,29 @@ public class CrownstoneServiceData extends JSONObject {
 		double energyUsed = bb.getInt() * 64.0;
 		setAccumulatedEnergy(energyUsed);
 		parsePartialTimestamp(bb);
-		int validation = BleUtils.toUint16(bb.getShort());
-		if (validation != 0xFACE) {
+
+		if (external && withRssi) {
+			int extRssi = bb.get();
+			setExternalRssi(extRssi);
+		}
+		else {
+			bb.get(); // reserved
+		}
+
+		int validation = BleUtils.toUint8(bb.get());
+		if (validation == VALIDATION) {
+			setValidation(true);
+		}
+		else {
+			setValidation(false);
 			getLogger().LOGv(TAG, "validation mismatch: " + validation);
 		}
+
 		reconstructTimestamp();
 		return true;
 	}
 
-	private boolean parseErrorPacket(ByteBuffer bb, boolean external) {
+	private boolean parseErrorPacket(ByteBuffer bb, boolean external, boolean withRssi) {
 		if (external) {
 			setFlagExternalData(true);
 			setCrownstoneId(-1);
@@ -283,9 +397,28 @@ public class CrownstoneServiceData extends JSONObject {
 		parseFlagsBitmask(bb.get());
 		setTemperature(bb.get());
 		parsePartialTimestamp(bb);
-		double powerUsageReal = bb.getShort() / 8.0;
-		setPowerUsageReal(powerUsageReal);
-//		setPowerUsageApparent(powerUsageReal); // Assume power factor of 1.0
+
+		if (external) {
+			if (withRssi) {
+				int extRssi = bb.get();
+				setExternalRssi(extRssi);
+			}
+			else {
+				bb.get(); // reserved
+			}
+			int validation = BleUtils.toUint8(bb.get());
+			if (validation == VALIDATION) {
+				setValidation(true);
+			}
+			else {
+				setValidation(false);
+				getLogger().LOGv(TAG, "validation mismatch: " + validation);
+			}
+		}
+		else {
+			double powerUsageReal = bb.getShort() / 8.0;
+			setPowerUsageReal(powerUsageReal);
+		}
 		reconstructTimestamp();
 		return true;
 	}
@@ -331,7 +464,21 @@ public class CrownstoneServiceData extends JSONObject {
 		return realPower / powerFactor;
 	}
 
-
+	private void setDeviceTypeFromServiceUuid() {
+		switch (getServiceUuid()) {
+			case BluenetConfig.CROWNSTONE_PLUG_SERVICE_DATA_UUID:
+				setDeviceType(BluenetConfig.DEVICE_CROWNSTONE_PLUG);
+				break;
+			case BluenetConfig.GUIDESTONE_SERVICE_DATA_UUID:
+				setDeviceType(BluenetConfig.DEVICE_GUIDESTONE);
+				break;
+			case BluenetConfig.CROWNSTONE_BUILTIN_SERVICE_DATA_UUID:
+				setDeviceType(BluenetConfig.DEVICE_CROWNSTONE_BUILTIN);
+				break;
+			default:
+				setDeviceType(BluenetConfig.DEVICE_UNDEF);
+		}
+	}
 
 	private boolean isSetupPacket() {
 		switch (getOpCode()) {
@@ -400,6 +547,24 @@ public class CrownstoneServiceData extends JSONObject {
 	//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\\
 	//%%%%%%%%%%                    Getters and setters of fields                       %%%%%%%%%%\\
 	//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\\
+
+	public int getDeviceType() {
+		try {
+			return getInt("deviceType");
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "no type found");
+			return 0;
+		}
+	}
+
+	private void setDeviceType(int type) {
+		try {
+			put("deviceType", type);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "failed to add type");
+			e.printStackTrace();
+		}
+	}
 
 	public int getType() {
 		try {
@@ -487,6 +652,24 @@ public class CrownstoneServiceData extends JSONObject {
 			put("crownstoneExternalId", crownstoneStateId);
 		} catch (JSONException e) {
 			getLogger().LOGv(TAG, "failed to add ext crownstone id");
+			e.printStackTrace();
+		}
+	}
+
+	public int getExternalRssi() {
+		try {
+			return getInt("externalRssi");
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "no ext rssi found");
+			return 0;
+		}
+	}
+
+	private void setExternalRssi(int rssi) {
+		try {
+			put("externalRssi", rssi);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "failed to add ext rssi");
 			e.printStackTrace();
 		}
 	}
@@ -1057,6 +1240,24 @@ public class CrownstoneServiceData extends JSONObject {
 			put("changingBytes", encodedString);
 		} catch (JSONException e) {
 			getLogger().LOGv(TAG, "failed to add changing bytes");
+			e.printStackTrace();
+		}
+	}
+
+	public boolean getValidation() {
+		try {
+			return getBoolean("validation");
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "no validation found");
+			return false;
+		}
+	}
+
+	private void setValidation(boolean validation) {
+		try {
+			put("validation", validation);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "failed to add validation");
 			e.printStackTrace();
 		}
 	}
