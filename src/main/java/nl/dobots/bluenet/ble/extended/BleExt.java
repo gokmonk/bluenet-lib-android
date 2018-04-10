@@ -1218,7 +1218,7 @@ public class BleExt extends Logging implements IWriteCallback {
 
 		@Override
 		public synchronized void run() {
-			getLogger().LOGd(TAG, "delayed disconnect timeout");
+			getLogger().LOGi(TAG, "Delayed disconnect timeout");
 			disconnectAndClose(false, new IStatusCallback() {
 				@Override
 				public void onSuccess() {
@@ -1378,7 +1378,7 @@ public class BleExt extends Logging implements IWriteCallback {
 		final IExecStatusCallback execStatusCallback = new IExecStatusCallback() {
 
 			public void onExecuteSuccess(boolean disconnect) {
-				if (disconnect && resumeDelayedDisconnect[0]) {
+				if (disconnect && resumeDelayedDisconnect[0] && checkConnection(address)) {
 					delayedDisconnect(null);
 				}
 //				handleConnectRetrySuccess();
@@ -2699,6 +2699,7 @@ public class BleExt extends Logging implements IWriteCallback {
 					return;
 				}
 
+				// Have to subscribe, else the bootloader doesn't accept any commands.
 				_bleBase.subscribe(_targetAddress, BluenetConfig.DFU_SERVICE_UUID, BluenetConfig.DFU_CONTROL_UUID,
 						new IIntegerCallback() {
 							@Override
@@ -2714,6 +2715,7 @@ public class BleExt extends Logging implements IWriteCallback {
 
 									@Override
 									public void onError(int error) {
+										BleLog.getInstance().LOGi(TAG, "Write error expected, as bootloader resets");
 										// Treat as if it was a success..
 										done();
 									}
