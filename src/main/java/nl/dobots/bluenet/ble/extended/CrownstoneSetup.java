@@ -1,16 +1,25 @@
 package nl.dobots.bluenet.ble.extended;
 
+import org.json.JSONObject;
+
 import nl.dobots.bluenet.ble.base.BleBase;
 import nl.dobots.bluenet.ble.base.BleConfiguration;
 import nl.dobots.bluenet.ble.base.callbacks.IExecStatusCallback;
+import nl.dobots.bluenet.ble.base.callbacks.IIntegerCallback;
 import nl.dobots.bluenet.ble.base.callbacks.IProgressCallback;
+import nl.dobots.bluenet.ble.base.structs.ControlResultPacket;
 import nl.dobots.bluenet.ble.base.structs.SetupPacket;
+import nl.dobots.bluenet.ble.base.structs.StreamMsg;
+import nl.dobots.bluenet.ble.core.BleCore;
+import nl.dobots.bluenet.ble.core.callbacks.IDataCallback;
 import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.base.callbacks.SimpleExecStatusCallback;
 import nl.dobots.bluenet.ble.base.structs.ControlMsg;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.cfg.BluenetConfig;
 import nl.dobots.bluenet.ble.extended.callbacks.IExecuteCallback;
+import nl.dobots.bluenet.utils.BleLog;
+import nl.dobots.bluenet.utils.BleUtils;
 
 /**
  * Copyright (c) 2016 Dominik Egger <dominik@dobots.nl>. All rights reserved.
@@ -51,6 +60,7 @@ public class CrownstoneSetup {
 	private int _iBeaconMinor;
 	private IProgressCallback _progressCallback;
 	private IStatusCallback _statusCallback;
+	private Integer _subscriptionId;
 
 	private boolean _cancel;
 
@@ -211,26 +221,74 @@ public class CrownstoneSetup {
 
 					_cancel = false;
 
-//					setupStep(1);
+					if (_bleExt.hasCharacteristic(BluenetConfig.CHAR_SETUP_CONTROL_UUID, null)) {
+						// Old way:
+						setupStep(1);
+					}
+					else if (_bleExt.hasCharacteristic(BluenetConfig.CHAR_SETUP_CONTROL2_UUID, null)) {
+						// New way:
+						_bleBase.subscribeMultipart(_targetAddress, BluenetConfig.SETUP_SERVICE_UUID, BluenetConfig.CHAR_SETUP_CONTROL2_UUID, new IIntegerCallback() {
+							@Override
+							public void onSuccess(int result) {
+								_subscriptionId = result;
+								_progressCallback.onProgress(1, null);
 
-					SetupPacket setupPacket = new SetupPacket(0, crownstoneId, adminKey, memberKey, guestKey, meshAccessAddress, iBeaconUuid, iBeaconMajor, iBeaconMinor);
-					byte[] payload = setupPacket.toArray();
 
-					ControlMsg controlMsg = new ControlMsg(BluenetConfig.CMD_SETUP, payload.length, payload);
-					_bleExt.writeControl(controlMsg, new IStatusCallback() {
-						@Override
-						public void onSuccess() {
-							_bleExt.getLogger().LOGi(TAG, "success");
-							// Clear cache, as we know that the services will change.
-							_bleExt.disconnectAndClose(true, _statusCallback);
-						}
+								SetupPacket setupPacket = new SetupPacket(0, crownstoneId, adminKey, memberKey, guestKey, meshAccessAddress, iBeaconUuid, iBeaconMajor, iBeaconMinor);
+								byte[] payload = setupPacket.toArray();
 
-						@Override
-						public void onError(int error) {
-							_bleExt.getLogger().LOGi(TAG, "error: " + error);
-							_statusCallback.onError(error);
-						}
-					});
+								ControlMsg controlMsg = new ControlMsg(BluenetConfig.CMD_SETUP, payload.length, payload);
+								_bleExt.writeControl(controlMsg, new IStatusCallback() {
+									@Override
+									public void onSuccess() {
+										_bleExt.getLogger().LOGi(TAG, "success");
+										_progressCallback.onProgress(2, null);
+									}
+
+									@Override
+									public void onError(int error) {
+										_bleExt.getLogger().LOGi(TAG, "error: " + error);
+										_statusCallback.onError(error);
+									}
+								});
+							}
+
+							@Override
+							public void onError(int error) {
+								_statusCallback.onError(error);
+							}
+						}, new IDataCallback() {
+							@Override
+							public void onData(JSONObject json) {
+								byte[] decryptedBytes = BleCore.getValue(json);
+								ControlResultPacket resultPacket = new ControlResultPacket();
+								if (!resultPacket.fromArray(decryptedBytes)) {
+									_statusCallback.onError(BleErrors.ERROR_MSG_PARSING);
+									return;
+								}
+								switch (resultPacket.getErrorCode()) {
+									case BluenetConfig.ERR_WAIT_FOR_SUCCESS:
+										// Wait for next result packet.
+										_progressCallback.onProgress(3, null);
+										break;
+									case BluenetConfig.ERR_SUCCESS:
+										// Done
+										_progressCallback.onProgress(4, null);
+										// Clear cache, as we know that the services will change.
+										_bleExt.disconnectAndClose(true, _statusCallback);
+										break;
+									default:
+										_bleExt.getLogger().LOGe(TAG, "Setup failed. Return code: " + resultPacket.getErrorCode());
+										_statusCallback.onError(BleErrors.ERROR_SETUP_FAILED);
+								}
+							}
+
+							@Override
+							public void onError(int error) {
+								_statusCallback.onError(error);
+							}
+						});
+					}
 				}
 			}, 500);
 		}

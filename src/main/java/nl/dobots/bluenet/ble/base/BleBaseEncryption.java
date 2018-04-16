@@ -212,6 +212,7 @@ public class BleBaseEncryption {
 		// Check validation key
 		for (int i=0; i<VALIDATION_KEY_LENGTH; i++) {
 			if (decryptedData[i] != validationKey[i]) {
+				getLogger().LOGw(TAG, "validationkey: " + BleUtils.bytesToString(validationKey) + " decrypted: " + BleUtils.bytesToString(decryptedData));
 				getLogger().LOGw(TAG, "incorrect validation key");
 				return null;
 			}

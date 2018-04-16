@@ -341,4 +341,29 @@ public class BluenetConfig {
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	public static final int KEEP_ALIVE_NO_ACTION =                      255;
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Error codes
+	public static final int ERR_SUCCESS                               = 0x00;
+	public static final int ERR_WAIT_FOR_SUCCESS                      = 0x01;
+
+	public static final int ERR_BUFFER_UNASSIGNED                     = 0x10;
+	public static final int ERR_BUFFER_LOCKED                         = 0x11;
+
+	public static final int ERR_WRONG_PAYLOAD_LENGTH                  = 0x20;
+	public static final int ERR_WRONG_PARAMETER                       = 0x21;
+	public static final int ERR_INVALID_MESSAGE                       = 0x22;
+	public static final int ERR_UNKNOWN_OP_CODE                       = 0x23;
+	public static final int ERR_UNKNOWN_TYPE                          = 0x24;
+	public static final int ERR_NOT_FOUND                             = 0x25;
+
+	public static final int ERR_NO_ACCESS                             = 0x30;
+
+	public static final int ERR_NOT_AVAILABLE                         = 0x40;
+	public static final int ERR_NOT_IMPLEMENTED                       = 0x41;
+	public static final int ERR_WRONG_SETTING                         = 0x42;
+
+	public static final int ERR_WRITE_DISABLED                        = 0x50;
+	public static final int ERR_WRITE_NOT_ALLOWED                     = 0x51;
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
