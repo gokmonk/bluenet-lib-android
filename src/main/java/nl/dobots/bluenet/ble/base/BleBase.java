@@ -62,6 +62,7 @@ public class BleBase extends BleCore {
 	private EncryptionSessionData _encryptionSessionData = null;
 	private boolean _setupMode = false;
 	private byte[] _setupEncryptionKey = null;
+	private String _setupControlCharUuid = null;
 
 	private IWriteCallback _onWriteCallback = null;
 
@@ -465,6 +466,8 @@ public class BleBase extends BleCore {
 	 */
 	public void discoverServices(String address, boolean forceDiscover, final IDiscoveryCallback callback) {
 		_setupMode = false;
+		_setupControlCharUuid = null;
+
 
 		super.discoverServices(address, forceDiscover, new IDataCallback() {
 			@Override
@@ -478,6 +481,12 @@ public class BleBase extends BleCore {
 						for (int j = 0; j < characteristics.length(); j++) {
 							JSONObject charac = characteristics.getJSONObject(j);
 							String characteristicUuid = charac.getString(BleCoreTypes.PROPERTY_CHARACTERISTIC_UUID);
+							if (characteristicUuid.equals(BluenetConfig.CHAR_SETUP_CONTROL_UUID)) {
+								_setupControlCharUuid = characteristicUuid;
+							}
+							else if (characteristicUuid.equals(BluenetConfig.CHAR_SETUP_CONTROL2_UUID)) {
+								_setupControlCharUuid = characteristicUuid;
+							}
 							getLogger().LOGd(TAG, "found service %s with characteristic %s", serviceUuid, characteristicUuid);
 							callback.onDiscovery(serviceUuid, characteristicUuid);
 						}
@@ -1880,7 +1889,7 @@ public class BleBase extends BleCore {
 	public void sendCommand(String address, ControlMsg command, char accessLevel, final IStatusCallback callback) {
 		getLogger().LOGd(TAG, "setupMode = " + _setupMode);
 		if (_setupMode) {
-			sendCommand(address, command, BluenetConfig.SETUP_SERVICE_UUID, BluenetConfig.CHAR_SETUP_CONTROL_UUID, accessLevel, callback);
+			sendCommand(address, command, BluenetConfig.SETUP_SERVICE_UUID, _setupControlCharUuid, accessLevel, callback);
 		} else {
 			sendCommand(address, command, BluenetConfig.CROWNSTONE_SERVICE_UUID, BluenetConfig.CHAR_CONTROL_UUID, accessLevel, callback);
 		}

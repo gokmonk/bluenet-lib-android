@@ -1076,7 +1076,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	 * @return true if control characteristic is available, false otherwise
 	 */
 	public boolean hasControlCharacteristic(IBaseCallback callback, boolean allowSetupCharacteristic) {
-		if (allowSetupCharacteristic && hasCharacteristic(BluenetConfig.CHAR_SETUP_CONTROL_UUID, null)) {
+		if (allowSetupCharacteristic && (hasCharacteristic(BluenetConfig.CHAR_SETUP_CONTROL_UUID, null) || hasCharacteristic(BluenetConfig.CHAR_SETUP_CONTROL2_UUID, null))) {
 			return true;
 		}
 		else {

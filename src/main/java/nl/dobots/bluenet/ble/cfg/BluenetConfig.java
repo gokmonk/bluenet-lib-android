@@ -50,6 +50,7 @@ public class BluenetConfig {
 	public static final String CHAR_SETUP_CONFIG_READ_UUID =            "24f10005-7d10-4805-bfc1-7663a01c3bff";
 	public static final String CHAR_SETUP_GOTO_DFU_UUID =               "24f10006-7d10-4805-bfc1-7663a01c3bff";
 	public static final String CHAR_SETUP_SESSION_NONCE_UUID =          "24f10008-7d10-4805-bfc1-7663a01c3bff";
+	public static final String CHAR_SETUP_CONTROL2_UUID =               "24f10007-7d10-4805-bfc1-7663a01c3bff";
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
