@@ -58,6 +58,7 @@ public class BleDevice {
 		crownstonePlug,
 		crownstoneBuiltin,
 		guidestone,
+		crownstoneDongle,
 	}
 
 	enum CrownstoneMode {
@@ -198,7 +199,7 @@ public class BleDevice {
 	}
 
 	public boolean isStone() {
-		return _type == DeviceType.crownstonePlug || _type == DeviceType.crownstoneBuiltin || _type == DeviceType.guidestone;
+		return _type == DeviceType.crownstonePlug || _type == DeviceType.crownstoneBuiltin || _type == DeviceType.guidestone || _type == DeviceType.crownstoneDongle;
 	}
 
 	public boolean isCrownstonePlug() { return _type == DeviceType.crownstonePlug; }
@@ -206,6 +207,8 @@ public class BleDevice {
 	public boolean isCrownstoneBuiltin() { return _type == DeviceType.crownstoneBuiltin; }
 
 	public boolean isGuidestone() { return _type == DeviceType.guidestone; }
+
+	public boolean isCrownstoneDongle() { return _type == DeviceType.crownstoneDongle; }
 
 	public boolean isValidatedCrownstone() {
 		return _isValidatedCrownstone;
@@ -225,6 +228,8 @@ public class BleDevice {
 					return DeviceType.guidestone;
 				case BluenetConfig.DEVICE_CROWNSTONE_BUILTIN:
 					return DeviceType.crownstoneBuiltin;
+				case BluenetConfig.DEVICE_CROWNSTONE_DONGLE:
+					return DeviceType.crownstoneDongle;
 			}
 		}
 		if (json.has(BleTypes.PROPERTY_IS_IBEACON)) {

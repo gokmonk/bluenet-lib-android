@@ -147,6 +147,8 @@ public class BluenetConfig {
 	public static final char CMD_ALLOW_DIMMING =                        29;
 	public static final char CMD_LOCK_SWITCH =                          30;
 	public static final char CMD_SETUP =                                31;
+	public static final char CMD_ENABLE_SWITCHCRAFT =                   32;
+	public static final char CMD_UART_MSG =                             33;
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -322,6 +324,7 @@ public class BluenetConfig {
 	public static final int DEVICE_CROWNSTONE_PLUG =                    1;
 	public static final int DEVICE_GUIDESTONE =                         2;
 	public static final int DEVICE_CROWNSTONE_BUILTIN =                 3;
+	public static final int DEVICE_CROWNSTONE_DONGLE =                  4;
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////

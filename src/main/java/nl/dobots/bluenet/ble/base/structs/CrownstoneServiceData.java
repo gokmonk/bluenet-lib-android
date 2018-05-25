@@ -425,11 +425,12 @@ public class CrownstoneServiceData extends JSONObject {
 
 
 	private void parseFlagsBitmask(byte flagBitmask) {
-		setFlagDimmingAvailable((flagBitmask & (1L << 0)) != 0);
-		setFlagDimmingAllowed(  (flagBitmask & (1L << 1)) != 0);
-		setFlagError(           (flagBitmask & (1L << 2)) != 0);
-		setFlagSwitchLocked(    (flagBitmask & (1L << 3)) != 0);
-		setFlagTimeSet(         (flagBitmask & (1L << 4)) != 0);
+		setFlagDimmingAvailable(   (flagBitmask & (1L << 0)) != 0);
+		setFlagDimmingAllowed(     (flagBitmask & (1L << 1)) != 0);
+		setFlagError(              (flagBitmask & (1L << 2)) != 0);
+		setFlagSwitchLocked(       (flagBitmask & (1L << 3)) != 0);
+		setFlagTimeSet(            (flagBitmask & (1L << 4)) != 0);
+		setFlagSwitchcraftEnabled( (flagBitmask & (1L << 5)) != 0);
 	}
 
 	private void parseErrorBitmask(long bitmask) {
@@ -913,7 +914,24 @@ public class CrownstoneServiceData extends JSONObject {
 		}
 	}
 
-
+	public boolean getFlagSwitchcraftEnabled() {
+		final String entry = "switchcraftEnabled";
+		try {
+			return getBoolean(entry);
+		} catch (JSONException e) {
+			getLogger().LOGv(TAG, "not found " + entry);
+			return false;
+		}
+	}
+	private void setFlagSwitchcraftEnabled(boolean val) {
+		final String entry = "switchcraftEnabled";
+		try {
+			put(entry, val);
+		} catch (JSONException e) {
+			getLogger().LOGe(TAG, "failed to add " + entry);
+			e.printStackTrace();
+		}
+	}
 
 	public String getErrorBitMaskString() {
 		final String entry = "errorBitMaskString";
