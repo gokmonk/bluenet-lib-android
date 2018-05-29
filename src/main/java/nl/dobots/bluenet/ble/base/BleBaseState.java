@@ -219,6 +219,33 @@ public class BleBaseState {
 				});
 	}
 
+	private void parseResetCounter(StateMsg state, IIntegerCallback callback) {
+		if (state.getType() == BluenetConfig.STATE_RESET_COUNTER) {
+			if (state.getLength() != 2) {
+				getLogger().LOGe(TAG, "Wrong length parameter: %d", state.getLength());
+				callback.onError(BleErrors.ERROR_WRONG_LENGTH_PARAMETER);
+			} else {
+				int resetCounter = BleUtils.toUint16(state.getShortValue());
+				getLogger().LOGd(TAG, "reset counter: %d", resetCounter);
+				callback.onSuccess(resetCounter);
+			}
+		}
+	}
+
+	public void getResetCounter(String address, final IIntegerCallback callback) {
+		_bleBase.getState(address, BluenetConfig.STATE_RESET_COUNTER, new IStateCallback() {
+			@Override
+			public void onSuccess(StateMsg state) {
+				parseResetCounter(state, callback);
+			}
+
+			@Override
+			public void onError(int error) {
+				callback.onError(error);
+			}
+		});
+	}
+
 	private void parseErrorState(StateMsg state, IIntegerCallback callback) {
 		if (state.getType() == BluenetConfig.STATE_ERRORS) {
 			if (state.getLength() != 4) {

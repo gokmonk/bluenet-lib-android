@@ -146,6 +146,34 @@ public class BleExtState {
 		});
 	}
 
+	public void getResetCounter(final IIntegerCallback callback) {
+		_bleExt.getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				if (_bleExt.isConnected(callback) && _bleExt.hasStateCharacteristics(callback)) {
+					getLogger().LOGd(TAG, "Get reset counter ...");
+					_bleBaseState.getResetCounter(_bleExt.getTargetAddress(), callback);
+				}
+			}
+		});
+	}
+
+	public void getResetCounter(final String address, final IIntegerCallback callback) {
+		_bleExt.getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGv(TAG, "Get error state");
+				_bleExt.connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						getResetCounter(execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
+
 	public void getErrorState(final IIntegerCallback callback) {
 		_bleExt.getHandler().post(new Runnable() {
 			@Override
