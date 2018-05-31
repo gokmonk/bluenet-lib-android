@@ -135,6 +135,7 @@ public class BleScanner {
 
 	/**
 	 * Change whether to run scanner in background.
+	 * Note: scanning will be stopped and not restarted automatically.
 	 *
 	 * @param makeReady       Set to true when the scanner should be made ready. This also means
 	 *                        the user may be requested to enable bluetooth and location services.
@@ -153,11 +154,19 @@ public class BleScanner {
 			callback.onError(BleErrors.ERROR_BUSY);
 			return;
 		}
+		BleIntervalScanner scanner = getScanner();
+		boolean wasRunning = (scanner != null && scanner.isRunning());
 		if (enable && !_initializedScanService) {
+			if (wasRunning) {
+				stopScanning();
+			}
 			deinitScanner();
 			initScanService(makeReady);
 		}
 		else if (!enable && !_initializedScanner) {
+			if (wasRunning) {
+				stopScanning();
+			}
 			deinitScanService();
 			initScanner(makeReady);
 		}
