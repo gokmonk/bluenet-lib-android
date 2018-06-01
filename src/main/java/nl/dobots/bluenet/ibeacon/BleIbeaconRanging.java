@@ -83,12 +83,14 @@ public class BleIbeaconRanging {
 
 
 	public synchronized void addIbeaconFilter(BleIbeaconFilter filter) {
+		getLogger().LOGi(TAG, "addIbeaconFilter: " + filter);
 		_iBeaconFilter.add(filter);
 		_lastSeen.put(filter.getUuid(), 0L);
 		getLogger().LOGv(TAG, "lastseen " + filter.getUuid() + " at " + _lastSeen.get(filter.getUuid()));
 	}
 
 	public synchronized void remIbeaconFilter(BleIbeaconFilter filter) {
+		getLogger().LOGi(TAG, "addIbeaconFilter: " + filter);
 		for (int i = _iBeaconFilter.size()-1; i >= 0; i--) {
 			if (_iBeaconFilter.get(i).equals(filter)) {
 				_iBeaconFilter.remove(i);
@@ -123,10 +125,12 @@ public class BleIbeaconRanging {
 
 	// Subscribe to beacon scans, and enter / exit region events.
 	public boolean registerListener(BleBeaconRangingListener listener) {
+		getLogger().LOGi(TAG, "registerListener");
 		return _rangingListeners.add(listener);
 	}
 
 	public boolean unregisterListener(BleBeaconRangingListener listener) {
+		getLogger().LOGi(TAG, "unregisterListener");
 		return _rangingListeners.remove(listener);
 	}
 
@@ -215,7 +219,7 @@ public class BleIbeaconRanging {
 	}
 
 	private synchronized void enterRegion(UUID uuid) {
-		getLogger().LOGd(TAG, "enterRegion: " + uuid.toString());
+		getLogger().LOGi(TAG, "enterRegion: " + uuid.toString());
 		_inRegion.add(uuid);
 		for (BleBeaconRangingListener listener : _rangingListeners) {
 			listener.onRegionEnter(uuid);
@@ -223,7 +227,7 @@ public class BleIbeaconRanging {
 	}
 
 	private synchronized void exitRegion(UUID uuid) {
-		getLogger().LOGd(TAG, "exitRegion: " + uuid.toString());
+		getLogger().LOGi(TAG, "exitRegion: " + uuid.toString());
 //		_lastSeen.remove(uuid);
 		_inRegion.remove(uuid);
 		if (!_paused) {

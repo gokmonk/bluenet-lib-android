@@ -11,6 +11,7 @@ import android.support.annotation.Nullable;
 
 import java.util.ArrayList;
 
+import nl.dobots.bluenet.ble.base.structs.EncryptionKeys;
 import nl.dobots.bluenet.ble.cfg.BleErrors;
 import nl.dobots.bluenet.ble.core.callbacks.IStatusCallback;
 import nl.dobots.bluenet.ble.core.callbacks.StatusSingleCallback;
@@ -42,6 +43,9 @@ public class BleScanner {
 	private int                _scanPause;
 	private BleDeviceFilter    _scanFilter;
 	private int                _scanMode;
+	private int                _connectTimeout;
+	private int                _connectRetries;
+	private EncryptionKeys     _encryptionKeys;
 
 	// Without service
 	private boolean            _initializedScanner = false;
@@ -123,6 +127,7 @@ public class BleScanner {
 			return;
 		}
 
+		_runInBackground = runInBackground;
 		if (runInBackground) {
 			initScanService(makeReady);
 		}
@@ -136,6 +141,8 @@ public class BleScanner {
 	/**
 	 * Change whether to run scanner in background.
 	 * Note: scanning will be stopped and not restarted automatically.
+	 * Note: the BleExt instance is re-initialized, so you may have to configure it again (though most settings are set again by this class).
+	 * Note: the BleIbeaconRanging instance is re-initialized, so you will have to configure it again (register listener, add filters, etc).
 	 *
 	 * @param makeReady       Set to true when the scanner should be made ready. This also means
 	 *                        the user may be requested to enable bluetooth and location services.
@@ -145,6 +152,7 @@ public class BleScanner {
 	 * @param callback        The callback to be notified about success or failure.
 	 */
 	public void runInBackground(boolean makeReady, boolean enable, @Nullable Notification notification, @Nullable Integer notificationId, IStatusCallback callback) {
+		BleLog.getInstance().LOGi(TAG, "runInBackground makeReady=" + makeReady + " enable=" + enable);
 		if (!_initialized) {
 			BleLog.getInstance().LOGe(TAG, "Not initialized");
 			return;
@@ -155,6 +163,7 @@ public class BleScanner {
 			return;
 		}
 		BleIntervalScanner scanner = getScanner();
+		_runInBackground = enable;
 		boolean wasRunning = (scanner != null && scanner.isRunning());
 		if (enable && !_initializedScanService) {
 			if (wasRunning) {
@@ -185,6 +194,10 @@ public class BleScanner {
 	 */
 	public boolean isInitialized() {
 		return _initialized;
+	}
+
+	public boolean isRunningInBackground() {
+		return _runInBackground;
 	}
 
 	public void checkReady(boolean makeReady, boolean runInBackground, @Nullable Activity activity, @Nullable final IStatusCallback callback) {
@@ -377,10 +390,12 @@ public class BleScanner {
 
 
 	private void initScanner(boolean makeReady) {
+		BleLog.getInstance().LOGi(TAG, "initScanner: makeReady=" + makeReady);
 		_intervalScanner = new BleIntervalScanner();
 		_intervalScanner.init(makeReady, _activity, new IStatusCallback() {
 			@Override
 			public void onSuccess() {
+				BleLog.getInstance().LOGi(TAG, "initScanner success");
 //				_intervalScanner.registerEventListener(BleScanner.this);
 //				_intervalScanner.registerScanDeviceListener(BleScanner.this);
 				applyScannerSettings(_intervalScanner);
@@ -391,6 +406,7 @@ public class BleScanner {
 
 			@Override
 			public void onError(int error) {
+				BleLog.getInstance().LOGe(TAG, "initScanner failed: " + error);
 				_initCallback.reject(error);
 			}
 		});
@@ -406,6 +422,7 @@ public class BleScanner {
 	}
 
 	private void initScanService(boolean makeReady) {
+		BleLog.getInstance().LOGi(TAG, "initScanService: makeReady=" + makeReady);
 		if (_notification == null || _notificationId == null) {
 			_initCallback.reject(BleErrors.ERROR_NO_NOTIFICATION);
 			return;
@@ -442,6 +459,7 @@ public class BleScanner {
 			_scanService.init(_makeScanServiceReady, _activity, new IStatusCallback() {
 				@Override
 				public void onSuccess() {
+					BleLog.getInstance().LOGi(TAG, "initScanService success");
 					_scanServiceScanner = _scanService.getScanner();
 //					_scanServiceScanner.registerEventListener(BleScanner.this);
 //					_scanServiceScanner.registerScanDeviceListener(BleScanner.this);
@@ -461,7 +479,7 @@ public class BleScanner {
 
 				@Override
 				public void onError(int error) {
-					BleLog.getInstance().LOGe(TAG, "Scan service init failed: " + error);
+					BleLog.getInstance().LOGe(TAG, "initScanService failed: " + error);
 					// TODO: is this enough?
 					_scanService = null;
 					_context.unbindService(_serviceConnection);
@@ -501,10 +519,13 @@ public class BleScanner {
 			return;
 		}
 		_settingsInitialized = true;
-		_scanDuration = scanner.getScanDuration();
-		_scanPause =    scanner.getScanPause();
-		_scanFilter =   scanner.getScanFilter();
-		_scanMode =     scanner.getScanMode();
+		_scanDuration =   scanner.getScanDuration();
+		_scanPause =      scanner.getScanPause();
+		_scanFilter =     scanner.getScanFilter();
+		_scanMode =       scanner.getScanMode();
+		_connectTimeout = scanner.getBleExt().getConnectTimeout();
+		_connectRetries = scanner.getBleExt().getNumRetries();
+		_encryptionKeys = scanner.getBleExt().getBleBase().getEncryptionsKeys();
 	}
 
 	// Apply the settings from cache to a scanner.
@@ -512,9 +533,14 @@ public class BleScanner {
 		if (!_settingsInitialized || scanner == null) {
 			return;
 		}
+		if (_encryptionKeys != null) {
+			scanner.getBleExt().getBleBase().setEncryptionKeys(_encryptionKeys);
+		}
 		scanner.setScanInterval(_scanDuration, _scanPause);
 		scanner.setScanFilter(_scanFilter);
 		scanner.setScanMode(_scanMode);
+		scanner.getBleExt().setConnectTimeout(_connectTimeout);
+		scanner.getBleExt().setNumRetries(_connectRetries);
 	}
 
 	// Register cached listeners.

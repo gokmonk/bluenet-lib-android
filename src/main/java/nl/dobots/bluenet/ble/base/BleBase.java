@@ -124,17 +124,21 @@ public class BleBase extends BleCore {
 	}
 
 	public void setEncryptionKeys(EncryptionKeys encryptionKeys) {
-		getLogger().LOGd(TAG, "setEncryptionKeys: " + encryptionKeys.toString());
+		getLogger().LOGi(TAG, "setEncryptionKeys: " + encryptionKeys.toString());
 		_encryptionKeys = encryptionKeys;
 	}
 
+	public EncryptionKeys getEncryptionsKeys() {
+		return _encryptionKeys;
+	}
+
 	public void setSetupEncryptionKey(byte[] key) {
-		getLogger().LOGd(TAG, "setSetupEncryptionKey to " + BleUtils.bytesToString(key));
+		getLogger().LOGi(TAG, "setSetupEncryptionKey to " + BleUtils.bytesToString(key));
 		_setupEncryptionKey = key;
 	}
 
 	public void setSetupEncryptionKey(String key) {
-		getLogger().LOGd(TAG, "setSetupEncryptionKey to " + key);
+		getLogger().LOGi(TAG, "setSetupEncryptionKey to " + key);
 		try {
 			if (key != null) {
 				_setupEncryptionKey = BleUtils.hexStringToBytes(key);
@@ -145,7 +149,7 @@ public class BleBase extends BleCore {
 	}
 
 	public void clearSetupEncryptionKey() {
-		getLogger().LOGd(TAG, "clearSetupEncryptionKey");
+		getLogger().LOGi(TAG, "clearSetupEncryptionKey");
 		_setupEncryptionKey = null;
 	}
 
@@ -318,11 +322,11 @@ public class BleBase extends BleCore {
 				try {
 					device = new BleDevice(json);
 				} catch (JSONException e) {
-					getLogger().LOGe(TAG, "Failed to parse json into device! Err: " + e.getMessage());
+					getLogger().LOGd(TAG, "Failed to parse json into device! Err: " + e.getMessage());
 					getLogger().LOGd(TAG, "json: " + json.toString());
 					return;
 				}
-				getLogger().LOGw(TAG, "Device: " + device.toString());
+				getLogger().LOGd(TAG, "Device: " + device.toString());
 				callback.onDeviceScanned(device);
 			}
 		});
@@ -348,7 +352,7 @@ public class BleBase extends BleCore {
 				int type = BleUtils.toUint8(bb.get());
 				byte[] data = new byte[len - 1];
 				bb.get(data, 0, len - 1);
-				getLogger().LOGw(TAG, "len=" + len + " type=" + type);
+				getLogger().LOGv(TAG, "len=" + len + " type=" + type);
 				// See: https://www.bluetooth.com/specifications/assigned-numbers/generic-access-profile
 				switch (type) {
 					case 0xFF: {
@@ -368,7 +372,7 @@ public class BleBase extends BleCore {
 						CrownstoneServiceData crownstoneServiceData = new CrownstoneServiceData();
 						if (crownstoneServiceData.parseBytes(data, _encryptionEnabled, EncryptionKeys.getGuestKey(_encryptionKeys))) {
 							BleCore.addProperty(json, BleTypes.PROPERTY_SERVICE_DATA, crownstoneServiceData);
-          				getLogger().LOGw(TAG, "serviceData: " + crownstoneServiceData.toString());
+          				getLogger().LOGd(TAG, "serviceData: " + crownstoneServiceData.toString());
 						}
 						break;
 					}

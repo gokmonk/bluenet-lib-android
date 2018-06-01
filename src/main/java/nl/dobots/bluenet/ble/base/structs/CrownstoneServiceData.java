@@ -65,7 +65,7 @@ public class CrownstoneServiceData extends JSONObject {
 
 	public boolean parseBytes(byte[] bytes, boolean encrypted, byte[] key) {
 		// Includes the service UUID (first 2 bytes)
-		getLogger().LOGw(TAG, "serviceData: " + BleUtils.bytesToString(bytes));
+		getLogger().LOGv(TAG, "serviceData: " + BleUtils.bytesToString(bytes));
 		if (bytes.length < 3) {
 			return false;
 		}

@@ -219,9 +219,13 @@ public class BleExt extends Logging implements IWriteCallback {
 		_numConnectRetries = numRetries;
 	}
 
+	public int getNumRetries() { return _numConnectRetries; }
+
 	public void setConnectTimeout(int timeoutMs) {
 		_connectTimeout = timeoutMs;
 	}
+
+	public int getConnectTimeout() { return _connectTimeout; }
 
 	/**
 	 * Get the list of scanned devices. The list is updated every time a device is detected, the

@@ -58,4 +58,8 @@ public class BleIbeaconFilter {
 	public UUID getUuid() {
 		return uuid;
 	}
+
+	public String toString() {
+		return "uuid=" + uuid.toString() + " major=" + major + " minor=" + minor;
+	}
 }
