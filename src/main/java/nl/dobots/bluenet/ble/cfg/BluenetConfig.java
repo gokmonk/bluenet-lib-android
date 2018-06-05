@@ -207,6 +207,11 @@ public class BluenetConfig {
 	public static final char CONFIG_CURRENT_THRESHOLD_DIMMER =          51;   //! 0x33
 	public static final char CONFIG_DIMMER_TEMP_UP =                    52;   //! 0x34
 	public static final char CONFIG_DIMMER_TEMP_DOWN =                  53;   //! 0x35
+	public static final char CONFIG_PWM_ALLOWED =                       54;   //! 0x36
+	public static final char CONFIG_SWITCH_LOCKED =                     55;   //! 0x37
+	public static final char CONFIG_SWITCHCRAFT_ENABLED =               56;   //! 0x38
+	public static final char CONFIG_SWITCHCRAFT_THRESHOLD =             57;   //! 0x39
+
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
