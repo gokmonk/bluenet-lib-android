@@ -267,11 +267,13 @@ public class CrownstoneSetup {
 						_bleBase.subscribeMultipart(_targetAddress, BluenetConfig.SETUP_SERVICE_UUID, BluenetConfig.CHAR_SETUP_CONTROL2_UUID, new IIntegerCallback() {
 							@Override
 							public void onSuccess(int result) {
+								_bleExt.getLogger().LOGi(TAG, "Successfully subscribed for notifications");
 								if (_statusCallback == null) {
 									return;
 								}
 								_subscriptionId = result;
 								_currentStep = 1;
+								_bleExt.getLogger().LOGi(TAG, "setupStep " + _currentStep);
 								_progressCallback.onProgress(_currentStep, null);
 
 
@@ -282,22 +284,23 @@ public class CrownstoneSetup {
 								_bleExt.writeControl(controlMsg, new IStatusCallback() {
 									@Override
 									public void onSuccess() {
+										_bleExt.getLogger().LOGi(TAG, "Successfully wrote setup command");
 										if (_statusCallback == null) {
 											return;
 										}
-										_bleExt.getLogger().LOGi(TAG, "success");
 										_bleExt.getHandler().postDelayed(setupTimeoutRunnable, 10000); // 10s timeout.
 
 										_currentStep = 2;
+										_bleExt.getLogger().LOGi(TAG, "setupStep " + _currentStep);
 										_progressCallback.onProgress(_currentStep, null);
 									}
 
 									@Override
 									public void onError(int error) {
+										_bleExt.getLogger().LOGi(TAG, "failed to write setup command: " + error);
 										if (_statusCallback == null) {
 											return;
 										}
-										_bleExt.getLogger().LOGi(TAG, "error: " + error);
 										_statusCallback.onError(error);
 									}
 								});
@@ -305,6 +308,7 @@ public class CrownstoneSetup {
 
 							@Override
 							public void onError(int error) {
+								_bleExt.getLogger().LOGi(TAG, "failed to subscribe: " + error);
 								if (_statusCallback == null) {
 									return;
 								}
@@ -328,11 +332,13 @@ public class CrownstoneSetup {
 									case BluenetConfig.ERR_WAIT_FOR_SUCCESS:
 										// Wait for next result packet.
 										_currentStep = 3;
+										_bleExt.getLogger().LOGi(TAG, "setupStep " + _currentStep);
 										_progressCallback.onProgress(_currentStep, null);
 										break;
 									case BluenetConfig.ERR_SUCCESS:
 										// Done
 										_currentStep = 4;
+										_bleExt.getLogger().LOGi(TAG, "setupStep " + _currentStep);
 										_progressCallback.onProgress(_currentStep, null);
 										// Cancel timeout
 										_bleExt.getHandler().removeCallbacks(setupTimeoutRunnable);
@@ -349,6 +355,7 @@ public class CrownstoneSetup {
 
 							@Override
 							public void onError(int error) {
+								_bleExt.getLogger().LOGi(TAG, "error: " + error);
 								if (_statusCallback == null) {
 									return;
 								}
