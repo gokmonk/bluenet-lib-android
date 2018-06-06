@@ -218,20 +218,61 @@ public class CrownstoneSetup {
 					_iBeaconMinor = iBeaconMinor;
 					_progressCallback = progressCallback;
 					_statusCallback = statusCallback;
-
+					_currentStep = 0;
 					_cancel = false;
 
 					if (_bleExt.hasCharacteristic(BluenetConfig.CHAR_SETUP_CONTROL_UUID, null)) {
-						// Old way:
+						// Old way.
 						setupStep(1);
 					}
 					else if (_bleExt.hasCharacteristic(BluenetConfig.CHAR_SETUP_CONTROL2_UUID, null)) {
-						// New way:
+						// New way.
+						final Runnable setupTimeoutRunnable = new Runnable() {
+							@Override
+							public void run() {
+								_bleExt.getLogger().LOGe(TAG, "Timeout! step=" + _currentStep);
+								final IStatusCallback callback = _statusCallback;
+								_statusCallback = null;
+								_progressCallback = null;
+								// At step 2, the setup command has been successfully written, assume it will be ok.
+								if (_currentStep >= 2) {
+									_bleExt.disconnectAndClose(true, new IStatusCallback() {
+										@Override
+										public void onSuccess() {
+											callback.onSuccess();
+										}
+
+										@Override
+										public void onError(int error) {
+											callback.onSuccess();
+										}
+									});
+								}
+								else {
+									_bleExt.disconnectAndClose(true, new IStatusCallback() {
+										@Override
+										public void onSuccess() {
+											callback.onError(BleErrors.ERROR_TIMEOUT);
+										}
+
+										@Override
+										public void onError(int error) {
+											callback.onError(BleErrors.ERROR_TIMEOUT);
+										}
+									});
+								}
+							}
+						};
+
 						_bleBase.subscribeMultipart(_targetAddress, BluenetConfig.SETUP_SERVICE_UUID, BluenetConfig.CHAR_SETUP_CONTROL2_UUID, new IIntegerCallback() {
 							@Override
 							public void onSuccess(int result) {
+								if (_statusCallback == null) {
+									return;
+								}
 								_subscriptionId = result;
-								_progressCallback.onProgress(1, null);
+								_currentStep = 1;
+								_progressCallback.onProgress(_currentStep, null);
 
 
 								SetupPacket setupPacket = new SetupPacket(0, crownstoneId, adminKey, memberKey, guestKey, meshAccessAddress, iBeaconUuid, iBeaconMajor, iBeaconMinor);
@@ -241,12 +282,21 @@ public class CrownstoneSetup {
 								_bleExt.writeControl(controlMsg, new IStatusCallback() {
 									@Override
 									public void onSuccess() {
+										if (_statusCallback == null) {
+											return;
+										}
 										_bleExt.getLogger().LOGi(TAG, "success");
-										_progressCallback.onProgress(2, null);
+										_bleExt.getHandler().postDelayed(setupTimeoutRunnable, 10000); // 10s timeout.
+
+										_currentStep = 2;
+										_progressCallback.onProgress(_currentStep, null);
 									}
 
 									@Override
 									public void onError(int error) {
+										if (_statusCallback == null) {
+											return;
+										}
 										_bleExt.getLogger().LOGi(TAG, "error: " + error);
 										_statusCallback.onError(error);
 									}
@@ -255,36 +305,53 @@ public class CrownstoneSetup {
 
 							@Override
 							public void onError(int error) {
+								if (_statusCallback == null) {
+									return;
+								}
 								_statusCallback.onError(error);
 							}
 						}, new IDataCallback() {
 							@Override
 							public void onData(JSONObject json) {
+								if (_statusCallback == null) {
+									return;
+								}
 								byte[] decryptedBytes = BleCore.getValue(json);
 								ControlResultPacket resultPacket = new ControlResultPacket();
 								if (!resultPacket.fromArray(decryptedBytes)) {
+									// Cancel timeout
+									_bleExt.getHandler().removeCallbacks(setupTimeoutRunnable);
 									_statusCallback.onError(BleErrors.ERROR_MSG_PARSING);
 									return;
 								}
 								switch (resultPacket.getErrorCode()) {
 									case BluenetConfig.ERR_WAIT_FOR_SUCCESS:
 										// Wait for next result packet.
-										_progressCallback.onProgress(3, null);
+										_currentStep = 3;
+										_progressCallback.onProgress(_currentStep, null);
 										break;
 									case BluenetConfig.ERR_SUCCESS:
 										// Done
-										_progressCallback.onProgress(4, null);
+										_currentStep = 4;
+										_progressCallback.onProgress(_currentStep, null);
+										// Cancel timeout
+										_bleExt.getHandler().removeCallbacks(setupTimeoutRunnable);
 										// Clear cache, as we know that the services will change.
 										_bleExt.disconnectAndClose(true, _statusCallback);
 										break;
 									default:
 										_bleExt.getLogger().LOGe(TAG, "Setup failed. Return code: " + resultPacket.getErrorCode());
+										// Cancel timeout
+										_bleExt.getHandler().removeCallbacks(setupTimeoutRunnable);
 										_statusCallback.onError(BleErrors.ERROR_SETUP_FAILED);
 								}
 							}
 
 							@Override
 							public void onError(int error) {
+								if (_statusCallback == null) {
+									return;
+								}
 								_statusCallback.onError(error);
 							}
 						});
