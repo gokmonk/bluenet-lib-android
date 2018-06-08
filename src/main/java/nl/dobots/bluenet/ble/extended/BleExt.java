@@ -1017,7 +1017,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	 *                           be enough
 	 * @return true if the device has the characteristic, false otherwise
 	 */
-	public boolean hasCharacteristic(String characteristicUuid, IBaseCallback callback) {
+	public boolean hasCharacteristic(String characteristicUuid, @Nullable IBaseCallback callback) {
 
 		if (_detectedCharacteristics.indexOf(characteristicUuid) == -1) {
 			if (callback != null) {
@@ -1057,7 +1057,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	 * @param callback the callback to be informed about an error
 	 * @return true if state characteristics are available, false otherwise
 	 */
-	public boolean hasStateCharacteristics(IBaseCallback callback) {
+	public boolean hasStateCharacteristics(@Nullable IBaseCallback callback) {
 		return hasCharacteristic(BluenetConfig.CHAR_STATE_CONTROL_UUID, callback) &&
 				hasCharacteristic(BluenetConfig.CHAR_STATE_READ_UUID, callback);
 	}
@@ -1068,7 +1068,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	 * @param callback the callback to be informed about an error
 	 * @return true if control characteristic is available, false otherwise
 	 */
-	public boolean hasControlCharacteristic(IBaseCallback callback) {
+	public boolean hasControlCharacteristic(@Nullable IBaseCallback callback) {
 		return hasControlCharacteristic(callback, false);
 	}
 
@@ -1079,7 +1079,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	 * @param allowSetupCharacteristic whether it's also ok to use the control characteristic in setup mode
 	 * @return true if control characteristic is available, false otherwise
 	 */
-	public boolean hasControlCharacteristic(IBaseCallback callback, boolean allowSetupCharacteristic) {
+	public boolean hasControlCharacteristic(@Nullable IBaseCallback callback, boolean allowSetupCharacteristic) {
 		if (allowSetupCharacteristic && (hasCharacteristic(BluenetConfig.CHAR_SETUP_CONTROL_UUID, null) || hasCharacteristic(BluenetConfig.CHAR_SETUP_CONTROL2_UUID, null))) {
 			return true;
 		}
@@ -2699,6 +2699,12 @@ public class BleExt extends Logging implements IWriteCallback {
 
 			@Override
 			public void onSuccess() {
+				// If already in normal mode, consider it a success.
+				if (hasControlCharacteristic(null, true)) {
+					callback.onSuccess();
+					return;
+				}
+
 				if (!hasCharacteristic(BluenetConfig.DFU_CONTROL_UUID, callback)) {
 					return;
 				}
