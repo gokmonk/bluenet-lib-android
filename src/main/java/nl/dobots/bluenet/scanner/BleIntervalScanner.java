@@ -312,6 +312,13 @@ public class BleIntervalScanner {
 			@Override
 			public void onSuccess() {
 				_running = true;
+				// This check first, else the stopScanRunnable is removed without being started again.
+				// TODO: make this thread safe
+				if (isScanActive()) {
+					getLogger().LOGd(TAG, "already scanning");
+					callback.onSuccess();
+					return;
+				}
 				_intervalScanHandler.removeCallbacksAndMessages(null);
 				_intervalScanHandler.post(_startScanRunnable);
 				callback.onSuccess();
