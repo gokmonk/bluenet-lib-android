@@ -2602,6 +2602,10 @@ public class BleCore extends Logging {
 			@Override
 			// Callback when a BLE advertisement has been found.
 			public void onScanResult(int callbackType, ScanResult result) {
+				if (result.getRssi() >= 0) {
+					// Invalid rssi, ignore this result.
+					return;
+				}
 				if (result.getScanRecord() != null) {
 					onDeviceScanned(result.getDevice(), result.getRssi(), result.getScanRecord().getBytes());
 				}
