@@ -995,7 +995,7 @@ public class BleExt extends Logging implements IWriteCallback {
 
 					@Override
 					public void onError(int error) {
-						getLogger().LOGd(TAG, "Failed to discover services");
+						getLogger().LOGw(TAG, "Failed to discover services: " + error);
 						callback.onError(error);
 					}
 				}, readSessionNonce, true);
