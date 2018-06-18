@@ -71,8 +71,8 @@ public class MeshKeepAliveSameTimeoutPacket implements MeshKeepAlivePayload {
 		}
 	}
 
-	// 2B timeout + 1B count + 1B reserved
-	private static final int HEADER_SIZE = 4;
+	// 2B timeout + 1B count
+	private static final int HEADER_SIZE = 3;
 	// 1B Crownstone ID + 1B action + switch state
 	private static final int ITEM_SIZE = 2;
 	// Max number of items in the list
@@ -125,7 +125,6 @@ public class MeshKeepAliveSameTimeoutPacket implements MeshKeepAlivePayload {
 
 		_timeout = BleUtils.toUint16(bb.getShort());
 		_count = BleUtils.toUint8(bb.get());
-		int reserved = BleUtils.toUint8(bb.get());
 		if ((_count > MAX_ITEMS) || (bb.remaining() < _count * ITEM_SIZE)) {
 //			BleLog.getInstance().LOGe(TAG, "Invalid length: " + _size);
 //			BleLog.getInstance().LOGe(TAG, "from mesh message: " + BleUtils.bytesToString(bytes));
@@ -151,7 +150,6 @@ public class MeshKeepAliveSameTimeoutPacket implements MeshKeepAlivePayload {
 		}
 		bb.putShort((short) _timeout);
 		bb.put((byte)_count);
-		bb.put((byte) 0); // Reserved
 
 		for (int i = 0; i < _count; i++) {
 			_list[i].toArray(bb);
