@@ -211,6 +211,8 @@ public class BluenetConfig {
 	public static final char CONFIG_SWITCH_LOCKED =                     55;   //! 0x37
 	public static final char CONFIG_SWITCHCRAFT_ENABLED =               56;   //! 0x38
 	public static final char CONFIG_SWITCHCRAFT_THRESHOLD =             57;   //! 0x39
+	public static final char CONFIG_MESH_CHANNEL =                      58;   //! 0x3A
+	public static final char CONFIG_UART_ENABLED =                      59;   //! 0x3B
 
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////

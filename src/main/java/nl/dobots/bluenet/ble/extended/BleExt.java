@@ -1690,7 +1690,7 @@ public class BleExt extends Logging implements IWriteCallback {
 	public void writeSwitch(final int value, final IStatusCallback callback) {
 		if (isConnected(callback)) {
 			getLogger().LOGd(TAG, "Set switch to %d", value);
-			if (hasControlCharacteristic(callback)) {
+			if (hasControlCharacteristic(callback, true)) {
 				_bleBase.sendCommand(_targetAddress, new ControlMsg(BluenetConfig.CMD_SWITCH, 1, new byte[]{(byte) value}), callback);
 			}
 		}
