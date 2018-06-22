@@ -1720,6 +1720,67 @@ public class BleExt extends Logging implements IWriteCallback {
 		});
 	}
 
+	/**
+	 * Function to toggle the switch.
+	 * <p>
+	 * Note: needs to be already connected or an error is created! Use overloaded function
+	 * with address otherwise
+	 *
+	 * @param valueOn  the switch value to be written in case it should be turned on (0-100)
+	 * @param callback the callback returns the value that was written in case of success.
+	 */
+	public void toggleSwitch(final int valueOn, final IIntegerCallback callback) {
+		if (isConnected(callback)) {
+			getLogger().LOGd(TAG, "Toggle switch");
+			readSwitch(new IIntegerCallback() {
+				@Override
+				public void onSuccess(int result) {
+					final int value = result == 0 ? valueOn : 0;
+					writeSwitch(value, new IStatusCallback() {
+						@Override
+						public void onSuccess() {
+							callback.onSuccess(value);
+						}
+
+						@Override
+						public void onError(int error) {
+							callback.onError(error);
+						}
+					});
+				}
+
+				@Override
+				public void onError(int error) {
+
+				}
+			});
+		}
+	}
+
+	/**
+	 * Function to toggle the switch.
+	 * Connects to the device if not already connected, and/or delays the disconnect if necessary.
+	 * <p>
+	 *
+	 * @param address  the MAC address of the device to which the switch value should be written
+	 * @param valueOn  the switch value to be written in case it should be turned on (0-100)
+	 * @param callback the callback returns the value that was written in case of success.
+	 */
+	public void toggleSwitch(final String address, final int valueOn, final IIntegerCallback callback) {
+		getHandler().post(new Runnable() {
+			@Override
+			public void run() {
+				getLogger().LOGd(TAG, "Toggle switch");
+				connectAndExecute(address, new IExecuteCallback() {
+					@Override
+					public void execute(final IExecStatusCallback execCallback) {
+						toggleSwitch(valueOn, execCallback);
+					}
+				}, new SimpleExecStatusCallback(callback));
+			}
+		});
+	}
+
 
 	/**
 	 * Function to enable/disable the switch lock
